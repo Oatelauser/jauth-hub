@@ -346,7 +346,8 @@ function fileHash(p) {
 // ---------------------------------------------------------------- 在途防护与播报去重
 
 // spotless:apply 失败时区分"真违规"与"并发 subagent 还在写":mtime 距今 30s 内视为在途写入
-const IN_FLIGHT_WINDOW_MS = 30 * 1000;
+// (窗口可配:hook-config.json 的 formatter.inFlightWindowSec,默认 30)
+const IN_FLIGHT_WINDOW_MS = ((cfg.formatter && cfg.formatter.inFlightWindowSec) || 30) * 1000;
 
 function isInFlight(p) {
   try {
@@ -369,6 +370,9 @@ function downgradeInFlightFailure(files, r, result, label) {
   if (failed.length === 0) return false;
 
   const inFlight = failed.filter(isInFlight);
+  // 只要本轮有在途参与即打标:该回合视为"未定稿",reportStop 不落播报指纹——
+  // 否则复检出的真实 violation 会被同状态去重吞掉,"下回合复检"承诺落空
+  if (inFlight.length > 0) result.inFlightHit = true;
   if (inFlight.length === failed.length) {
     result.notes.push(`${label} 失败涉及的文件均在途写入(30s 内有改动),疑并发 subagent 写入,不记违规,下回合复检: ${inFlight.map(f => path.basename(f)).join(', ')}`);
     return true;
@@ -382,6 +386,12 @@ function downgradeInFlightFailure(files, r, result, label) {
 // Stop 播报边沿触发:指纹(touched 相对路径排序集 + preview 全文)不变且本轮无自动格式化 → 静默。
 // 刻意保留 fixed 打破去重:格式化重写后即使指纹相同也必须重播(提示重新 Read)
 function reportStop(result, files, preview, header) {
+  // 在途回合不构成"已播报"语义:上轮若因在途降级只播了 note,指纹不比对也不落盘,
+  // 保证复检出的终态结果(自愈或真实 violation)必然播出,不被同状态去重吞掉
+  if (result.inFlightHit) {
+    rmFile(LAST_BROADCAST_FILE);
+    return report(result, header);
+  }
   const fingerprint = crypto.createHash('sha256')
     .update([...files].map(f => path.relative(ROOT, f)).sort().join('\n') + '\u0000' + (preview || ''))
     .digest('hex');
