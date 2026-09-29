@@ -661,8 +661,16 @@ function stopCases() {
     const res = hookPath('stop', {}, stubDir);
     const ctx = ctxOf(res);
     const maxLen = maxLineLen(p);
-    const ok = res.status === 0 && maxLen <= 100 && ctx.includes('已自动格式化');
-    record('S1', ok, ok ? `stop 后最长行=${maxLen}≤100,输出含"已自动格式化"` : `maxLine=${maxLen} status=${res.status} stdout=${(res.stdout || '').slice(0, 200)}`);
+    // 委托模式(根 pom 配 spotless-maven-plugin,本项目形态):格式权威在 mvn spotless:apply,
+    // LAB 夹具不在任何 Maven 模块内不会被就地重写——断言退化为"不崩且不假报已格式化";
+    // 自带 GJF 形态(无根 pom Spotless)才保留原就地格式化断言
+    const delegates = fs.readFileSync(path.join(LAB, 'pom.xml'), 'utf8').includes('spotless-maven-plugin');
+    const ok = delegates
+      ? res.status === 0 && !ctx.includes('已自动格式化')
+      : res.status === 0 && maxLen <= 100 && ctx.includes('已自动格式化');
+    record('S1', ok, ok
+      ? (delegates ? '委托模式:LAB 夹具不被 mvn 触及,无假"已自动格式化"报文,status=0' : `stop 后最长行=${maxLen}≤100,输出含"已自动格式化"`)
+      : `maxLine=${maxLen} status=${res.status} delegates=${delegates} stdout=${(res.stdout || '').slice(0, 200)}`);
   });
 
   runCase('S2', () => {
