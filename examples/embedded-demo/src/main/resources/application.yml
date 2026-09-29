@@ -1,0 +1,40 @@
+# 内嵌示例宿主：memory 存储（零数据库依赖首跑），issuer 指向自身。
+# 全部凭据为占位值，仅供本机演练，勿复用到任何真实环境。
+spring:
+  application:
+    name: jauth-hub-embedded-demo
+
+server:
+  port: 8081
+
+jauth-hub:
+  storage: memory
+  issuer: http://localhost:8081
+  # memory 模式要求至少一个种子客户端（内存仓库不可空构造）；authorization_endpoint 强制 PKCE
+  clients:
+    - client-id: embedded-demo-public
+      client-name: embedded-demo 公开客户端（PKCE）
+      grant-types:
+        - authorization_code
+        - refresh_token
+      redirect-uris:
+        # 演练时无需真实存在：浏览器跳到它之后从地址栏复制 code 即可
+        - http://localhost:8081/callback
+      scopes:
+        - openid
+        - profile
+    - client-id: embedded-demo-rs
+      client-name: embedded-demo 内省机密客户端
+      # 占位 secret（SPEC §4：内省调用方须为机密客户端）；生产写 ENC() 密文
+      client-secret: embedded-demo-rs-dev-only-placeholder
+      grant-types:
+        - client_credentials
+      redirect-uris:
+        - http://localhost:8081/unused-rs-placeholder
+      scopes:
+        - openid
+  # 宿主自家接口接 OAuth 保护：rs-starter 预接线内省，指向自身的 /oauth2/introspect（闭环）
+  rs:
+    introspection-uri: http://localhost:8081/oauth2/introspect
+    client-id: embedded-demo-rs
+    client-secret: embedded-demo-rs-dev-only-placeholder

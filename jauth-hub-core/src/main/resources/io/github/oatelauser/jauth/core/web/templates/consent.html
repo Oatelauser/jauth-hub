@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="https://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('jauth.consent.title')}">
+  <title>授权确认</title>
+</head>
+<body>
+  <div class="page">
+    <aside class="sidebar" th:if="${educational}">
+      <section class="panel">
+        <h2 th:text="#{jauth.teach.flow-title}">当前流程</h2>
+        <nav th:replace="~{fragments/layout :: steps(2, 'jauth.flow.authcode.step1', 'jauth.flow.authcode.step2', 'jauth.flow.authcode.step3', 'jauth.flow.authcode.step4')}">steps</nav>
+      </section>
+      <section class="panel" th:replace="~{fragments/layout :: httplog}">http log</section>
+    </aside>
+    <main class="card">
+      <p class="brand" th:text="#{jauth.brand}">jauth-hub</p>
+      <h1 th:text="#{jauth.consent.title}">授权确认</h1>
+      <p class="client-line">
+        <span th:text="#{jauth.consent.client-label}">应用</span>：
+        <strong th:text="${clientName}">demo-client</strong>
+      </p>
+      <details class="teach" th:if="${educational}">
+        <summary th:text="#{jauth.teach.what-happened}">发生了什么</summary>
+        <p th:text="#{jauth.consent.teach}">教学说明</p>
+      </details>
+      <form class="form" th:action="@{/oauth2/consent}" method="post">
+        <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+        <input type="hidden" name="client_id" th:value="${clientId}" />
+        <input type="hidden" name="state" th:value="${state}" />
+        <p class="scopes-label" th:text="#{jauth.consent.requested}">该应用请求获得以下权限：</p>
+        <ul class="scopes">
+          <li th:each="scope : ${scopes}">
+            <label class="scope-item">
+              <input type="checkbox" name="scope" th:value="${scope.name()}" checked />
+              <span class="scope-name" th:text="${scope.name()}">profile</span>
+              <span class="scope-desc" th:text="${scope.description()}">描述</span>
+            </label>
+          </li>
+        </ul>
+        <div class="actions">
+          <button class="btn primary" type="submit" name="action" value="authorize" th:text="#{jauth.consent.authorize}">同意授权</button>
+          <button class="btn" type="submit" name="action" value="deny" th:text="#{jauth.consent.deny}">拒绝</button>
+        </div>
+      </form>
+    </main>
+  </div>
+</body>
+</html>

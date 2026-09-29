@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.github.oatelauser</groupId>
+    <artifactId>jauth-hub</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>jauth-hub-selfservice</artifactId>
+  <name>jauth-hub-selfservice</name>
+  <description>Domain-data self-service pages: dashboard, PAT management, application management</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>io.github.oatelauser</groupId>
+      <artifactId>jauth-hub-core</artifactId>
+    </dependency>
+    <!-- 自带条件装配（页面/服务按 jauth-hub.storage 注册），版本走 Boot BOM -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- jdbc 侧集成测试基准库（PostgreSQL 兼容模式），走 core 命名空间 Flyway 迁移 -->
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

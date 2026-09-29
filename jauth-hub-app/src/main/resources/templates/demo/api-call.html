@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<!--/* /demo API 调用页：持 token 调 /api/demo/whoami（rs-starter 内省闭环）+ 无 token 对照 401 */-->
+<html lang="zh" xmlns:th="https://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title th:text="#{jauth.demo.api.title} + ' · jauth-hub'">持令牌调用受保护接口</title>
+  <link rel="stylesheet" th:href="@{/css/jauth.css}" href="/css/jauth.css" />
+  <link rel="stylesheet" th:href="@{/demo/demo.css}" href="/demo/demo.css" />
+</head>
+<body>
+  <div class="page">
+    <aside class="sidebar" th:if="${educational}">
+      <section class="panel">
+        <h2 th:text="#{jauth.teach.flow-title}">当前流程</h2>
+        <nav th:replace="~{fragments/layout :: steps(4, 'jauth.flow.authcode.step1', 'jauth.flow.authcode.step2', 'jauth.flow.authcode.step3', 'jauth.flow.authcode.step4')}">steps</nav>
+      </section>
+      <section class="panel" th:replace="~{fragments/layout :: httplog}">http log</section>
+    </aside>
+    <main class="card demo-card">
+      <p class="brand" th:text="#{jauth.brand}">jauth-hub</p>
+      <h1 th:text="#{jauth.demo.api.title}">持令牌调用受保护接口</h1>
+      <details class="teach" th:if="${educational}">
+        <summary th:text="#{jauth.teach.what-happened}">发生了什么</summary>
+        <p th:text="#{jauth.demo.api.teach}">闭环教学说明</p>
+      </details>
+
+      <div class="alert" id="api-no-token" hidden="hidden" th:text="#{jauth.demo.api.need-token}">没有可用令牌</div>
+
+      <div id="api-panel" hidden="hidden">
+        <div class="demo-actions">
+          <button class="btn primary" type="button" id="api-call" th:text="#{jauth.demo.api.call}">带令牌调用</button>
+          <button class="btn" type="button" id="api-call-bare" th:text="#{jauth.demo.api.call-bare}">不带令牌调用</button>
+        </div>
+        <h2 class="demo-section-title" th:text="#{jauth.demo.api.response-title}">响应</h2>
+        <p><span class="demo-status" id="api-status" hidden="hidden"></span></p>
+        <pre class="demo-json" id="api-body" hidden="hidden"></pre>
+      </div>
+    </main>
+  </div>
+  <script th:src="@{/demo/demo.js}" src="/demo/demo.js"></script>
+  <script th:inline="javascript">
+    (function () {
+      var CFG = /*[[${demoConfig}]]*/ {};
+      jauthDemo.httplog.init(/*[[#{jauth.demo.httplog}]]*/ 'HTTP 日志');
+
+      var tokens = jauthDemo.readTokens();
+      if (!tokens) {
+        document.getElementById('api-no-token').hidden = false;
+        return;
+      }
+      document.getElementById('api-panel').hidden = false;
+
+      function render(result) {
+        var badge = document.getElementById('api-status');
+        badge.textContent = 'HTTP ' + result.status;
+        badge.className = 'demo-status ' + (result.status < 400 ? 's2xx' : 's4xx');
+        badge.hidden = false;
+        var body = document.getElementById('api-body');
+        body.textContent = jauthDemo.prettyJson(result.text);
+        body.hidden = false;
+      }
+
+      document.getElementById('api-call').addEventListener('click', function () {
+        jauthDemo.httplog.fetch('GET', CFG.whoamiUri, {
+          headers: { 'Authorization': 'Bearer ' + tokens.access_token }
+        }).then(render);
+      });
+      document.getElementById('api-call-bare').addEventListener('click', function () {
+        jauthDemo.httplog.fetch('GET', CFG.whoamiUri, {}).then(render);
+      });
+    })();
+  </script>
+</body>
+</html>

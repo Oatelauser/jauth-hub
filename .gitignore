@@ -1,0 +1,23 @@
+.serena/
+target/
+build/
+node_modules/
+*.iml
+.idea/
+
+# logs & crash dumps
+*.log
+hs_err_pid*
+
+# H2 database files
+*.mv.db
+*.trace.db
+
+# OS
+.DS_Store
+
+# reports & build byproducts
+coverage/
+.flattened-pom.xml
+dependency-check-report.html
+.tools/

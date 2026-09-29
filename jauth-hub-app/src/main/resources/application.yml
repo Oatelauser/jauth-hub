@@ -1,0 +1,59 @@
+# jauth-hub-app 独立部署壳默认配置（dev：H2 文件库）。
+# 敏感项写法约定（08 票）：dev 允许明文占位值；生产一律 ENC() 密文，例如
+#   password: ENC(xJ8f...)   # java -cp <classpath> ...ConfigEncryptor encrypt <key> <明文> 生成
+# 密钥放环境变量 APP_CONFIG_KEY（容器 Secret 注入），密文可入库、密钥不入库。
+spring:
+  application:
+    name: jauth-hub-app
+  datasource:
+    # H2 PostgreSQL 兼容模式（SPEC §1 双兼容 SQL 的 dev 落点）；文件库随工作目录 ./data 持久化
+    url: jdbc:h2:file:./data/jauth-hub;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password: "" # dev 本地库空密码；生产换 PostgreSQL + ENC()（见 application-prod.yml）
+  session:
+    jdbc:
+      # spring_session 表由 jauth 私有 Flyway V3 迁移建立（vendored DDL），Spring Session 侧不再自建
+      initialize-schema: never
+
+server:
+  port: 8080
+
+jauth-hub:
+  storage: jdbc
+  issuer: http://localhost:8080
+  # 首启超管（04 票：properties 定义 → 启动 seeding，幂等；存在即跳过）。dev 占位密码，生产 ENC()
+  bootstrap:
+    superadmin:
+      username: admin
+      password: admin-dev-only-placeholder
+  # /demo 教学区客户端种子（SPEC §2：播种器不是第二真源，运行期以库为准）
+  clients:
+    - client-id: demo-public
+      client-name: /demo 教学区公开客户端（PKCE）
+      # 无 client-secret = 公开客户端（NONE 认证方式），强制 PKCE 由播种器统一附加
+      # 教学第 2 步：授权同意页可见（consent 页演示）
+      require-authorization-consent: true
+      grant-types:
+        - authorization_code
+        - refresh_token
+      redirect-uris:
+        - http://localhost:8080/demo/callback
+      scopes:
+        - openid
+        - profile
+    - client-id: demo-rs
+      client-name: /demo 内省演示机密客户端
+      # dev 占位 secret；生产 ENC()。内省调用方须为机密客户端（SPEC §4）
+      client-secret: demo-rs-dev-only-placeholder
+      # 仅作内省凭证使用，不走浏览器重定向；播种校验要求 redirect 非空故给占位值
+      grant-types:
+        - client_credentials
+      redirect-uris:
+        - http://localhost:8080/demo/unused-rs-placeholder
+      scopes:
+        - openid
+  # rs-starter：/api/demo/** 经自身内省端点验 opaque token（同 app 闭环，06 Q1 模式）
+  rs:
+    introspection-uri: http://localhost:8080/oauth2/introspect
+    client-id: demo-rs
+    client-secret: demo-rs-dev-only-placeholder

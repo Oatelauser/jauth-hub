@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.github.oatelauser</groupId>
+    <artifactId>jauth-hub</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>jauth-hub-app</artifactId>
+  <name>jauth-hub-app</name>
+  <description>Standalone deployment shell: own user store, /demo teaching zone, spring-plus trio; not published to Maven Central</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>io.github.oatelauser</groupId>
+      <artifactId>jauth-hub-starter</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.github.oatelauser</groupId>
+      <artifactId>jauth-hub-selfservice</artifactId>
+    </dependency>
+    <!-- /api/demo/** 闭环：app 自产的资源服务器端点经内省验 token（B5 rs-starter）。
+         根 pom dependencyManagement 未列 rs-starter，此处显式钉 reactor 版本 -->
+    <dependency>
+      <groupId>io.github.oatelauser</groupId>
+      <artifactId>jauth-hub-resource-server-starter</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- spring-plus 三件套（SPEC §2：app 全必选） -->
+    <dependency>
+      <groupId>io.github.oatelauser</groupId>
+      <artifactId>spring-plus-boot-starter</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.github.oatelauser</groupId>
+      <artifactId>spring-plus-web-starter</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.github.oatelauser</groupId>
+      <artifactId>spring-plus-security-starter</artifactId>
+    </dependency>
+    <!-- Spring Session JDBC（SPEC §1：会话 JDBC 默认）；spring_session 表由 jauth Flyway V3 建 -->
+    <dependency>
+      <groupId>org.springframework.session</groupId>
+      <artifactId>spring-session-jdbc</artifactId>
+    </dependency>
+    <!-- spring-plus-web 的全局异常处理引用 jakarta.validation API（校验失败结构化输出），需在场 -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+    <!-- dev 默认 H2 文件库（PostgreSQL 兼容模式）；prod profile 换 PostgreSQL 驱动 -->
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- MockMvc 装配（Boot 4 的 webmvc-test 模块） -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webmvc-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- csrf()/user() 请求后处理器（登录与角色两态测试） -->
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- 独立部署壳：repackage 可执行 jar（SPEC §8：app 不上 Central，制品形态是可运行应用） -->
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>repackage</id>
+            <goals>
+              <goal>repackage</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

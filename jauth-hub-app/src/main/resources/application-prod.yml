@@ -1,0 +1,23 @@
+# 生产 profile：PostgreSQL + 环境变量注入。敏感项推荐 ENC() 写法（spring-plus config-encryption）：
+#   1. java -cp <classpath> io.github.oatelauser.springplus.boot.crypto.ConfigEncryptor genkey
+#      → 256-bit Base64 密钥放环境变量 APP_CONFIG_KEY（K8s Secret / 交付注入，密钥不入库）
+#   2. java -cp <classpath> ...ConfigEncryptor encrypt '<密钥>' '<明文>' → 输出 ENC(xJ8f...)
+#   3. 替换下方占位，例如 password: ENC(xJ8f...)
+# 环境准备阶段自动解密（EnvironmentPostProcessor），业务侧零感知；密钥丢失密文不可恢复，换钥先验证 decrypt。
+spring:
+  datasource:
+    url: jdbc:postgresql://${JAUTH_DB_HOST:localhost}:5432/${JAUTH_DB_NAME:jauth_hub}
+    username: ${JAUTH_DB_USER:jauth}
+    # 直传环境变量亦可行；ENC() 的收益是密文可以随配置入库而明文不落盘
+    password: ${JAUTH_DB_PASSWORD}
+
+jauth-hub:
+  issuer: ${JAUTH_ISSUER}
+  bootstrap:
+    superadmin:
+      username: ${JAUTH_SUPERADMIN_USERNAME}
+      password: ${JAUTH_SUPERADMIN_PASSWORD} # 生产建议 ENC(...) 后整段入配置中心/CI 变量
+  rs:
+    introspection-uri: ${JAUTH_ISSUER}/oauth2/introspect
+    client-id: demo-rs
+    client-secret: ${JAUTH_DEMO_RS_SECRET} # 生产建议 ENC(...)

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<!--/* /demo 令牌面板：opaque 令牌的内省结果展示（取代解码 payload）、过期倒计时、实时 HTTP 日志 */-->
+<html lang="zh" xmlns:th="https://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title th:text="#{jauth.demo.token.title} + ' · jauth-hub'">令牌面板</title>
+  <link rel="stylesheet" th:href="@{/css/jauth.css}" href="/css/jauth.css" />
+  <link rel="stylesheet" th:href="@{/demo/demo.css}" href="/demo/demo.css" />
+</head>
+<body>
+  <div class="page">
+    <aside class="sidebar" th:if="${educational}">
+      <section class="panel">
+        <h2 th:text="#{jauth.teach.flow-title}">当前流程</h2>
+        <nav th:replace="~{fragments/layout :: steps(3, 'jauth.flow.authcode.step1', 'jauth.flow.authcode.step2', 'jauth.flow.authcode.step3', 'jauth.flow.authcode.step4')}">steps</nav>
+      </section>
+      <section class="panel" th:replace="~{fragments/layout :: httplog}">http log</section>
+    </aside>
+    <main class="card demo-card">
+      <p class="brand" th:text="#{jauth.brand}">jauth-hub</p>
+      <h1 th:text="#{jauth.demo.token.title}">令牌面板</h1>
+      <details class="teach" th:if="${educational}">
+        <summary th:text="#{jauth.teach.what-happened}">发生了什么</summary>
+        <p th:text="#{jauth.demo.token.teach}">opaque 令牌教学说明</p>
+      </details>
+
+      <div class="alert" id="tk-no-token" hidden="hidden" th:text="#{jauth.demo.token.no-token}">没有令牌</div>
+
+      <div id="tk-panel" hidden="hidden">
+        <h2 class="demo-section-title" th:text="#{jauth.demo.token.access-label}">访问令牌（opaque）</h2>
+        <p class="demo-token" id="tk-access"></p>
+        <div class="demo-actions">
+          <button class="btn" type="button" id="tk-reveal" th:text="#{jauth.demo.token.reveal}">显示 / 隐藏</button>
+        </div>
+
+        <h2 class="demo-section-title" th:text="#{jauth.demo.token.expires-label}">剩余有效期</h2>
+        <p class="demo-countdown" id="tk-countdown">--:--</p>
+
+        <h2 class="demo-section-title" th:text="#{jauth.demo.token.introspect-title}">内省结果</h2>
+        <div class="demo-actions">
+          <button class="btn primary" type="button" id="tk-introspect" th:text="#{jauth.demo.token.introspect-submit}">内省此令牌</button>
+        </div>
+        <table class="demo-kv" id="tk-introspect-kv" hidden="hidden">
+          <tbody>
+            <tr><th>active</th><td id="tk-i-active"></td></tr>
+            <tr><th>sub</th><td id="tk-i-sub"></td></tr>
+            <tr><th>username</th><td id="tk-i-username"></td></tr>
+            <tr><th>scope</th><td id="tk-i-scope"></td></tr>
+            <tr><th>client_id</th><td id="tk-i-client"></td></tr>
+            <tr><th>token_type</th><td id="tk-i-type"></td></tr>
+            <tr><th>exp</th><td id="tk-i-exp"></td></tr>
+          </tbody>
+        </table>
+        <pre class="demo-json" id="tk-introspect-json" hidden="hidden"></pre>
+
+        <div class="demo-actions">
+          <a class="btn primary" href="/demo/api-call" th:text="#{jauth.demo.token.go-api}">持令牌调用受保护接口</a>
+          <a class="btn" href="/demo" th:text="#{jauth.demo.token.restart}">重新发起授权</a>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script th:src="@{/demo/demo.js}" src="/demo/demo.js"></script>
+  <script th:inline="javascript">
+    (function () {
+      var CFG = /*[[${demoConfig}]]*/ {};
+      var countdownTimer = null;
+      jauthDemo.httplog.init(/*[[#{jauth.demo.httplog}]]*/ 'HTTP 日志');
+
+      var tokens = jauthDemo.readTokens();
+      if (!tokens) {
+        document.getElementById('tk-no-token').hidden = false;
+        return;
+      }
+      document.getElementById('tk-panel').hidden = false;
+      renderToken(tokens.access_token, true);
+      startCountdown(tokens);
+      document.getElementById('tk-reveal').addEventListener('click', function () {
+        renderToken(tokens.access_token, null);
+      });
+      document.getElementById('tk-introspect').addEventListener('click', function () {
+        // RFC 7662：token 放 form 体，Basic 携带机密客户端凭证（教学区直连演示；生产此调用在后端）
+        var basic = btoa(CFG.rsClientId + ':' + CFG.rsClientSecret);
+        jauthDemo.httplog.fetch('POST', CFG.introspectEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': 'Basic ' + basic
+          },
+          body: new URLSearchParams({ token: tokens.access_token })
+        }).then(function (result) {
+          var data = JSON.parse(result.text);
+          document.getElementById('tk-i-active').textContent = String(data.active);
+          document.getElementById('tk-i-sub').textContent = data.sub || '—';
+          document.getElementById('tk-i-username').textContent = data.username || '—';
+          document.getElementById('tk-i-scope').textContent = data.scope || '—';
+          document.getElementById('tk-i-client').textContent = data.client_id || '—';
+          document.getElementById('tk-i-type').textContent = data.token_type || '—';
+          document.getElementById('tk-i-exp').textContent = data.exp ? new Date(data.exp * 1000).toLocaleString() : '—';
+          document.getElementById('tk-introspect-kv').hidden = false;
+          document.getElementById('tk-introspect-json').textContent = jauthDemo.prettyJson(result.text);
+          document.getElementById('tk-introspect-json').hidden = false;
+        });
+      });
+
+      var masked = true;
+      function renderToken(value, reset) {
+        var element = document.getElementById('tk-access');
+        if (reset !== null && reset !== undefined) {
+          masked = true;
+        } else {
+          masked = !masked;
+        }
+        element.textContent = masked ? value.slice(0, 12) + '…（已折叠）' : value;
+      }
+
+      function startCountdown(t) {
+        var expiresAt = t.obtainedAt + (t.expires_in || 0) * 1000;
+        var element = document.getElementById('tk-countdown');
+        function tick() {
+          var remain = Math.floor((expiresAt - Date.now()) / 1000);
+          if (remain <= 0) {
+            element.textContent = /*[[#{jauth.demo.token.expired}]]*/ '已过期';
+            element.className = 'demo-countdown expired';
+            window.clearInterval(countdownTimer);
+            return;
+          }
+          var minutes = Math.floor(remain / 60);
+          var seconds = remain % 60;
+          element.textContent = minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+        }
+        tick();
+        countdownTimer = window.setInterval(tick, 1000);
+      }
+    })();
+  </script>
+</body>
+</html>

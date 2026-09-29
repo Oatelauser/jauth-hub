@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.github.oatelauser</groupId>
+    <artifactId>jauth-hub</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>jauth-hub-starter</artifactId>
+  <name>jauth-hub-starter</name>
+  <description>Opt-in takeover-style auto-configuration: the single integration entry point for host applications</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>io.github.oatelauser</groupId>
+      <artifactId>jauth-hub-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+    <!-- 属性面 IDE 元数据（jauth-hub.* 配置项提示） -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <!-- spring-plus 桥的编译面（SimpleResponse 版渲染器）；optional：不传递给宿主，在场与否由宿主 classpath 决定 -->
+    <dependency>
+      <groupId>io.github.oatelauser</groupId>
+      <artifactId>spring-plus-web-starter</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- MockMvc 装配（@AutoConfigureMockMvc 在 Boot 4 的 webmvc-test 模块） -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webmvc-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- 协议流集成测试的请求级认证（user/httpBasic/csrf post-processor） -->
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- jdbc 模式集成测试基准库（PostgreSQL 兼容模式） -->
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

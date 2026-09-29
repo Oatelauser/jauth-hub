@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="https://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('jauth.device.title')}">
+  <title>设备验证</title>
+</head>
+<body>
+  <div class="page">
+    <aside class="sidebar" th:if="${educational}">
+      <section class="panel">
+        <h2 th:text="#{jauth.teach.flow-title}">当前流程</h2>
+        <nav th:replace="~{fragments/layout :: steps(2, 'jauth.flow.device.step1', 'jauth.flow.device.step2', 'jauth.flow.device.step3', 'jauth.flow.device.step4')}">steps</nav>
+      </section>
+      <section class="panel" th:replace="~{fragments/layout :: httplog}">http log</section>
+    </aside>
+    <main class="card">
+      <p class="brand" th:text="#{jauth.brand}">jauth-hub</p>
+      <h1 th:text="#{jauth.device.title}">设备验证</h1>
+      <p class="hint" th:text="#{jauth.device.hint}">请输入设备上显示的用户码</p>
+      <details class="teach" th:if="${educational}">
+        <summary th:text="#{jauth.teach.what-happened}">发生了什么</summary>
+        <p th:text="#{jauth.device.teach}">教学说明</p>
+      </details>
+      <form class="form" th:action="@{/oauth2/device_verification}" method="post">
+        <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+        <label class="field">
+          <span th:text="#{jauth.device.code-label}">用户码</span>
+          <input type="text" name="user_code" class="code-input" autocomplete="one-time-code" required />
+        </label>
+        <button class="btn primary" type="submit" th:text="#{jauth.device.submit}">验证</button>
+      </form>
+    </main>
+  </div>
+</body>
+</html>
