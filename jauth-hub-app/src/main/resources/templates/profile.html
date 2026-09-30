@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<!--/* 档案页（B12，任何登录用户）：当前显示名 + 改显示名表单 + 自助改密表单(JS → JSON) */-->
+<html lang="zh" xmlns:th="https://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('jauth.profile.title')}">
+  <title>个人档案</title>
+</head>
+<body>
+  <!--/* 壳层档案页补充样式（au- 前缀，与用户管理页同命名空间） */-->
+  <style>
+    .au-wide { max-width: 640px; }
+    .au-account-line { color: #5a607a; font-size: 14px; margin: 4px 0 0; }
+    .card h2 { margin: 20px 0 12px; font-size: 17px; }
+  </style>
+  <div class="page">
+    <main class="card au-wide">
+      <meta name="_csrf" th:if="${_csrf != null}" th:content="${_csrf.token}" />
+      <meta name="_csrf_header" th:if="${_csrf != null}" th:content="${_csrf.headerName}" />
+      <p class="brand" th:text="#{jauth.brand}">jauth-hub</p>
+      <h1 th:text="#{jauth.profile.title}">个人档案</h1>
+      <details class="teach" th:if="${educational}">
+        <summary th:text="#{jauth.teach.what-happened}">发生了什么</summary>
+        <p th:text="#{jauth.profile.teach}">改密教学说明</p>
+      </details>
+      <p class="au-account-line">
+        <span th:text="#{jauth.profile.account-label}">账号</span>
+        <span class="scope-name" th:text="${username}">alice</span>
+      </p>
+
+      <h2 th:text="#{jauth.profile.display-title}">显示名</h2>
+      <form class="form" id="display-name-form">
+        <label class="field">
+          <span th:text="#{jauth.profile.field-display-name}">显示名</span>
+          <input type="text" name="displayName" maxlength="100"
+                 th:value="${displayName}" th:placeholder="#{jauth.profile.display-placeholder}" />
+        </label>
+        <button class="btn" type="submit" th:text="#{jauth.profile.save-display-name}">保存显示名</button>
+      </form>
+
+      <h2 th:text="#{jauth.profile.password-title}">修改密码</h2>
+      <form class="form" id="password-form">
+        <label class="field">
+          <span th:text="#{jauth.profile.field-old-password}">旧密码</span>
+          <input type="password" name="oldPassword" required="required" autocomplete="current-password" />
+        </label>
+        <label class="field">
+          <span th:text="#{jauth.profile.field-new-password}">新密码</span>
+          <input type="password" name="newPassword" required="required" autocomplete="new-password"
+                 th:placeholder="#{jauth.admin.users.password-hint}" />
+        </label>
+        <button class="btn primary" type="submit" th:text="#{jauth.profile.change-password}">修改密码</button>
+      </form>
+    </main>
+  </div>
+  <script th:inline="javascript">
+    (function () {
+      var csrfMeta = document.querySelector('meta[name="_csrf"]');
+      var csrfHeaderMeta = document.querySelector('meta[name="_csrf_header"]');
+      function postJson(url, body) {
+        var headers = { 'Content-Type': 'application/json' };
+        if (csrfMeta && csrfHeaderMeta) { headers[csrfHeaderMeta.content] = csrfMeta.content; }
+        return fetch(url, { method: 'POST', headers: headers, credentials: 'same-origin',
+                            body: JSON.stringify(body) })
+          .then(function (response) { return response.json(); });
+      }
+      function done(body, message) {
+        if (body.code !== '00000') { window.alert(body.message || body.code); return; }
+        window.alert(message);
+      }
+      document.getElementById('display-name-form').addEventListener('submit', function (event) {
+        event.preventDefault();
+        var form = event.target;
+        postJson(/*[[ @{/api/profile} ]]*/ '/api/profile', {
+            displayName: form.querySelector('input[name="displayName"]').value.trim()
+          })
+          .then(function (body) { done(body, /*[[#{jauth.profile.saved}]]*/ '已保存'); });
+      });
+      document.getElementById('password-form').addEventListener('submit', function (event) {
+        event.preventDefault();
+        var form = event.target;
+        postJson(/*[[ @{/api/profile/password} ]]*/ '/api/profile/password', {
+            oldPassword: form.querySelector('input[name="oldPassword"]').value,
+            newPassword: form.querySelector('input[name="newPassword"]').value
+          })
+          .then(function (body) {
+            done(body, /*[[#{jauth.profile.password-changed}]]*/ '密码已修改');
+            if (body.code === '00000') { form.reset(); }
+          });
+      });
+    })();
+  </script>
+</body>
+</html>

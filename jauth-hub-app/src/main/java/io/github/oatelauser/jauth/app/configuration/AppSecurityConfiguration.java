@@ -18,8 +18,8 @@ import org.springframework.web.accept.HeaderContentNegotiationStrategy;
  * 壳层 default 链（SPEC §2 宿主链共存四规则之四：default 链只由 app 提供）。
  *
  * <p>jauth 协议链（序位 100，starter 装配）已认领协议端点 ∪ /login ∪ /css/**；本链兜其余一切：/demo 教学区
- * 公开、/selfservice 与 /api 需认证，<b>anyRequest denyAll</b>（spring-plus 安全红线：默认关大门，放行走显式
- * 白名单）。/api/demo/** 经 rs-starter 内省验 opaque token；/api/admin/** 的角色判定交给 spring-plus
+ * 公开、/selfservice、/api、/admin、/profile 需认证，<b>anyRequest denyAll</b>（spring-plus 安全红线：默认关
+ * 大门，放行走显式白名单）。/api/demo/** 经 rs-starter 内省验 opaque token；/api/admin/** 的角色判定交给 spring-plus
  * {@code @RequiresRole} 方法级拦截（08 票：GrantedAuthority 路线零代码）。
  *
  * <p>认证失败入口：非 HTML 请求由资源服务器装配注册 Bearer 入口（401 + WWW-Authenticate），浏览器请求回落
@@ -55,6 +55,9 @@ public class AppSecurityConfiguration {
                         .requestMatchers("/actuator/**")
                         .authenticated()
                         .requestMatchers("/selfservice/**", "/api/**")
+                        .authenticated()
+                        // B12 用户管理页/档案页：仅需认证——SUPER_ADMIN 细门在 @RequiresRole 注解层（08 票路线）
+                        .requestMatchers("/admin/**", "/profile")
                         .authenticated()
                         .anyRequest()
                         .denyAll())

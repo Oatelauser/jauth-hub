@@ -1,6 +1,7 @@
 package io.github.oatelauser.jauth.core.user;
 
 import java.time.Instant;
+import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -53,6 +54,29 @@ public interface UserRepository {
      * @param status 新状态
      */
     void updateStatus(String id, String status);
+
+    /**
+     * 更新角色（SUPERADMIN/USER）。
+     *
+     * @param id 用户 id
+     * @param role 新角色
+     */
+    void updateRole(String id, String role);
+
+    /**
+     * 更新展示名（档案自助维护，B12）。
+     *
+     * @param id 用户 id
+     * @param displayName 新展示名，可为空（UI 回退 username）
+     */
+    void updateDisplayName(String id, @Nullable String displayName);
+
+    /**
+     * 全量列表（app 用户管理页，B12）：单部署用户量形态不设过滤/分页。
+     *
+     * @return 全部用户，按登录名升序
+     */
+    List<JauthUser> findAll();
 
     /**
      * 更新最近强认证时间（sudo 位）。

@@ -1,6 +1,8 @@
 package io.github.oatelauser.jauth.core.user;
 
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.UnaryOperator;
@@ -94,6 +96,48 @@ public class InMemoryUserRepository implements UserRepository {
                         user.status(),
                         strongAuthAt,
                         user.createdAt()));
+    }
+
+    @Override
+    public void updateRole(String id, String role) {
+        Assert.hasText(id, "id cannot be empty");
+        Assert.hasText(role, "role cannot be empty");
+        update(
+                id,
+                user -> new JauthUser(
+                        user.id(),
+                        user.username(),
+                        user.passwordHash(),
+                        user.displayName(),
+                        user.email(),
+                        role,
+                        user.status(),
+                        user.strongAuthAt(),
+                        user.createdAt()));
+    }
+
+    @Override
+    public void updateDisplayName(String id, @Nullable String displayName) {
+        Assert.hasText(id, "id cannot be empty");
+        update(
+                id,
+                user -> new JauthUser(
+                        user.id(),
+                        user.username(),
+                        user.passwordHash(),
+                        displayName,
+                        user.email(),
+                        user.role(),
+                        user.status(),
+                        user.strongAuthAt(),
+                        user.createdAt()));
+    }
+
+    @Override
+    public List<JauthUser> findAll() {
+        return this.usersById.values().stream()
+                .sorted(Comparator.comparing(JauthUser::username))
+                .toList();
     }
 
     private void update(String id, UnaryOperator<JauthUser> mapper) {

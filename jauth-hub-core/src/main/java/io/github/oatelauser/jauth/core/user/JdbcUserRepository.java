@@ -32,6 +32,12 @@ public class JdbcUserRepository implements UserRepository {
 
     private static final String UPDATE_STATUS_SQL = "UPDATE jauth_user SET status = ? WHERE id = ?";
 
+    private static final String UPDATE_ROLE_SQL = "UPDATE jauth_user SET role = ? WHERE id = ?";
+
+    private static final String UPDATE_DISPLAY_NAME_SQL = "UPDATE jauth_user SET display_name = ? WHERE id = ?";
+
+    private static final String FIND_ALL_SQL = "SELECT " + COLUMN_NAMES + " FROM jauth_user ORDER BY username ASC";
+
     private static final String UPDATE_STRONG_AUTH_AT_SQL = "UPDATE jauth_user SET strong_auth_at = ? WHERE id = ?";
 
     private static final RowMapper<JauthUser> USER_ROW_MAPPER = (rs, rowNum) -> new JauthUser(
@@ -92,6 +98,24 @@ public class JdbcUserRepository implements UserRepository {
         Assert.hasText(id, "id cannot be empty");
         Assert.hasText(status, "status cannot be empty");
         this.jdbcOperations.update(UPDATE_STATUS_SQL, status, id);
+    }
+
+    @Override
+    public void updateRole(String id, String role) {
+        Assert.hasText(id, "id cannot be empty");
+        Assert.hasText(role, "role cannot be empty");
+        this.jdbcOperations.update(UPDATE_ROLE_SQL, role, id);
+    }
+
+    @Override
+    public void updateDisplayName(String id, @Nullable String displayName) {
+        Assert.hasText(id, "id cannot be empty");
+        this.jdbcOperations.update(UPDATE_DISPLAY_NAME_SQL, displayName, id);
+    }
+
+    @Override
+    public List<JauthUser> findAll() {
+        return this.jdbcOperations.query(FIND_ALL_SQL, USER_ROW_MAPPER);
     }
 
     @Override

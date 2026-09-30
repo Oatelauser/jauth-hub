@@ -85,6 +85,41 @@ abstract class AbstractUserRepositoryContractTest {
         assertThat(repository().findByUsername("nobody")).isNull();
     }
 
+    @Test
+    void updateRoleAffectsOnlyThatField() {
+        JauthUser user = newUser("018f0000-0000-7000-8000-000000000005", "erin");
+        repository().save(user);
+
+        repository().updateRole(user.id(), JauthUser.ROLE_SUPERADMIN);
+
+        JauthUser updated = repository().findById(user.id());
+        assertThat(updated.role()).isEqualTo(JauthUser.ROLE_SUPERADMIN);
+        assertThat(updated.status()).isEqualTo(JauthUser.STATUS_ACTIVE);
+        assertThat(updated.displayName()).isEqualTo("erin-display");
+    }
+
+    @Test
+    void updateDisplayNameSetsAndClears() {
+        JauthUser user = newUser("018f0000-0000-7000-8000-000000000006", "frank");
+        repository().save(user);
+
+        repository().updateDisplayName(user.id(), "新展示名");
+        assertThat(repository().findById(user.id()).displayName()).isEqualTo("新展示名");
+
+        repository().updateDisplayName(user.id(), null);
+        assertThat(repository().findById(user.id()).displayName()).isNull();
+        assertThat(repository().findById(user.id()).username()).isEqualTo("frank");
+    }
+
+    @Test
+    void findAllReturnsAllOrderedByUsernameAsc() {
+        repository().save(newUser("018f0000-0000-7000-8000-000000000007", "zoe"));
+        repository().save(newUser("018f0000-0000-7000-8000-000000000008", "alice"));
+        repository().save(newUser("018f0000-0000-7000-8000-000000000009", "mallory"));
+
+        assertThat(repository().findAll()).extracting(JauthUser::username).containsExactly("alice", "mallory", "zoe");
+    }
+
     protected final UserRepository repository() {
         return this.repository;
     }

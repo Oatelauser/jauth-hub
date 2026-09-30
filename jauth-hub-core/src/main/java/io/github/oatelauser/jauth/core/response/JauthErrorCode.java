@@ -5,7 +5,8 @@ package io.github.oatelauser.jauth.core.response;
  *
  * <p>占段 A05xx（授权/客户端请求错）+ B05xx（认证中心内部错）——spring-plus 家族分段惯例，与家族已占段（如 A0301）不撞车（09 票决议）。
  * 按批增补不预铺：A0501-A0502/B05xx 为基座四枚；selfservice 已占 A0503-A0505（登录主体/存储模式/scope 勾选）、
- * A0509-A0510（B10 应用注册名称/redirect URI 校验）与 A0511（B11 安装审批 ceiling 空勾选）；B8 增 A0506-A0508（org/安装域）。
+ * A0509-A0510（B10 应用注册名称/redirect URI 校验）与 A0511（B11 安装审批 ceiling 空勾选）；B8 增 A0506-A0508（org/安装域）；
+ * app 已占 A0512-A0514（B12 用户管理：撞名/自操作拒/旧密码错，落 app 自立枚举 AppErrorCode）。
  *
  * @author oatelauser
  */
