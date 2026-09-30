@@ -7,6 +7,11 @@ spring:
     name: jauth-hub-app
   profiles:
     active: local
+  messages:
+    # 勿回退系统 locale：fallbackToSystemLocale 默认 true 会把 JVM 默认 locale 插进 ResourceBundle
+    # 候选链（排在根 bundle 之前）——en 服务器上中文浏览器会被 messages_en 劫持、中文 UI 永不可达。
+    # 关掉后：zh 请求落根 bundle（中文，UI 主语言），en 请求落 messages_en 骨架，与产品语义一致
+    fallback-to-system-locale: false
   session:
     jdbc:
       # spring_session 表由 jauth 私有 Flyway V3 迁移建立（vendored DDL），Spring Session 侧不再自建
