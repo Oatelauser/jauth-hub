@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    # ubuntu runner 自带 Docker → @Testcontainers(disabledWithoutDocker) 的 PostgreSQL
+    # 真库验证用例自动激活（本地无 Docker 一直 skip 的那批）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Verify (tests + Spotless/p3c/SpotBugs gates + PG Testcontainers)
+        run: mvn -B verify
