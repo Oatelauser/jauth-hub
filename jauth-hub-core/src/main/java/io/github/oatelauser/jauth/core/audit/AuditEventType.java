@@ -3,8 +3,8 @@ package io.github.oatelauser.jauth.core.audit;
 /**
  * 审计事件类型词表（票 07：词表归代码枚举所有，DB 列不加 CHECK）。
  *
- * <p>v1.0 覆盖：登录（成功/失败）、令牌（签发/刷新/撤销）、consent 接受；v1.1 追加审批事件
- * （jauth_installation），届时在此扩枚举值即可。
+ * <p>v1.0 覆盖：登录（成功/失败）、令牌（签发/刷新/撤销）、consent 接受；v1.1（B8）追加 org/安装域：
+ * org 创建与安装两步制全生命周期（发起/批准/驳回/撤销），由 OrgService/InstallationService 服务路径发布。
  *
  * @author oatelauser
  */
@@ -26,7 +26,22 @@ public enum AuditEventType {
     TOKEN_REVOKED("token.revoked"),
 
     /** consent 接受（consent 服务 save 路径）。 */
-    CONSENT_ACCEPTED("consent.accepted");
+    CONSENT_ACCEPTED("consent.accepted"),
+
+    /** org 自助创建（创建者自动 OWNER，OrgService.create 路径）。 */
+    ORG_CREATED("org.created"),
+
+    /** 安装请求发起（任何登录用户，InstallationService.request 路径）。 */
+    INSTALL_REQUESTED("installation.requested"),
+
+    /** 安装批准（OWNER 勾 ceiling_scopes，InstallationService.approve 路径）。 */
+    INSTALL_APPROVED("installation.approved"),
+
+    /** 安装驳回（OWNER，InstallationService.reject 路径）。 */
+    INSTALL_REJECTED("installation.rejected"),
+
+    /** 安装撤销（OWNER 对 APPROVED 行收回，InstallationService.revoke 路径）。 */
+    INSTALL_REVOKED("installation.revoked");
 
     private final String wireName;
 

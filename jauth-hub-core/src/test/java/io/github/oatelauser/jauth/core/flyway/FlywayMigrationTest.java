@@ -10,7 +10,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Flyway 迁移单测：H2(PostgreSQL 兼容模式) 上从零跑完 V1-V5，验证全部业务表齐建、 框架三表 owner CHECK 生效、spring_session 两表
+ * Flyway 迁移单测：H2(PostgreSQL 兼容模式) 上从零跑完 V1-V6，验证全部业务表齐建、 框架三表 owner CHECK 生效、spring_session 两表
  * vendored DDL 可执行。
  *
  * <p>表清单 14 张 = 框架 3 + 自有 9（含 B2 补定的 jauth_jwk）+ vendored 2，对齐 SPEC §3 "14 表"。
@@ -50,7 +50,16 @@ class FlywayMigrationTest {
     void flywayHistoryRecordsAllMigrations() {
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE type = 'SQL'", Integer.class);
-        assertThat(count).isEqualTo(5);
+        assertThat(count).isEqualTo(6);
+    }
+
+    @Test
+    void installationRequestColumnsExist() {
+        // V6 两步制补列：requested_by/requested_scopes（B8 安装请求域）
+        List<String> columns = jdbcTemplate.queryForList(
+                "SELECT column_name FROM information_schema.columns WHERE table_name =" + " 'jauth_installation'",
+                String.class);
+        assertThat(columns).contains("requested_by", "requested_scopes");
     }
 
     @Test

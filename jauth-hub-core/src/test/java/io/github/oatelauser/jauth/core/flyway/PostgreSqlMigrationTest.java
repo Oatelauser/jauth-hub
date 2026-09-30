@@ -61,5 +61,17 @@ class PostgreSqlMigrationTest {
                         "jauth_jwk",
                         "spring_session",
                         "spring_session_attributes");
+
+        // V6 两步制补列：requested_by/requested_scopes（B8 安装请求域）
+        List<String> installationColumns = new ArrayList<>();
+        try (Statement statement = POSTGRES.createConnection("").createStatement();
+                ResultSet resultSet =
+                        statement.executeQuery("SELECT column_name FROM information_schema.columns WHERE table_name ="
+                                + " 'jauth_installation'")) {
+            while (resultSet.next()) {
+                installationColumns.add(resultSet.getString(1));
+            }
+        }
+        assertThat(installationColumns).contains("requested_by", "requested_scopes");
     }
 }

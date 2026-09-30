@@ -16,6 +16,14 @@ import io.github.oatelauser.jauth.core.authorization.JauthJdbcOAuth2Authorizatio
 import io.github.oatelauser.jauth.core.client.ClientSeedProperties;
 import io.github.oatelauser.jauth.core.client.ClientSeeder;
 import io.github.oatelauser.jauth.core.client.JauthJdbcRegisteredClientRepository;
+import io.github.oatelauser.jauth.core.org.InMemoryInstallationRepository;
+import io.github.oatelauser.jauth.core.org.InMemoryOrgRepository;
+import io.github.oatelauser.jauth.core.org.InstallationRepository;
+import io.github.oatelauser.jauth.core.org.InstallationService;
+import io.github.oatelauser.jauth.core.org.JdbcInstallationRepository;
+import io.github.oatelauser.jauth.core.org.JdbcOrgRepository;
+import io.github.oatelauser.jauth.core.org.OrgRepository;
+import io.github.oatelauser.jauth.core.org.OrgService;
 import io.github.oatelauser.jauth.core.ratelimit.RateLimiter;
 import io.github.oatelauser.jauth.core.response.DefaultResponseRenderer;
 import io.github.oatelauser.jauth.core.response.JauthResponseAdvice;
@@ -243,6 +251,38 @@ public class JauthHubAutoConfiguration {
     @Bean
     MeController jauthMeController(PlatformTokenResolver tokenResolver) {
         return new MeController(tokenResolver);
+    }
+
+    // ------------------------------------------------------------------ org 域装配（B8）
+
+    /**
+     * org 域服务（自助创建 + OWNER 门）：仓储由下方两段 storage 配置按 {@code jauth-hub.storage} 供给
+     * （memory/jdbc 皆注册 OrgRepository，此处单点装配）。
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    OrgService jauthOrgService(
+            OrgRepository orgRepository, AuditEventPublisher auditPublisher, ObjectProvider<Clock> clock) {
+        return new OrgService(orgRepository, auditPublisher, clock.getIfAvailable(Clock::systemUTC));
+    }
+
+    /** 安装两步制（流向 A）：request/approve/reject/revoke 状态机 + 生命周期审计。 */
+    @Bean
+    @ConditionalOnMissingBean
+    InstallationService jauthInstallationService(
+            InstallationRepository installationRepository,
+            OrgRepository orgRepository,
+            OrgService orgService,
+            RegisteredClientRepository registeredClientRepository,
+            AuditEventPublisher auditPublisher,
+            ObjectProvider<Clock> clock) {
+        return new InstallationService(
+                installationRepository,
+                orgRepository,
+                orgService,
+                registeredClientRepository,
+                auditPublisher,
+                clock.getIfAvailable(Clock::systemUTC));
     }
 
     // ------------------------------------------------------------------ 令牌装配
@@ -706,6 +746,18 @@ public class JauthHubAutoConfiguration {
             return new InMemoryUserRepository();
         }
 
+        @Bean
+        @ConditionalOnMissingBean(OrgRepository.class)
+        InMemoryOrgRepository jauthOrgRepository() {
+            return new InMemoryOrgRepository();
+        }
+
+        @Bean
+        @ConditionalOnMissingBean(InstallationRepository.class)
+        InMemoryInstallationRepository jauthInstallationRepository() {
+            return new InMemoryInstallationRepository();
+        }
+
         /**
          * 短命签名密钥源：进程内生成 RSA-2048 单钥，重启即换（memory 模式语义：密钥不落表、无轮转调度）。
          * 既有令牌重启后全部失验，属该模式面向 demo/轻嵌入的既定代价（SPEC §3 memory 语义行）。
@@ -833,6 +885,19 @@ public class JauthHubAutoConfiguration {
         @ConditionalOnMissingBean(UserRepository.class)
         JdbcUserRepository jauthUserRepository(DataSource dataSource, FlywayMigrationGuard migrationGuard) {
             return new JdbcUserRepository(new JdbcTemplate(dataSource));
+        }
+
+        @Bean
+        @ConditionalOnMissingBean(OrgRepository.class)
+        JdbcOrgRepository jauthOrgRepository(DataSource dataSource, FlywayMigrationGuard migrationGuard) {
+            return new JdbcOrgRepository(new JdbcTemplate(dataSource));
+        }
+
+        @Bean
+        @ConditionalOnMissingBean(InstallationRepository.class)
+        JdbcInstallationRepository jauthInstallationRepository(
+                DataSource dataSource, FlywayMigrationGuard migrationGuard) {
+            return new JdbcInstallationRepository(new JdbcTemplate(dataSource));
         }
 
         @Bean
