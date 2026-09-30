@@ -3,7 +3,7 @@ package io.github.oatelauser.jauth.starter;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.nimbusds.jose.jwk.source.JWKSource;
-import io.github.oatelauser.jauth.core.authorization.JauthJdbcOAuth2AuthorizationService;
+import io.github.oatelauser.jauth.core.authorization.AuditingOAuth2AuthorizationService;
 import io.github.oatelauser.jauth.core.client.JauthJdbcRegisteredClientRepository;
 import io.github.oatelauser.jauth.core.response.DefaultResponseRenderer;
 import io.github.oatelauser.jauth.core.response.ResponseRenderer;
@@ -65,8 +65,9 @@ class JauthAutoConfigurationMatrixTest {
             assertThat(context.getBean(RegisteredClientRepository.class).findByClientId("matrix-client"))
                     .isNotNull();
             assertThat(context).hasBean("jauthAuthorizationService");
+            // B7：族谱包装版被审计装饰包裹（生命周期事件），断言到装饰层
             assertThat(context.getBean("jauthAuthorizationService"))
-                    .isInstanceOf(FamilyAwareInMemoryAuthorizationService.class);
+                    .isInstanceOf(AuditingOAuth2AuthorizationService.class);
             assertThat(context).doesNotHaveBean(JauthJdbcRegisteredClientRepository.class);
             assertThat(context).doesNotHaveBean(JdbcTokenFamilyService.class);
             assertThat(context).doesNotHaveBean(JdbcUserRepository.class);
@@ -97,11 +98,11 @@ class JauthAutoConfigurationMatrixTest {
                 .withBean(PlatformTransactionManager.class, () -> new DataSourceTransactionManager(dataSource))
                 .run(context -> {
                     assertThat(context).hasSingleBean(JauthJdbcRegisteredClientRepository.class);
-                    assertThat(context).hasSingleBean(JauthJdbcOAuth2AuthorizationService.class);
+                    assertThat(context).hasBean("jauthAuthorizationService");
                     assertThat(context).hasSingleBean(JdbcTokenFamilyService.class);
                     assertThat(context).hasSingleBean(JdbcUserRepository.class);
                     assertThat(context.getBean("jauthAuthorizationService"))
-                            .isInstanceOf(JauthJdbcOAuth2AuthorizationService.class);
+                            .isInstanceOf(AuditingOAuth2AuthorizationService.class);
                     assertThat(context).hasBean("jauthSeedingTransactionTemplate");
                     String maxVersion = new JdbcTemplate(context.getBean(DataSource.class))
                             .queryForObject("SELECT MAX(version) FROM jauth_flyway_schema_history", String.class);

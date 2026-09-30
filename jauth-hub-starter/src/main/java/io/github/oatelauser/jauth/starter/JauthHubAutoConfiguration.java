@@ -6,10 +6,17 @@ import com.nimbusds.jose.jwk.KeyUse;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
+import io.github.oatelauser.jauth.core.audit.AuditEventPublisher;
+import io.github.oatelauser.jauth.core.audit.InMemoryRollingAuditService;
+import io.github.oatelauser.jauth.core.audit.JdbcAuditEventService;
+import io.github.oatelauser.jauth.core.audit.SecurityEventAuditBridge;
+import io.github.oatelauser.jauth.core.authorization.AuditingOAuth2AuthorizationConsentService;
+import io.github.oatelauser.jauth.core.authorization.AuditingOAuth2AuthorizationService;
 import io.github.oatelauser.jauth.core.authorization.JauthJdbcOAuth2AuthorizationService;
 import io.github.oatelauser.jauth.core.client.ClientSeedProperties;
 import io.github.oatelauser.jauth.core.client.ClientSeeder;
 import io.github.oatelauser.jauth.core.client.JauthJdbcRegisteredClientRepository;
+import io.github.oatelauser.jauth.core.ratelimit.RateLimiter;
 import io.github.oatelauser.jauth.core.response.DefaultResponseRenderer;
 import io.github.oatelauser.jauth.core.response.JauthResponseAdvice;
 import io.github.oatelauser.jauth.core.response.ResponseRenderer;
@@ -27,10 +34,16 @@ import io.github.oatelauser.jauth.core.token.key.JwkRotationService;
 import io.github.oatelauser.jauth.core.user.InMemoryUserRepository;
 import io.github.oatelauser.jauth.core.user.JdbcUserRepository;
 import io.github.oatelauser.jauth.core.user.UserRepository;
+import io.github.oatelauser.jauth.core.web.AccessTokenPlatformTokenResolver;
 import io.github.oatelauser.jauth.core.web.ConsentController;
 import io.github.oatelauser.jauth.core.web.DeviceVerifyController;
 import io.github.oatelauser.jauth.core.web.EducationalFlag;
+import io.github.oatelauser.jauth.core.web.LocalIntrospectionJwtDecoder;
 import io.github.oatelauser.jauth.core.web.LoginController;
+import io.github.oatelauser.jauth.core.web.LoginLockoutFilter;
+import io.github.oatelauser.jauth.core.web.MeController;
+import io.github.oatelauser.jauth.core.web.PlatformTokenResolver;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
@@ -79,6 +92,7 @@ import org.springframework.security.oauth2.server.authorization.InMemoryOAuth2Au
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
@@ -91,6 +105,7 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
@@ -148,6 +163,9 @@ public class JauthHubAutoConfiguration {
     /** 设备验证页：AuthorizationServerSettings.deviceVerificationEndpoint 落点（verification_uri 即此）。 */
     static final String DEVICE_VERIFY_PATH = "/device/verify";
 
+    /** 平台 API /me（SPEC §4 端点三分；链 matcher 认领 + 控制器自担 Bearer 认证）。 */
+    static final String ME_PATH = "/me";
+
     /** core 单文件 CSS 的出网路径（模板内 @{/css/jauth.css}）。 */
     static final String CSS_PATTERN = "/css/**";
 
@@ -191,6 +209,40 @@ public class JauthHubAutoConfiguration {
     @ConditionalOnMissingBean
     JauthResponseAdvice jauthResponseAdvice(ResponseRenderer renderer) {
         return new JauthResponseAdvice(renderer);
+    }
+
+    // ------------------------------------------------------------------ 限流与登录锁定（SPEC §5/§6）
+
+    /**
+     * 限流器（内存计数器无表，票 07）：请求配额按调用方主体合并桶；登录锁定按用户名键控。
+     * Clock 宿主可注入（jdbc 模式默认 systemUTC），测试以可变钟推进窗口/锁定期。
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    RateLimiter jauthRateLimiter(JauthHubProperties properties, ObjectProvider<Clock> clock) {
+        return new RateLimiter(
+                properties.getRateLimit().getLimitPerHour(),
+                properties.getRateLimit().getLoginMaxFailures(),
+                Duration.ofMinutes(properties.getRateLimit().getLoginLockMinutes()),
+                clock.getIfAvailable(Clock::systemUTC));
+    }
+
+    // ------------------------------------------------------------------ 审计与 /me（SPEC §5 横切）
+
+    /**
+     * Spring Security 认证事件接线桥：登录成功/失败 → 审计 + 登录失败锁定计数（core 类注释的事件源
+     * 过滤论证）。audit publisher 与 UserRepository 按存储模式由两个配置分支供给。
+     */
+    @Bean
+    SecurityEventAuditBridge jauthSecurityEventAuditBridge(
+            AuditEventPublisher auditPublisher, RateLimiter rateLimiter, UserRepository userRepository) {
+        return new SecurityEventAuditBridge(auditPublisher, rateLimiter, userRepository);
+    }
+
+    /** /me 平台端点（core）：认证面 = PlatformTokenResolver 本进程内省（SPEC §4）。 */
+    @Bean
+    MeController jauthMeController(PlatformTokenResolver tokenResolver) {
+        return new MeController(tokenResolver);
     }
 
     // ------------------------------------------------------------------ 令牌装配
@@ -244,13 +296,18 @@ public class JauthHubAutoConfiguration {
 
     /**
      * JwtDecoder：Security 7 的 oidc() 装配在 build 期硬性要求容器内有 JwtDecoder（userinfo 端点的资源服务器
-     * 侧接线）。Boot 全自动配置宿主由 Boot 的 SAS JWT 自动配置供给；本装配补同一默认（同一 JWKSource 派生，
-     * 即框架 OAuth2AuthorizationServerConfiguration.jwtDecoder 的公开工厂），宿主可替换。
+     * 侧接线）。本装配给<b>本进程内省优先</b>版（B7）：先经 {@link PlatformTokenResolver} 解析 opaque 授权
+     * 令牌与 PAT（/userinfo、/me 等 Bearer 面），未命中回落真 JWT 解码（同一 JWKSource 派生，即框架
+     * OAuth2AuthorizationServerConfiguration.jwtDecoder 的公开工厂；SELF_CONTAINED 客户端仍走签名验证），
+     * 宿主可整体替换。框架因 oidc userinfo 强制挂 JWT 腿且自动消费本 bean——以 bean 形态接入而非
+     * oauth2ResourceServer DSL，避免与宿主/rs-starter 的 opaque 装配在同名配置器上冲突
+     * （"JWTs or Opaque Tokens, not both"）。
      */
     @Bean
     @ConditionalOnMissingBean
-    JwtDecoder jauthJwtDecoder(JWKSource<SecurityContext> jwkSource) {
-        return OAuth2AuthorizationServerConfiguration.jwtDecoder(jwkSource);
+    JwtDecoder jauthJwtDecoder(JWKSource<SecurityContext> jwkSource, PlatformTokenResolver platformTokenResolver) {
+        return new LocalIntrospectionJwtDecoder(
+                platformTokenResolver, OAuth2AuthorizationServerConfiguration.jwtDecoder(jwkSource));
     }
 
     // ------------------------------------------------------------------ 页面与教学（SPEC §7）
@@ -436,7 +493,8 @@ public class JauthHubAutoConfiguration {
             OAuth2AuthorizationService authorizationService,
             OAuth2AuthorizationConsentService authorizationConsentService,
             AuthorizationServerSettings authorizationServerSettings,
-            OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator)
+            OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator,
+            RateLimiter rateLimiter)
             throws Exception {
 
         http.oauth2AuthorizationServer(authorizationServer -> authorizationServer
@@ -445,7 +503,16 @@ public class JauthHubAutoConfiguration {
                 .authorizationConsentService(authorizationConsentService)
                 .authorizationServerSettings(authorizationServerSettings)
                 .tokenGenerator(tokenGenerator)
-                .oidc(Customizer.withDefaults())
+                .oidc(oidc -> oidc
+                        // RP-Initiated Logout 显式钉住框架默认语义（SPEC §5 横切）：id_token_hint 须为本
+                        // 主体签发且未吊销，post_logout_redirect_uri 须在客户端注册白名单（精确匹配），
+                        // 成功即失效会话并 302 回 RP（可携带 state）——校验语义全在框架 provider，不重写
+                        .logoutEndpoint(Customizer.withDefaults()))
+                // Device Flow（SPEC §5 v1.0）：框架按惰性启用——不显式调用则 /device_authorization 与
+                // 验证端点不挂链（404）；verification_uri 广告值同步落自有页面（框架默认
+                // /oauth2/device_verification 只是广告串，不随 AuthorizationServerSettings 联动）
+                .deviceAuthorizationEndpoint(
+                        deviceAuthorization -> deviceAuthorization.verificationUri(DEVICE_VERIFY_PATH))
                 .authorizationEndpoint(endpoint -> endpoint.consentPage(CONSENT_PAGE_PATH)));
 
         OAuth2AuthorizationServerConfigurer authorizationServerConfigurer =
@@ -456,7 +523,14 @@ public class JauthHubAutoConfiguration {
                 PathPatternRequestMatcher.withDefaults().matcher(LOGIN_PATH),
                 PathPatternRequestMatcher.withDefaults().matcher(CONSENT_PAGE_PATH),
                 PathPatternRequestMatcher.withDefaults().matcher(DEVICE_VERIFY_PATH),
+                PathPatternRequestMatcher.withDefaults().matcher(ME_PATH),
                 PathPatternRequestMatcher.withDefaults().matcher(CSS_PATTERN)));
+
+        // 登录锁定闸：用户名口令认证之前（锁定期内不触达口令校验）
+        http.addFilterBefore(
+                new LoginLockoutFilter(rateLimiter, LOGIN_PATH), UsernamePasswordAuthenticationFilter.class);
+        // 端点限流：经配置器挂客户端认证之后、端点过滤器之前（配置器类注释的序位论证——锚类 build 期才注册）
+        http.with(new RateLimitEndpointConfigurer<>(rateLimiter, authorizationServerSettings));
 
         // CORS 仅在显式配置来源时启用（默认空 = 关，SPEC §4）
         if (!properties.getCors().getAllowedOrigins().isEmpty()) {
@@ -466,7 +540,7 @@ public class JauthHubAutoConfiguration {
         http.authorizeHttpRequests(authorize -> authorize
                 .requestMatchers(endpointsMatcher)
                 .authenticated()
-                .requestMatchers(LOGIN_PATH, CSS_PATTERN)
+                .requestMatchers(LOGIN_PATH, CSS_PATTERN, ME_PATH)
                 .permitAll()
                 .requestMatchers(CONSENT_PAGE_PATH, DEVICE_VERIFY_PATH)
                 .authenticated());
@@ -584,18 +658,46 @@ public class JauthHubAutoConfiguration {
             return new InMemoryTokenFamilyService();
         }
 
+        /**
+         * memory 审计降级：内存滚动缓冲（SPEC §3 语义——有界、仅调试、重启即失；core 类注释）。
+         */
         @Bean
-        @ConditionalOnMissingBean(OAuth2AuthorizationService.class)
-        FamilyAwareInMemoryAuthorizationService jauthAuthorizationService(
-                InMemoryTokenFamilyService tokenFamilyService) {
-            return new FamilyAwareInMemoryAuthorizationService(
-                    new InMemoryOAuth2AuthorizationService(), tokenFamilyService);
+        @ConditionalOnMissingBean(AuditEventPublisher.class)
+        InMemoryRollingAuditService jauthAuditEventPublisher(ObjectProvider<Clock> clock) {
+            return new InMemoryRollingAuditService(clock.getIfAvailable(Clock::systemUTC));
         }
 
+        /**
+         * 授权服务 = 审计装饰（族谱包装版）：RTR 熔断在包装层，生命周期审计（签发/刷新/撤销）在装饰层，
+         * 各自单点。宿主自定义授权服务时整链让位（含审计装饰——审计接线属 jauth 装配职责，不裹宿主实现）。
+         */
+        @Bean
+        @ConditionalOnMissingBean(OAuth2AuthorizationService.class)
+        AuditingOAuth2AuthorizationService jauthAuthorizationService(
+                InMemoryTokenFamilyService tokenFamilyService,
+                AuditEventPublisher auditPublisher,
+                ObjectProvider<MeterRegistry> meterRegistry) {
+            return new AuditingOAuth2AuthorizationService(
+                    new FamilyAwareInMemoryAuthorizationService(
+                            new InMemoryOAuth2AuthorizationService(), tokenFamilyService),
+                    auditPublisher,
+                    meterRegistry.getIfAvailable());
+        }
+
+        /** consent 服务 = 审计装饰（memory 实现）：consent.accepted 事件在 save 路径（装饰类注释）。 */
         @Bean
         @ConditionalOnMissingBean(OAuth2AuthorizationConsentService.class)
-        InMemoryOAuth2AuthorizationConsentService jauthAuthorizationConsentService() {
-            return new InMemoryOAuth2AuthorizationConsentService();
+        AuditingOAuth2AuthorizationConsentService jauthAuthorizationConsentService(AuditEventPublisher auditPublisher) {
+            return new AuditingOAuth2AuthorizationConsentService(
+                    new InMemoryOAuth2AuthorizationConsentService(), auditPublisher);
+        }
+
+        /** /me 解析：授权令牌路径（PAT 在 memory 模式禁用，无叠加腿）。 */
+        @Bean
+        @ConditionalOnMissingBean(PlatformTokenResolver.class)
+        AccessTokenPlatformTokenResolver jauthPlatformTokenResolver(OAuth2AuthorizationService authorizationService) {
+            return new AccessTokenPlatformTokenResolver(
+                    token -> authorizationService.findByToken(token, OAuth2TokenType.ACCESS_TOKEN));
         }
 
         @Bean
@@ -672,24 +774,59 @@ public class JauthHubAutoConfiguration {
             return new JdbcTokenFamilyService(new JdbcTemplate(dataSource));
         }
 
+        /** jdbc 审计：jauth_audit_event 追加只写（V2 建表）。 */
+        @Bean
+        @ConditionalOnMissingBean(AuditEventPublisher.class)
+        JdbcAuditEventService jauthAuditEventService(DataSource dataSource, Clock clock) {
+            return new JdbcAuditEventService(new JdbcTemplate(dataSource), clock);
+        }
+
+        /**
+         * 授权服务 = 审计装饰（PAT 叠加 → JDBC 哈希手术版）：读取路径 PAT 回退在叠加层（B5 闭环），
+         * 生命周期审计在最外层（save/remove 单点）。PAT 叠加构造幂等播种 jauth-pat 伪客户端
+         * （内省 client_id 反查所需，叠加层类注释）。
+         */
         @Bean
         @ConditionalOnMissingBean(OAuth2AuthorizationService.class)
-        JauthJdbcOAuth2AuthorizationService jauthAuthorizationService(
+        AuditingOAuth2AuthorizationService jauthAuthorizationService(
                 DataSource dataSource,
                 JauthJdbcRegisteredClientRepository registeredClientRepository,
                 JdbcTokenFamilyService tokenFamilyService,
+                UserRepository userRepository,
+                AuditEventPublisher auditPublisher,
+                Clock clock,
+                ObjectProvider<MeterRegistry> meterRegistry,
                 FlywayMigrationGuard migrationGuard) {
-            return new JauthJdbcOAuth2AuthorizationService(
-                    new JdbcTemplate(dataSource), registeredClientRepository, tokenFamilyService);
+            PatIntrospectionSupport patSupport = new PatIntrospectionSupport(
+                    new JdbcTemplate(dataSource), registeredClientRepository, userRepository, clock);
+            return new AuditingOAuth2AuthorizationService(
+                    new PatAwareOAuth2AuthorizationService(
+                            new JauthJdbcOAuth2AuthorizationService(
+                                    new JdbcTemplate(dataSource), registeredClientRepository, tokenFamilyService),
+                            patSupport),
+                    auditPublisher,
+                    meterRegistry.getIfAvailable());
         }
 
+        /** consent 服务 = 审计装饰（JDBC 实现）。 */
         @Bean
         @ConditionalOnMissingBean(OAuth2AuthorizationConsentService.class)
-        JdbcOAuth2AuthorizationConsentService jauthAuthorizationConsentService(
+        AuditingOAuth2AuthorizationConsentService jauthAuthorizationConsentService(
                 DataSource dataSource,
                 JauthJdbcRegisteredClientRepository registeredClientRepository,
+                AuditEventPublisher auditPublisher,
                 FlywayMigrationGuard migrationGuard) {
-            return new JdbcOAuth2AuthorizationConsentService(new JdbcTemplate(dataSource), registeredClientRepository);
+            return new AuditingOAuth2AuthorizationConsentService(
+                    new JdbcOAuth2AuthorizationConsentService(new JdbcTemplate(dataSource), registeredClientRepository),
+                    auditPublisher);
+        }
+
+        /** /me 解析：授权令牌 + PAT 同一 findByToken 回退面（PAT 叠加层已在授权服务内）。 */
+        @Bean
+        @ConditionalOnMissingBean(PlatformTokenResolver.class)
+        AccessTokenPlatformTokenResolver jauthPlatformTokenResolver(OAuth2AuthorizationService authorizationService) {
+            return new AccessTokenPlatformTokenResolver(
+                    token -> authorizationService.findByToken(token, OAuth2TokenType.ACCESS_TOKEN));
         }
 
         @Bean

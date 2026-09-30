@@ -37,6 +37,11 @@
       <groupId>org.flywaydb</groupId>
       <artifactId>flyway-database-postgresql</artifactId>
     </dependency>
+    <!-- 发令牌计数指标（jauth.tokens.issued，SPEC §8）：仅 API 依赖，注册表由宿主/actuator 供给，无注册表零副作用 -->
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-core</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>

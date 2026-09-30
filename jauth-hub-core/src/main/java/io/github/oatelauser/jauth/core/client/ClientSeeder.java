@@ -1,6 +1,7 @@
 package io.github.oatelauser.jauth.core.client;
 
 import io.github.oatelauser.jauth.core.util.UuidV7;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -66,10 +67,14 @@ public class ClientSeeder {
                         .requireProofKey(true)
                         .requireAuthorizationConsent(seed.isRequireAuthorizationConsent())
                         .build())
-                // opaque 正典（SPEC §1）：种子客户端 access token 显式 REFERENCE——默认(null)会落 JwtGenerator
-                // 的 SELF_CONTAINED 路径，与本库"opaque + 内省"的 v1 主线相悖；宿主按客户端可改回
+                // opaque 正典（SPEC §1）+ 令牌生命周期（SPEC §6 策略表默认，per-client 可覆盖）：
+                // access 2h / refresh 30d / 刷新即轮转（RTR——重放检测与整族熔断依赖轮转链，框架默认
+                // reuse(true) 下旧 refresh 永远有效，SPEC 承诺的熔断语义不会发生）
                 .tokenSettings(TokenSettings.builder()
                         .accessTokenFormat(OAuth2TokenFormat.REFERENCE)
+                        .accessTokenTimeToLive(Duration.ofHours(2))
+                        .refreshTokenTimeToLive(Duration.ofDays(30))
+                        .reuseRefreshTokens(false)
                         .build());
         if (StringUtils.hasText(seed.getClientSecret())) {
             builder.clientSecret(this.passwordEncoder.encode(seed.getClientSecret()))
@@ -81,6 +86,7 @@ public class ClientSeeder {
         seed.getGrantTypes()
                 .forEach(grantType -> builder.authorizationGrantType(new AuthorizationGrantType(grantType)));
         seed.getRedirectUris().forEach(builder::redirectUri);
+        seed.getPostLogoutRedirectUris().forEach(builder::postLogoutRedirectUri);
         seed.getScopes().forEach(builder::scope);
         return builder.build();
     }

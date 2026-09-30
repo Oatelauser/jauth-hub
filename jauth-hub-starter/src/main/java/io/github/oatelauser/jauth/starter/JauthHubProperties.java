@@ -35,6 +35,9 @@ public class JauthHubProperties {
 
     private Cors cors = new Cors();
 
+    /** 限流与登录锁定（SPEC §6 默认值：5000/小时、连错 5 次锁 15 分钟）。 */
+    private RateLimit rateLimit = new RateLimit();
+
     /** 播种清单（透传 core 的种子结构，两模式通用，幂等）。 */
     private List<ClientSeedProperties.ClientSeed> clients = new ArrayList<>();
 
@@ -91,6 +94,61 @@ public class JauthHubProperties {
 
     public void setIssuer(String issuer) {
         this.issuer = issuer;
+    }
+
+    /** 防御性拷贝出入（与 Cors 同款理由）。 */
+    public RateLimit getRateLimit() {
+        RateLimit copy = new RateLimit();
+        copy.setLimitPerHour(this.rateLimit.getLimitPerHour());
+        copy.setLoginMaxFailures(this.rateLimit.getLoginMaxFailures());
+        copy.setLoginLockMinutes(this.rateLimit.getLoginLockMinutes());
+        return copy;
+    }
+
+    public void setRateLimit(RateLimit rateLimit) {
+        RateLimit source = rateLimit == null ? new RateLimit() : rateLimit;
+        this.rateLimit.setLimitPerHour(source.getLimitPerHour());
+        this.rateLimit.setLoginMaxFailures(source.getLoginMaxFailures());
+        this.rateLimit.setLoginLockMinutes(source.getLoginLockMinutes());
+    }
+
+    /**
+     * 限流与登录锁定参数（SPEC §5 横切 + §6 默认策略表；限流内存计数器无表，票 07 工程项）。
+     */
+    public static class RateLimit {
+
+        /** 每小时请求配额（按调用方主体合并桶，GitHub 真实模型）。 */
+        private long limitPerHour = 5000;
+
+        /** 登录连错阈值（达到即锁定）。 */
+        private int loginMaxFailures = 5;
+
+        /** 登录锁定时长（分钟）。 */
+        private int loginLockMinutes = 15;
+
+        public long getLimitPerHour() {
+            return this.limitPerHour;
+        }
+
+        public void setLimitPerHour(long limitPerHour) {
+            this.limitPerHour = limitPerHour;
+        }
+
+        public int getLoginMaxFailures() {
+            return this.loginMaxFailures;
+        }
+
+        public void setLoginMaxFailures(int loginMaxFailures) {
+            this.loginMaxFailures = loginMaxFailures;
+        }
+
+        public int getLoginLockMinutes() {
+            return this.loginLockMinutes;
+        }
+
+        public void setLoginLockMinutes(int loginLockMinutes) {
+            this.loginLockMinutes = loginLockMinutes;
+        }
     }
 
     /**

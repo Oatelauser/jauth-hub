@@ -18,6 +18,18 @@ spring:
 server:
   port: 8080
 
+# actuator（SPEC §8）：health/info/metrics 暴露；访问控制在 default 链（health/info 公开探活，
+# metrics 走认证——指标含内部结构信息，不匿名开放）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
 jauth-hub:
   storage: jdbc
   issuer: http://localhost:8080

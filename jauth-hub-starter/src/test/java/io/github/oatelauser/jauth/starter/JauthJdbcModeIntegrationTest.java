@@ -2,7 +2,8 @@ package io.github.oatelauser.jauth.starter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.oatelauser.jauth.core.authorization.JauthJdbcOAuth2AuthorizationService;
+import io.github.oatelauser.jauth.core.authorization.AuditingOAuth2AuthorizationConsentService;
+import io.github.oatelauser.jauth.core.authorization.AuditingOAuth2AuthorizationService;
 import io.github.oatelauser.jauth.core.client.ClientSeedProperties;
 import io.github.oatelauser.jauth.core.client.ClientSeeder;
 import io.github.oatelauser.jauth.core.client.JauthJdbcRegisteredClientRepository;
@@ -19,7 +20,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
@@ -79,8 +79,9 @@ class JauthJdbcModeIntegrationTest {
     @DisplayName("JDBC 三件在场：JauthJdbc client/authorization + 框架 JdbcOAuth2AuthorizationConsentService")
     void jdbcStorageBeans() {
         assertThat(registeredClientRepository).isInstanceOf(JauthJdbcRegisteredClientRepository.class);
-        assertThat(authorizationService).isInstanceOf(JauthJdbcOAuth2AuthorizationService.class);
-        assertThat(authorizationConsentService).isInstanceOf(JdbcOAuth2AuthorizationConsentService.class);
+        // B7：JDBC 哈希手术版被 PAT 叠加 + 审计装饰包裹，断言到装饰层
+        assertThat(authorizationService).isInstanceOf(AuditingOAuth2AuthorizationService.class);
+        assertThat(authorizationConsentService).isInstanceOf(AuditingOAuth2AuthorizationConsentService.class);
         assertThat(tokenFamilyService).isInstanceOf(JdbcTokenFamilyService.class);
         assertThat(userRepository).isInstanceOf(JdbcUserRepository.class);
     }

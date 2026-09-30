@@ -20,7 +20,7 @@
         <summary th:text="#{jauth.teach.what-happened}">发生了什么</summary>
         <p th:text="#{jauth.device.teach}">教学说明</p>
       </details>
-      <form class="form" th:action="@{/oauth2/device_verification}" method="post">
+      <form class="form" th:action="@{/device/verify}" method="post">
         <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
         <label class="field">
           <span th:text="#{jauth.device.code-label}">用户码</span>

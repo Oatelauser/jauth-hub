@@ -7,8 +7,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 /**
  * 设备验证页：device flow 的用户确认端（05 票教学一句话）。
  *
- * <p>框架 device flow 的 verification_uri 落点即本页；表单提交 user_code 给 {@code POST
- * /oauth2/device_verification} 由框架消费（B4 装配），本控制器只渲染视图。
+ * <p>框架 device flow 的 verification_uri 落点即本页（AuthorizationServerSettings.deviceVerificationEndpoint
+ * = /device/verify，B7 与表单提交路径对齐）；表单提交 user_code 给同路径 POST 由框架消费，本控制器只渲染视图。
  *
  * @author oatelauser
  */

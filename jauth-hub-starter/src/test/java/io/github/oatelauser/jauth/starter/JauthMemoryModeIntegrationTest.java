@@ -3,6 +3,8 @@ package io.github.oatelauser.jauth.starter;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.nimbusds.jose.jwk.source.JWKSource;
+import io.github.oatelauser.jauth.core.authorization.AuditingOAuth2AuthorizationConsentService;
+import io.github.oatelauser.jauth.core.authorization.AuditingOAuth2AuthorizationService;
 import io.github.oatelauser.jauth.core.response.ResponseRenderer;
 import io.github.oatelauser.jauth.core.token.key.JwkRotationService;
 import io.github.oatelauser.jauth.core.web.EducationalFlag;
@@ -19,7 +21,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.MessageSource;
 import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.security.oauth2.server.authorization.InMemoryOAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
@@ -112,11 +113,12 @@ class JauthMemoryModeIntegrationTest {
     }
 
     @Test
-    @DisplayName("memory 三件在场：InMemory client/consent + 族谱包装的授权服务")
+    @DisplayName("memory 三件在场：InMemory client + 族谱包装与审计装饰的授权/consent 服务")
     void memoryStorageBeans() {
         assertThat(registeredClientRepository).isInstanceOf(InMemoryRegisteredClientRepository.class);
-        assertThat(authorizationConsentService).isInstanceOf(InMemoryOAuth2AuthorizationConsentService.class);
-        assertThat(authorizationService).isInstanceOf(FamilyAwareInMemoryAuthorizationService.class);
+        // B7：两服务被审计装饰包裹（生命周期事件），断言到装饰层
+        assertThat(authorizationConsentService).isInstanceOf(AuditingOAuth2AuthorizationConsentService.class);
+        assertThat(authorizationService).isInstanceOf(AuditingOAuth2AuthorizationService.class);
     }
 
     @Test

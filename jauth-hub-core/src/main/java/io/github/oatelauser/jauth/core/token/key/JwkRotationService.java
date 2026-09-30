@@ -65,13 +65,19 @@ public class JwkRotationService {
         this.clock = clock;
     }
 
-    /** 启动调度（幂等）。initialDelay=0：启动即扫一轮，新部署/重启后欠账轮转立刻补上。 */
+    /**
+     * 启动调度（幂等）。首轮扫描<b>同步</b>执行：新部署/重启后欠账轮转立刻补上，且首把签名钥在
+     * lifecycle 启动返回前必然就位——异步首轮会让早到的签发请求（如测试首请求）与 RSA 生成竞速，
+     * 以 "Failed to select a JWK signing key" 失败。后续轮转按 {@value #SWEEP_INTERVAL} 间隔调度。
+     */
     public synchronized void start() {
         if (scheduler != null) {
             return;
         }
+        sweepSafely();
         scheduler = Executors.newSingleThreadScheduledExecutor(rotationThreadFactory());
-        scheduler.scheduleWithFixedDelay(this::sweepSafely, 0, SWEEP_INTERVAL.toMillis(), TimeUnit.MILLISECONDS);
+        scheduler.scheduleWithFixedDelay(
+                this::sweepSafely, SWEEP_INTERVAL.toMillis(), SWEEP_INTERVAL.toMillis(), TimeUnit.MILLISECONDS);
     }
 
     /** 停止调度（幂等）。不等待在途任务（见类注释）。 */

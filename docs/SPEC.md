@@ -116,7 +116,7 @@ v2+：webhook、secret scanning、多 Secret 轮转、token exchange（配置可
 | 参数 | 默认 |
 |---|---|
 | access token | 2h |
-| refresh token | 30d，用后即轮转，重放→整族熔断 |
+| refresh token | 30d，用后即轮转，重放→整族熔断（**公开客户端不发 refresh token**——框架防线，B7 实测确认） |
 | PAT | 90d（可选 30/90/365） |
 | 设备码 / 授权码 | 15min / 5min + 强制 PKCE |
 | 密码 | ≥8 位（无复杂度表演）；bcrypt 默认强度（Argon2 缓） |

@@ -48,6 +48,11 @@ public class AppSecurityConfiguration {
         http.authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/demo/**", "/error")
                         .permitAll()
+                        // actuator（SPEC §8）：health/info 公开（探活/元信息），metrics 需认证
+                        .requestMatchers("/actuator/health", "/actuator/info")
+                        .permitAll()
+                        .requestMatchers("/actuator/**")
+                        .authenticated()
                         .requestMatchers("/selfservice/**", "/api/**")
                         .authenticated()
                         .anyRequest()

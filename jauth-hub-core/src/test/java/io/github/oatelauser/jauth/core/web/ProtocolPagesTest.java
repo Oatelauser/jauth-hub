@@ -124,12 +124,12 @@ class ProtocolPagesTest {
     }
 
     @Test
-    @DisplayName("设备验证页：用户码输入框提交到框架 device_verification 端点")
+    @DisplayName("设备验证页：用户码输入框提交到自有验证端点（与 settings 同路径 /device/verify）")
     void deviceVerifyRendersCodeInput() throws Exception {
         educated.perform(get("/device/verify"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("name=\"user_code\"")))
-                .andExpect(content().string(containsString("action=\"/oauth2/device_verification\"")))
+                .andExpect(content().string(containsString("action=\"/device/verify\"")))
                 .andExpect(content().string(containsString("设备验证")))
                 .andExpect(content().string(containsString("用户在本页输入用户码验证")));
     }

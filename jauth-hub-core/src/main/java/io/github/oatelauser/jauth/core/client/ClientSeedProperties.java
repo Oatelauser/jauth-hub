@@ -45,6 +45,9 @@ public class ClientSeedProperties {
         /** 精确 redirect 白名单。 */
         private List<String> redirectUris = new ArrayList<>();
 
+        /** OIDC RP-Initiated Logout 允许的 post_logout_redirect_uri 白名单（精确匹配，可空 = 不允许重定向回 RP）。 */
+        private List<String> postLogoutRedirectUris = new ArrayList<>();
+
         /** 申请的 scope。 */
         private List<String> scopes = new ArrayList<>();
 
@@ -97,6 +100,14 @@ public class ClientSeedProperties {
 
         public void setRedirectUris(List<String> redirectUris) {
             this.redirectUris = copyOf(redirectUris);
+        }
+
+        public List<String> getPostLogoutRedirectUris() {
+            return new ArrayList<>(this.postLogoutRedirectUris);
+        }
+
+        public void setPostLogoutRedirectUris(List<String> postLogoutRedirectUris) {
+            this.postLogoutRedirectUris = copyOf(postLogoutRedirectUris);
         }
 
         public List<String> getScopes() {
