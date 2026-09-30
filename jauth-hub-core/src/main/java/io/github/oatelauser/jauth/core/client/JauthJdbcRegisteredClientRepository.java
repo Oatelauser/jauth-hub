@@ -57,8 +57,18 @@ public class JauthJdbcRegisteredClientRepository extends JdbcRegisteredClientRep
         Assert.hasText(id, "id cannot be empty");
         List<ClientOwner> result = this.jdbcOperations.query(
                 FIND_OWNER_SQL,
-                (rs, rowNum) -> new ClientOwner(rs.getString("owner_user_id"), rs.getString("owner_org_id")),
+                (rs, rowNum) -> new ClientOwner(
+                        trimToNull(rs.getString("owner_user_id")), trimToNull(rs.getString("owner_org_id"))),
                 id);
         return result.isEmpty() ? null : result.get(0);
+    }
+
+    /** 两列 DDL 为 CHAR(36)（UUID 定长），H2 等驱动读短值回补空格——统一去空白归一，空串归 null（平台语义）。 */
+    private static @Nullable String trimToNull(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

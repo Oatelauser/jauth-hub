@@ -28,15 +28,19 @@ import org.springframework.util.Assert;
  */
 final class FamilyAwareInMemoryAuthorizationService implements OAuth2AuthorizationService {
 
-    private final InMemoryOAuth2AuthorizationService delegate;
+    private final OAuth2AuthorizationService delegate;
 
     private final InMemoryTokenFamilyService tokenFamilyService;
 
     /** 烧族索引：principalName + registeredClientId → 授权 id 集。save 记录、remove 清理。 */
     private final Map<String, Set<String>> authorizationIdsByFamily = new ConcurrentHashMap<>();
 
+    /**
+     * 委托取接口而非框架 final 类：B9 起 base 之上可垫 CeilingAware 取交层（装饰序 FamilyAware(Ceiling(base))，
+     * 剪枝最内层、族谱/审计观察剪后状态）；本类只调接口四方法，类型放宽行为不变。
+     */
     FamilyAwareInMemoryAuthorizationService(
-            InMemoryOAuth2AuthorizationService delegate, InMemoryTokenFamilyService tokenFamilyService) {
+            OAuth2AuthorizationService delegate, InMemoryTokenFamilyService tokenFamilyService) {
         Assert.notNull(delegate, "delegate cannot be null");
         Assert.notNull(tokenFamilyService, "tokenFamilyService cannot be null");
         this.delegate = delegate;

@@ -8,7 +8,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.github.oatelauser.jauth.core.client.InMemoryClientOwnerResolver;
+import io.github.oatelauser.jauth.core.org.InMemoryInstallationRepository;
+import io.github.oatelauser.jauth.core.org.InMemoryOrgRepository;
+import io.github.oatelauser.jauth.core.org.OrgScopeGate;
 import io.github.oatelauser.jauth.core.scope.InMemoryScopeCatalog;
+import io.github.oatelauser.jauth.core.user.InMemoryUserRepository;
 import jakarta.servlet.Filter;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
@@ -171,7 +176,16 @@ class ProtocolPagesTest {
 
         return MockMvcBuilders.standaloneSetup(
                         new LoginController(flag),
-                        new ConsentController(mockClients(), new InMemoryScopeCatalog(), messageSource, flag),
+                        new ConsentController(
+                                mockClients(),
+                                new InMemoryScopeCatalog(),
+                                messageSource,
+                                flag,
+                                new OrgScopeGate(
+                                        new InMemoryUserRepository(),
+                                        new InMemoryOrgRepository(),
+                                        new InMemoryInstallationRepository()),
+                                new InMemoryClientOwnerResolver()),
                         new DeviceVerifyController(flag))
                 .setViewResolvers(viewResolver)
                 .setLocaleResolver(new FixedLocaleResolver(Locale.SIMPLIFIED_CHINESE))

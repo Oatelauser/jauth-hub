@@ -19,26 +19,44 @@
         <span th:text="#{jauth.consent.client-label}">应用</span>：
         <strong th:text="${clientName}">demo-client</strong>
       </p>
+      <!--/* 组织客户端：选定 org（单候选隐式或多候选经选择器）后的上下文徽标 */-->
+      <p class="org-badge" th:if="${orgBadge != null}">
+        <span th:text="#{jauth.consent.org-context}">授权组织</span>：
+        <strong th:text="${orgBadge}">acme</strong>
+      </p>
       <details class="teach" th:if="${educational}">
         <summary th:text="#{jauth.teach.what-happened}">发生了什么</summary>
         <p th:text="#{jauth.consent.teach}">教学说明</p>
       </details>
+      <!--/* 组织客户端三态：0 候选引导态（不出授权表单）/ 多候选选择器（链接式重入本页，选定后再出表单） */-->
+      <div class="org-guide" th:if="${orgGuide}" th:text="#{jauth.consent.org-guide}">该应用需要先安装到你所在的组织</div>
+      <div class="org-select" th:if="${!#lists.isEmpty(orgChoices)}">
+        <p class="scopes-label" th:text="#{jauth.consent.org-select}">请选择组织上下文</p>
+        <ul class="org-choices">
+          <li th:each="choice : ${orgChoices}">
+            <a class="org-choice" th:href="${choice.href()}" th:text="${choice.orgName()}">acme</a>
+          </li>
+        </ul>
+      </div>
       <form class="form" th:action="@{/oauth2/authorize}" method="post">
         <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
         <input type="hidden" name="client_id" th:value="${clientId}" />
         <input type="hidden" name="state" th:value="${state}" />
-        <p class="scopes-label" th:text="#{jauth.consent.requested}">该应用请求获得以下权限：</p>
-        <ul class="scopes">
-          <li th:each="scope : ${scopes}">
-            <label class="scope-item">
-              <input type="checkbox" name="scope" th:value="${scope.name()}" checked />
-              <span class="scope-name" th:text="${scope.name()}">profile</span>
-              <span class="scope-desc" th:text="${scope.description()}">描述</span>
-            </label>
-          </li>
-        </ul>
+        <!--/* 引导态/选择器态不出 scope 表单（org 上下文未定，提交无意义），仅保留拒绝出口 */-->
+        <th:block th:if="${!orgGuide && #lists.isEmpty(orgChoices)}">
+          <p class="scopes-label" th:text="#{jauth.consent.requested}">该应用请求获得以下权限：</p>
+          <ul class="scopes">
+            <li th:each="scope : ${scopes}">
+              <label class="scope-item" th:classappend="${!scope.grantable()} ? disabled">
+                <input type="checkbox" name="scope" th:value="${scope.name()}" th:checked="${scope.checked()}" th:disabled="${!scope.grantable()}" />
+                <span class="scope-name" th:text="${scope.name()}">profile</span>
+                <span class="scope-desc" th:text="${scope.description()}">描述</span>
+              </label>
+            </li>
+          </ul>
+        </th:block>
         <div class="actions">
-          <button class="btn primary" type="submit" name="action" value="authorize" th:text="#{jauth.consent.authorize}">同意授权</button>
+          <button class="btn primary" type="submit" name="action" value="authorize" th:if="${!orgGuide && #lists.isEmpty(orgChoices)}" th:text="#{jauth.consent.authorize}">同意授权</button>
           <button class="btn" type="submit" name="action" value="deny" th:text="#{jauth.consent.deny}">拒绝</button>
         </div>
       </form>

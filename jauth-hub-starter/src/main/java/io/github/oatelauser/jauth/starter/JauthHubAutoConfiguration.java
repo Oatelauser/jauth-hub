@@ -12,10 +12,14 @@ import io.github.oatelauser.jauth.core.audit.JdbcAuditEventService;
 import io.github.oatelauser.jauth.core.audit.SecurityEventAuditBridge;
 import io.github.oatelauser.jauth.core.authorization.AuditingOAuth2AuthorizationConsentService;
 import io.github.oatelauser.jauth.core.authorization.AuditingOAuth2AuthorizationService;
+import io.github.oatelauser.jauth.core.authorization.CeilingAwareOAuth2AuthorizationService;
 import io.github.oatelauser.jauth.core.authorization.JauthJdbcOAuth2AuthorizationService;
+import io.github.oatelauser.jauth.core.client.ClientOwnerResolver;
 import io.github.oatelauser.jauth.core.client.ClientSeedProperties;
 import io.github.oatelauser.jauth.core.client.ClientSeeder;
+import io.github.oatelauser.jauth.core.client.InMemoryClientOwnerResolver;
 import io.github.oatelauser.jauth.core.client.JauthJdbcRegisteredClientRepository;
+import io.github.oatelauser.jauth.core.client.JdbcClientOwnerResolver;
 import io.github.oatelauser.jauth.core.org.InMemoryInstallationRepository;
 import io.github.oatelauser.jauth.core.org.InMemoryOrgRepository;
 import io.github.oatelauser.jauth.core.org.InstallationRepository;
@@ -23,7 +27,9 @@ import io.github.oatelauser.jauth.core.org.InstallationService;
 import io.github.oatelauser.jauth.core.org.JdbcInstallationRepository;
 import io.github.oatelauser.jauth.core.org.JdbcOrgRepository;
 import io.github.oatelauser.jauth.core.org.OrgRepository;
+import io.github.oatelauser.jauth.core.org.OrgScopeGate;
 import io.github.oatelauser.jauth.core.org.OrgService;
+import io.github.oatelauser.jauth.core.org.OrgsClaimsContributor;
 import io.github.oatelauser.jauth.core.ratelimit.RateLimiter;
 import io.github.oatelauser.jauth.core.response.DefaultResponseRenderer;
 import io.github.oatelauser.jauth.core.response.JauthResponseAdvice;
@@ -285,6 +291,17 @@ public class JauthHubAutoConfiguration {
                 clock.getIfAvailable(Clock::systemUTC));
     }
 
+    /**
+     * ceiling 封门口径（B9）：候选 org 集 / ceiling 读取的单点查询，服务端强制（授权服务链的 CeilingAware
+     * 装饰器）与 consent 页 org 上下文共用；仓储三件由两段 storage 供给，此处单点装配。
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    OrgScopeGate jauthOrgScopeGate(
+            UserRepository userRepository, OrgRepository orgRepository, InstallationRepository installationRepository) {
+        return new OrgScopeGate(userRepository, orgRepository, installationRepository);
+    }
+
     // ------------------------------------------------------------------ 令牌装配
 
     /** 默认 claims 贡献者：sub/username，用户查找接 jauth UserRepository（B2 既定接线）。 */
@@ -292,6 +309,17 @@ public class JauthHubAutoConfiguration {
     @ConditionalOnMissingBean(ClaimsContributor.class)
     DefaultClaimsContributor defaultClaimsContributor(UserRepository userRepository) {
         return new DefaultClaimsContributor(userRepository::findByUsername);
+    }
+
+    /**
+     * orgs claims 贡献者（B9）：claim orgs = 用户全部 org 归属（id/name/role），经下方两个定制器同形接出
+     * id_token / userinfo / opaque 内省。声明在默认贡献者之后：默认贡献者的让位条件以宿主自定义为准，
+     * 本贡献者独立在场（条件钉自身类型，不因宿主替换 sub/username 贡献者而消失）。
+     */
+    @Bean
+    @ConditionalOnMissingBean(OrgsClaimsContributor.class)
+    OrgsClaimsContributor orgsClaimsContributor(UserRepository userRepository, OrgRepository orgRepository) {
+        return new OrgsClaimsContributor(userRepository::findByUsername, orgRepository::findMembershipsByUser);
     }
 
     /** opaque access token 定制器（消费面一：内省富化），按 List 注入宿主可追加的贡献者。 */
@@ -375,8 +403,11 @@ public class JauthHubAutoConfiguration {
             RegisteredClientRepository clientRepository,
             ScopeCatalog scopeCatalog,
             MessageSource messageSource,
-            EducationalFlag educational) {
-        return new ConsentController(clientRepository, scopeCatalog, messageSource, educational);
+            EducationalFlag educational,
+            OrgScopeGate orgScopeGate,
+            ClientOwnerResolver clientOwnerResolver) {
+        return new ConsentController(
+                clientRepository, scopeCatalog, messageSource, educational, orgScopeGate, clientOwnerResolver);
     }
 
     @Bean
@@ -709,17 +740,22 @@ public class JauthHubAutoConfiguration {
 
         /**
          * 授权服务 = 审计装饰（族谱包装版）：RTR 熔断在包装层，生命周期审计（签发/刷新/撤销）在装饰层，
-         * 各自单点。宿主自定义授权服务时整链让位（含审计装饰——审计接线属 jauth 装配职责，不裹宿主实现）。
+         * 各自单点。ceiling 取交（B9）在最内层紧贴 base——外层审计/家族必须观察到剪后状态。宿主自定义
+         * 授权服务时整链让位（含审计装饰——审计接线属 jauth 装配职责，不裹宿主实现）。
          */
         @Bean
         @ConditionalOnMissingBean(OAuth2AuthorizationService.class)
         AuditingOAuth2AuthorizationService jauthAuthorizationService(
                 InMemoryTokenFamilyService tokenFamilyService,
+                ClientOwnerResolver clientOwnerResolver,
+                OrgScopeGate orgScopeGate,
                 AuditEventPublisher auditPublisher,
                 ObjectProvider<MeterRegistry> meterRegistry) {
             return new AuditingOAuth2AuthorizationService(
                     new FamilyAwareInMemoryAuthorizationService(
-                            new InMemoryOAuth2AuthorizationService(), tokenFamilyService),
+                            new CeilingAwareOAuth2AuthorizationService(
+                                    new InMemoryOAuth2AuthorizationService(), clientOwnerResolver, orgScopeGate),
+                            tokenFamilyService),
                     auditPublisher,
                     meterRegistry.getIfAvailable());
         }
@@ -744,6 +780,16 @@ public class JauthHubAutoConfiguration {
         @ConditionalOnMissingBean(UserRepository.class)
         InMemoryUserRepository jauthUserRepository() {
             return new InMemoryUserRepository();
+        }
+
+        /**
+         * owner 解析（B9）：memory 模式的进程内登记表——种子客户端不带归属，宿主/测试经 put 登记，
+         * 未登记即平台语义（ceiling 不剪）。
+         */
+        @Bean
+        @ConditionalOnMissingBean(ClientOwnerResolver.class)
+        InMemoryClientOwnerResolver jauthClientOwnerResolver() {
+            return new InMemoryClientOwnerResolver();
         }
 
         @Bean
@@ -835,8 +881,9 @@ public class JauthHubAutoConfiguration {
 
         /**
          * 授权服务 = 审计装饰（PAT 叠加 → JDBC 哈希手术版）：读取路径 PAT 回退在叠加层（B5 闭环），
-         * 生命周期审计在最外层（save/remove 单点）。PAT 叠加构造幂等播种 jauth-pat 伪客户端
-         * （内省 client_id 反查所需，叠加层类注释）。
+         * 生命周期审计在最外层（save/remove 单点）。ceiling 取交（B9）在最内层紧贴 base——外层审计/
+         * PAT 必须观察到剪后状态。PAT 叠加构造幂等播种 jauth-pat 伪客户端（内省 client_id 反查所需，
+         * 叠加层类注释）。
          */
         @Bean
         @ConditionalOnMissingBean(OAuth2AuthorizationService.class)
@@ -845,6 +892,7 @@ public class JauthHubAutoConfiguration {
                 JauthJdbcRegisteredClientRepository registeredClientRepository,
                 JdbcTokenFamilyService tokenFamilyService,
                 UserRepository userRepository,
+                OrgScopeGate orgScopeGate,
                 AuditEventPublisher auditPublisher,
                 Clock clock,
                 ObjectProvider<MeterRegistry> meterRegistry,
@@ -853,8 +901,13 @@ public class JauthHubAutoConfiguration {
                     new JdbcTemplate(dataSource), registeredClientRepository, userRepository, clock);
             return new AuditingOAuth2AuthorizationService(
                     new PatAwareOAuth2AuthorizationService(
-                            new JauthJdbcOAuth2AuthorizationService(
-                                    new JdbcTemplate(dataSource), registeredClientRepository, tokenFamilyService),
+                            new CeilingAwareOAuth2AuthorizationService(
+                                    new JauthJdbcOAuth2AuthorizationService(
+                                            new JdbcTemplate(dataSource),
+                                            registeredClientRepository,
+                                            tokenFamilyService),
+                                    new JdbcClientOwnerResolver(registeredClientRepository),
+                                    orgScopeGate),
                             patSupport),
                     auditPublisher,
                     meterRegistry.getIfAvailable());
@@ -885,6 +938,14 @@ public class JauthHubAutoConfiguration {
         @ConditionalOnMissingBean(UserRepository.class)
         JdbcUserRepository jauthUserRepository(DataSource dataSource, FlywayMigrationGuard migrationGuard) {
             return new JdbcUserRepository(new JdbcTemplate(dataSource));
+        }
+
+        /** owner 解析（B9）：jdbc 模式读 owner 两列（JauthJdbcRegisteredClientRepository 既有路径）。 */
+        @Bean
+        @ConditionalOnMissingBean(ClientOwnerResolver.class)
+        JdbcClientOwnerResolver jauthClientOwnerResolver(
+                JauthJdbcRegisteredClientRepository registeredClientRepository) {
+            return new JdbcClientOwnerResolver(registeredClientRepository);
         }
 
         @Bean

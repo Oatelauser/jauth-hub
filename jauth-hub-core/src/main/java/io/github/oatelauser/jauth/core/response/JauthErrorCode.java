@@ -28,7 +28,7 @@ public enum JauthErrorCode implements ErrorCode {
     /** 安装状态机不允许该操作：如对非 PENDING 行审批/驳回、对非 APPROVED 行撤销（B8）。 */
     A0507("A0507", "当前状态不允许该操作"),
 
-    /** 无权限执行该操作：如非 org OWNER 试图审批/驳回/撤销安装（B8）。 */
+    /** 无权限执行该操作：如非 org OWNER 试图审批/驳回/撤销安装（B8）；组织客户端发行无可用 org 上下文——未安装/安装非 APPROVED，或多 org 未选择（B9 fail-closed）。 */
     A0508("A0508", "无权限执行该操作");
 
     private final String code;

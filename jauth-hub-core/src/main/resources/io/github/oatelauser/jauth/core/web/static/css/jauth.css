@@ -286,3 +286,51 @@ body {
   color: var(--text-secondary);
   font-size: 13px;
 }
+
+/* 组织客户端三态（B9）：徽标 / 链接式选择器 / 引导态；超 ceiling 的禁用 scope 项降透明度 */
+.org-badge {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.org-badge strong {
+  color: var(--text-primary);
+}
+
+.org-select .org-choices {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.org-choice {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  text-decoration: none;
+  color: var(--text-primary);
+}
+
+.org-choice:hover {
+  border-color: var(--accent);
+}
+
+.org-guide {
+  margin: 0 0 16px;
+  border-radius: 8px;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.scope-item.disabled {
+  opacity: 0.55;
+}

@@ -31,6 +31,9 @@ public class JdbcInstallationRepository implements InstallationRepository {
     private static final String FIND_BY_CLIENT_AND_ORG_SQL =
             "SELECT " + COLUMN_NAMES + " FROM jauth_installation WHERE registered_client_id = ? AND org_id = ?";
 
+    private static final String FIND_BY_CLIENT_SQL =
+            "SELECT " + COLUMN_NAMES + " FROM jauth_installation WHERE registered_client_id = ?";
+
     private static final String INSERT_SQL =
             "INSERT INTO jauth_installation (" + COLUMN_NAMES + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
@@ -71,6 +74,12 @@ public class JdbcInstallationRepository implements InstallationRepository {
         List<Installation> result = this.jdbcOperations.query(
                 FIND_BY_CLIENT_AND_ORG_SQL, INSTALLATION_ROW_MAPPER, registeredClientId, orgId);
         return result.isEmpty() ? null : result.get(0);
+    }
+
+    @Override
+    public List<Installation> findByClient(String registeredClientId) {
+        Assert.hasText(registeredClientId, "registeredClientId cannot be empty");
+        return this.jdbcOperations.query(FIND_BY_CLIENT_SQL, INSTALLATION_ROW_MAPPER, registeredClientId);
     }
 
     @Override

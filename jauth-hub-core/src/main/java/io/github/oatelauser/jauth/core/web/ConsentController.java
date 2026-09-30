@@ -1,7 +1,13 @@
 package io.github.oatelauser.jauth.core.web;
 
+import io.github.oatelauser.jauth.core.authorization.CeilingAwareOAuth2AuthorizationService;
+import io.github.oatelauser.jauth.core.client.ClientOwner;
+import io.github.oatelauser.jauth.core.client.ClientOwnerResolver;
+import io.github.oatelauser.jauth.core.org.OrgMembership;
+import io.github.oatelauser.jauth.core.org.OrgScopeGate;
 import io.github.oatelauser.jauth.core.scope.ScopeCatalog;
 import io.github.oatelauser.jauth.core.scope.ScopeDefinition;
+import jakarta.servlet.http.HttpSession;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -9,33 +15,61 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Consent 页：授权码流程第二步，scope 交集在此成形（05 票教学一句话）。
  *
  * <p>照 SAS 官方 consent 页示例模式：框架在需要授权时重定向到本页并携带 client_id/state/scope 请求参数；表单回传目标是<b>授权端点
- * /oauth2/authorize</b>（框架在该 POST 上收 client_id/state/scope 后下发授权码），本页只有 GET——POST 打到 /oauth2/consent 即 405； 勾选 scope
- * 与发行令牌取交集的语义由 B4 装配的授权流程落地，本控制器只把视图与表单模型组装正确。 勾选态本批默认全选（框架示例行为：请求的 scope 默认勾上）；"已授权过的默认勾选"需接
- * consent 存储，随 B4 细化。
+ * /oauth2/authorize</b>（框架在该 POST 上收 client_id/state/scope 后下发授权码），本页只有 GET——POST 打到 /oauth2/consent 即 405；
+ * 勾选 scope 与发行令牌取交集的语义由授权服务链落地，本控制器只把视图与表单模型组装正确。
+ *
+ * <p><b>组织客户端的 org 上下文三态</b>（B9，口径与强制单点在 {@link OrgScopeGate} 与 CeilingAware 装饰器——渲染层只是
+ * UX，服务端剪枝才是防线）：个人/平台客户端渲染完全不变；组织客户端按候选 org 集分三态——0 个渲染引导态（需 org OWNER
+ * 安装）、1 个隐式上下文 + 会话暂存 + 徽标展示、多个渲染链接式选择器（GET 带 org 参数重入本页，保留原有
+ * client_id/state/scope 参数；合法选择后写会话暂存并重渲染）。org 上下文经会话暂存
+ * {@value CeilingAwareOAuth2AuthorizationService#CONSENT_ORG_SESSION_KEY_PREFIX}&lt;state&gt; 传给服务端装饰器，<b>不经表单字段</b>——
+ * POST 契约（client_id/state/scope）保持不变。选定后 ceiling 内的 scope 正常勾选，requested 但超出 ceiling 的展示但禁用（教学面：看得见批不下来）。
  *
  * @author oatelauser
  */
 @Controller
 public class ConsentController {
 
-    /** 视图名：模板位于 core 命名空间 templates 目录，解析前缀由装配方（B4）配置。 */
+    /** 视图名：模板位于 core 命名空间 templates 目录，解析前缀由装配方配置。 */
     static final String VIEW_CONSENT = "consent";
 
-    /** scope 表单项：目录未收录的 scope 也如实展示，描述回退为 scope 名本身。 */
-    public record ScopeItem(String name, String description, boolean checked) {}
+    /** scope 表单项：目录未收录的 scope 也如实展示，描述回退为 scope 名本身；grantable=false 渲染为禁用（超出 ceiling）。 */
+    public record ScopeItem(String name, String description, boolean checked, boolean grantable) {}
+
+    /** org 选择器条目：orgId 供选中标识，href 为保留 client_id/state/scope 的本页重入链接。 */
+    public record OrgChoice(String orgId, String orgName, String href) {}
+
+    /** org 上下文渲染态：plain（个人/平台）、guide、select（choices 非空）、selected（badge + ceiling）。 */
+    private record OrgConsentView(
+            boolean guide,
+            List<OrgChoice> choices,
+            @Nullable String selectedOrgName,
+            @Nullable Set<String> ceilingScopes) {
+
+        static OrgConsentView plain() {
+            return new OrgConsentView(false, List.of(), null, null);
+        }
+
+        static OrgConsentView guideView() {
+            return new OrgConsentView(true, List.of(), null, null);
+        }
+    }
 
     private final RegisteredClientRepository clientRepository;
 
@@ -45,15 +79,23 @@ public class ConsentController {
 
     private final EducationalFlag educational;
 
+    private final OrgScopeGate orgScopeGate;
+
+    private final ClientOwnerResolver clientOwnerResolver;
+
     public ConsentController(
             RegisteredClientRepository clientRepository,
             ScopeCatalog scopeCatalog,
             MessageSource messageSource,
-            EducationalFlag educational) {
+            EducationalFlag educational,
+            OrgScopeGate orgScopeGate,
+            ClientOwnerResolver clientOwnerResolver) {
         this.clientRepository = clientRepository;
         this.scopeCatalog = scopeCatalog;
         this.messageSource = messageSource;
         this.educational = educational;
+        this.orgScopeGate = orgScopeGate;
+        this.clientOwnerResolver = clientOwnerResolver;
     }
 
     /**
@@ -65,6 +107,9 @@ public class ConsentController {
      * @param clientId 框架重定向携带的 client_id 参数
      * @param state 框架重定向携带的 state 参数（防 CSRF，表单回传）
      * @param scopeParams 框架重定向携带的 scope 参数（空格拼接单值或多值）
+     * @param orgParam org 选择器的重入参数（多候选时指定所选 org，须在候选集内）
+     * @param principal 当前登录主体（consent 页必在认证后到达；缺席按无 org 上下文渲染）
+     * @param session 会话（org 选择的暂存载体）
      * @param model 视图模型
      * @return 视图名
      */
@@ -73,12 +118,21 @@ public class ConsentController {
             @RequestParam("client_id") String clientId,
             @RequestParam("state") String state,
             @RequestParam("scope") List<String> scopeParams,
+            @RequestParam(value = "org", required = false) @Nullable String orgParam,
+            @Nullable Authentication principal,
+            HttpSession session,
             Model model) {
         model.addAttribute("clientId", clientId);
         model.addAttribute("state", state);
         model.addAttribute("clientName", resolveClientName(clientId));
-        model.addAttribute("scopes", scopeItems(splitScopes(scopeParams), LocaleContextHolder.getLocale()));
         model.addAttribute("educational", educational.enabled());
+        Set<String> requestedScopes = splitScopes(scopeParams);
+        OrgConsentView orgView = orgConsentView(clientId, state, requestedScopes, orgParam, principal, session);
+        model.addAttribute("orgGuide", orgView.guide());
+        model.addAttribute("orgChoices", orgView.choices());
+        model.addAttribute("orgBadge", orgView.selectedOrgName());
+        model.addAttribute(
+                "scopes", scopeItems(requestedScopes, orgView.ceilingScopes(), LocaleContextHolder.getLocale()));
         return VIEW_CONSENT;
     }
 
@@ -94,15 +148,96 @@ public class ConsentController {
         return client != null && client.getClientName() != null ? client.getClientName() : clientId;
     }
 
-    private List<ScopeItem> scopeItems(Set<String> scopes, Locale locale) {
+    /** scope 项：ceiling 为 null（个人/平台或未选定 org）全部可勾选；组织客户端选定后 ceiling 内勾选、超界禁用。 */
+    private List<ScopeItem> scopeItems(Set<String> scopes, @Nullable Set<String> ceiling, Locale locale) {
         List<ScopeItem> items = new ArrayList<>(scopes.size());
         for (String name : scopes) {
+            boolean grantable = ceiling == null || ceiling.contains(name);
             ScopeDefinition definition = scopeCatalog.find(name).orElse(null);
             String description =
                     definition != null ? messageSource.getMessage(definition.i18nKey(), null, name, locale) : name;
-            items.add(new ScopeItem(name, description, true));
+            items.add(new ScopeItem(name, description, grantable, grantable));
         }
         items.sort(Comparator.comparing(ScopeItem::name));
         return items;
+    }
+
+    /**
+     * org 上下文三态判定：个人/平台（或未认证主体）→ plain；组织客户端按候选集 → guide/select/selected
+     * （1 候选与合法 org 参数选择均写会话暂存，供服务端装饰器在 code 生成保存时读取）。
+     */
+    private OrgConsentView orgConsentView(
+            String clientId,
+            String state,
+            Set<String> requestedScopes,
+            @Nullable String orgParam,
+            @Nullable Authentication principal,
+            HttpSession session) {
+        if (principal == null) {
+            return OrgConsentView.plain();
+        }
+        RegisteredClient client = clientRepository.findByClientId(clientId);
+        ClientOwner owner = client == null ? null : clientOwnerResolver.findOwner(client.getId());
+        if (owner == null || owner.orgId() == null) {
+            return OrgConsentView.plain();
+        }
+        List<OrgMembership> candidates = orgScopeGate.approvedOrgs(principal.getName(), client.getId());
+        if (candidates.isEmpty()) {
+            return OrgConsentView.guideView();
+        }
+        OrgMembership selected = selectedCandidate(candidates, orgParam);
+        if (selected == null && candidates.size() == 1) {
+            selected = candidates.get(0);
+        }
+        return selected != null
+                ? selectedView(client, state, selected, session)
+                : selectorView(clientId, state, requestedScopes, candidates);
+    }
+
+    private OrgConsentView selectorView(
+            String clientId, String state, Set<String> requestedScopes, List<OrgMembership> candidates) {
+        List<OrgChoice> choices = candidates.stream()
+                .map(membership -> new OrgChoice(
+                        membership.orgId(),
+                        membership.orgName(),
+                        choiceHref(clientId, state, requestedScopes, membership.orgId())))
+                .sorted(Comparator.comparing(OrgChoice::orgName))
+                .toList();
+        return new OrgConsentView(false, choices, null, null);
+    }
+
+    /** 合法 org 参数（在候选集内）优先；缺席或非法返回 null 交由候选数分流。 */
+    private @Nullable OrgMembership selectedCandidate(List<OrgMembership> candidates, @Nullable String orgParam) {
+        if (orgParam == null) {
+            return null;
+        }
+        return candidates.stream()
+                .filter(membership -> membership.orgId().equals(orgParam))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private OrgConsentView selectedView(
+            RegisteredClient client, String state, OrgMembership selected, HttpSession session) {
+        Set<String> ceiling = orgScopeGate.ceilingScopes(client.getId(), selected.orgId());
+        if (ceiling == null) {
+            // 渲染与封门读取之间安装被撤销的竞态：按引导态渲染，服务端装饰器仍 fail-closed
+            return OrgConsentView.guideView();
+        }
+        session.setAttribute(
+                CeilingAwareOAuth2AuthorizationService.CONSENT_ORG_SESSION_KEY_PREFIX + state, selected.orgId());
+        return new OrgConsentView(false, List.of(), selected.orgName(), ceiling);
+    }
+
+    /** 选择器重入链接：保留框架带来的 client_id/state/scope 原参数，追加所选 org。 */
+    private String choiceHref(String clientId, String state, Set<String> requestedScopes, String orgId) {
+        return UriComponentsBuilder.fromPath("/oauth2/consent")
+                .queryParam("client_id", clientId)
+                .queryParam("state", state)
+                .queryParam("scope", String.join(" ", requestedScopes))
+                .queryParam("org", orgId)
+                .encode()
+                .build()
+                .toUriString();
     }
 }

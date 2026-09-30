@@ -1,5 +1,6 @@
 package io.github.oatelauser.jauth.core.org;
 
+import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -27,6 +28,14 @@ public interface InstallationRepository {
      */
     @Nullable
     Installation findByClientAndOrg(String registeredClientId, String orgId);
+
+    /**
+     * 查某客户端的全部安装行（各状态皆含）——ceiling 候选筛（OrgScopeGate）用单查取代逐 org 查询的口径。
+     *
+     * @param registeredClientId oauth2_registered_client.id
+     * @return 该 client 的安装行列表（无安装为空列表）
+     */
+    List<Installation> findByClient(String registeredClientId);
 
     /**
      * 新增安装行（首发起）。同 (client, org) 已有行由服务层按状态机分流到 {@link #update}，唯一键冲突

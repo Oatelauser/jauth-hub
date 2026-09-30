@@ -1,5 +1,6 @@
 package io.github.oatelauser.jauth.core.org;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.jspecify.annotations.Nullable;
@@ -32,6 +33,14 @@ public class InMemoryInstallationRepository implements InstallationRepository {
                         && installation.orgId().equals(orgId))
                 .findFirst()
                 .orElse(null);
+    }
+
+    @Override
+    public List<Installation> findByClient(String registeredClientId) {
+        Assert.hasText(registeredClientId, "registeredClientId cannot be empty");
+        return this.installationsById.values().stream()
+                .filter(installation -> installation.registeredClientId().equals(registeredClientId))
+                .toList();
     }
 
     @Override
