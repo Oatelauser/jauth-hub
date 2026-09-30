@@ -21,7 +21,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 /**
  * Consent 页：授权码流程第二步，scope 交集在此成形（05 票教学一句话）。
  *
- * <p>照 SAS 官方 consent 页示例模式：框架在需要授权时重定向到本页并携带 client_id/state/scope 请求参数，表单原样回传； 勾选 scope
+ * <p>照 SAS 官方 consent 页示例模式：框架在需要授权时重定向到本页并携带 client_id/state/scope 请求参数；表单回传目标是<b>授权端点
+ * /oauth2/authorize</b>（框架在该 POST 上收 client_id/state/scope 后下发授权码），本页只有 GET——POST 打到 /oauth2/consent 即 405； 勾选 scope
  * 与发行令牌取交集的语义由 B4 装配的授权流程落地，本控制器只把视图与表单模型组装正确。 勾选态本批默认全选（框架示例行为：请求的 scope 默认勾上）；"已授权过的默认勾选"需接
  * consent 存储，随 B4 细化。
  *

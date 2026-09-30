@@ -102,7 +102,7 @@ class ProtocolPagesTest {
                 .andExpect(content().string(containsString("name=\"client_id\"")))
                 .andExpect(content().string(containsString("name=\"state\"")))
                 .andExpect(content().string(containsString("st-123")))
-                .andExpect(content().string(containsString("action=\"/oauth2/consent\"")))
+                .andExpect(content().string(containsString("action=\"/oauth2/authorize\"")))
                 .andExpect(content().string(containsString("type=\"checkbox\" name=\"scope\"" + " value=\"profile\"")))
                 .andExpect(content().string(containsString("确认你的身份标识（openid）")))
                 .andExpect(content().string(containsString("读取你的基本资料（如用户名）")))
