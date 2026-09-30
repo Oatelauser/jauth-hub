@@ -59,8 +59,8 @@ examples/                             内嵌接入示例工程（宿主嵌 start
 | `jauth_user` | 用户：含 role(SUPERADMIN\|USER)、strong_auth_at(sudo 位)、email(预留) |
 | `jauth_user_credential` | Passkey 凭据（v1.0 建表，v1.2 启用） |
 | `jauth_org` / `jauth_org_member` | 组织与成员（OWNER\|MEMBER，审批权在 OWNER） |
-| `jauth_installation` | 安装：client×org、ceiling_scopes 封顶、审批人/时间 |
-| `jauth_pat` | PAT：token_sha256/展示前缀/scopes/过期/last_used（名称列 B5 实施发现缺失，v1.x 加列迁移补——当前创建面仅 scope+有效期） |
+| `jauth_installation` | 安装：client×org、ceiling_scopes 封顶、审批人/时间；两步制（流向 A，2026-09-30 拍板，B8 落地）——任何登录用户 request（requested_by/requested_scopes，V6 列）→ OWNER approve/reject，APPROVED 可 revoke，REJECTED/REVOKED 可重发 |
+| `jauth_pat` | PAT：token_sha256/展示前缀/scopes/过期/last_used（名称列 B5 实施发现缺失，B10 以 V7 加列迁移补——当前创建面仅 scope+有效期） |
 | `jauth_token_family` | 刷新族谱：重放检测→整族烧断 |
 | `jauth_audit_event` | 追加只写，**只记生命周期事件**（签发/刷新/撤销/consent/登录/审批）；内省不打审计 |
 | `jauth_jwk` | 签名密钥（B1 复审补定，原"14 表"缺的第 14 张）：kid/算法/密钥材料/状态(ACTIVE\|RETIRING\|RETIRED)/created_at——支撑 §6 的 90d 轮转 + 14d 重叠 + 2 把共存；B2 批次以 V4 迁移落表 |
