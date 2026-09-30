@@ -38,6 +38,15 @@ public interface InstallationRepository {
     List<Installation> findByClient(String registeredClientId);
 
     /**
+     * 查某 org 的全部安装行（各状态皆含，创建时间新在前）——B11 安装审批页的单查询口径（同
+     * {@link #findByClient}：逐行按状态查库是循环内 DB 查询，页面一次取全量再分区渲染）。
+     *
+     * @param orgId org id
+     * @return 该 org 的安装行列表（无安装为空列表）
+     */
+    List<Installation> findByOrg(String orgId);
+
+    /**
      * 新增安装行（首发起）。同 (client, org) 已有行由服务层按状态机分流到 {@link #update}，唯一键冲突
      * 由 DB 约束兜底。
      *

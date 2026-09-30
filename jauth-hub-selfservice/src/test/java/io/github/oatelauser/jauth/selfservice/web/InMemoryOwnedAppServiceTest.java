@@ -57,6 +57,14 @@ class InMemoryOwnedAppServiceTest extends AbstractOwnedAppServiceContractTest {
         assertThat(this.ownerResolver.findOwner(registration.app().id())).isEqualTo(ClientOwner.ofUser(USER_ID));
     }
 
+    /** B11 org 路径：memory 模式注册 org 应用后登记 ofOrg 归属（ceiling/consent 的 org 上下文由此可读）。 */
+    @Test
+    void registerOrgRecordsOrgOwnerInResolver() {
+        OwnedAppService.Registration registration = this.service.registerOrg(ORG_ID, "组织门户", REDIRECTS, false);
+
+        assertThat(this.ownerResolver.findOwner(registration.app().id())).isEqualTo(ClientOwner.ofOrg(ORG_ID));
+    }
+
     @Test
     void platformSeedStaysOutOfPersonalList() {
         // 未登记归属（平台语义）的种子客户端不进个人列表——列表只出自注册记录

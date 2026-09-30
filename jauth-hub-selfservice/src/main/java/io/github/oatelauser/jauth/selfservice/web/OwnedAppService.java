@@ -33,7 +33,10 @@ import org.springframework.util.Assert;
  * 把关（故 requireAuthorizationConsent=true：个人应用也可能被其他用户授权，不得静默跳过确认）。
  *
  * <p><b>secret 明文纪律</b>（对齐 {@link io.github.oatelauser.jauth.selfservice.pat.PatService} 展示惯例）：只在
- * {@link #register} 返回值出现一次，列表与任何查询面只有编码后的存储值（不可逆）。
+ * {@link #register}/{@link #registerOrg} 返回值出现一次，列表与任何查询面只有编码后的存储值（不可逆）。
+ *
+ * <p><b>org 应用（B11）</b>：{@link #registerOrg}/{@link #listOrg} 是个人面的姊妹路——构造惯例同源，差别只在
+ * owner 归属列（owner_org_id）；org 应用的 scope 封顶走安装审批 ceiling，不由注册面决定。
  *
  * <p><b>双实现</b>：jdbc = {@link JdbcOwnedAppService}（client+owner 两条语句包事务，B10 滑账①收口）；memory =
  * {@link InMemoryOwnedAppService}（框架内存仓库 + owner 登记表）。memory 语义：注册记录重启即失，与框架
@@ -84,6 +87,29 @@ public abstract class OwnedAppService {
      */
     public Registration register(String userId, String name, Set<String> redirectUris, boolean confidential) {
         Assert.hasText(userId, "userId cannot be empty");
+        return registerOwned(ClientOwner.ofUser(userId), name, redirectUris, confidential);
+    }
+
+    /**
+     * 注册一枚 org 应用（B11，2026-09-30 拍板：org 应用 = ClientOwner.ofOrg）。
+     *
+     * <p>构造惯例与个人应用完全同源（同一私有核）；org 应用的发行封顶不在此面——ceiling 由该 org 的安装审批
+     * （InstallationService.approve）落定，运行时取交 = 请求 ∩ consent ∩ ceiling（B9 防线）。注册操作者须为该
+     * org OWNER 的门在页面层（OrgAppsController，A0508），本门面不重复判——与个人面一致只管构造与落位。
+     *
+     * @param orgId 归属 org id（jauth_org.id）
+     * @param name 应用名（非空，≤100 字符）
+     * @param redirectUris 精确回调白名单（非空，元素须为 http/https 绝对 URL 无 fragment）
+     * @param confidential true = 机密应用（随机 secret + refresh token）；false = 公开应用
+     * @return 应用视图 + 仅此一次的明文 secret（公开应用为 null）
+     */
+    public Registration registerOrg(String orgId, String name, Set<String> redirectUris, boolean confidential) {
+        Assert.hasText(orgId, "orgId cannot be empty");
+        return registerOwned(ClientOwner.ofOrg(orgId), name, redirectUris, confidential);
+    }
+
+    /** 两注册门面的收敛核：校验 → 构造 → 按归属双写落位（owner 两列语义由 {@link ClientOwner} 单点承载）。 */
+    private Registration registerOwned(ClientOwner owner, String name, Set<String> redirectUris, boolean confidential) {
         Assert.hasText(name, "name cannot be empty");
         Assert.isTrue(name.trim().length() <= NAME_MAX_LENGTH, "name exceeds " + NAME_MAX_LENGTH + " chars");
         Assert.notEmpty(redirectUris, "redirectUris cannot be empty");
@@ -91,7 +117,7 @@ public abstract class OwnedAppService {
 
         String rawSecret = confidential ? randomUrlSafe(SECRET_ENTROPY_BYTES) : null;
         RegisteredClient client = buildClient(name.trim(), redirectUris, confidential, rawSecret);
-        persist(client, ClientOwner.ofUser(userId));
+        persist(client, owner);
         return new Registration(
                 new OwnedApp(
                         client.getId(),
@@ -112,10 +138,18 @@ public abstract class OwnedAppService {
     public abstract List<OwnedApp> list(String userId);
 
     /**
+     * 列出 org 的应用（owner_org_id = orgId，平台内置与个人应用不在内）——B11 org 应用页的列表查询面。
+     *
+     * @param orgId org id
+     * @return 应用列表（新注册在前），机密应用的 secret 不回显
+     */
+    public abstract List<OwnedApp> listOrg(String orgId);
+
+    /**
      * 双写落位（client 本体 + owner 归属）：jdbc 实现包事务，memory 实现为框架 save + owner 登记表 put。
      *
      * @param client 已构造完成的客户端
-     * @param owner 个人归属（ofUser(userId)）
+     * @param owner 归属（个人 ofUser / 组织 ofOrg，B11 起两路共用本核）
      */
     protected abstract void persist(RegisteredClient client, ClientOwner owner);
 

@@ -34,6 +34,12 @@ public class JdbcOwnedAppService extends OwnedAppService {
                     + " client_id_issued_at FROM oauth2_registered_client WHERE owner_user_id = ?"
                     + " ORDER BY client_id_issued_at DESC, id ASC";
 
+    /** org 应用列表（B11）：owner 维度换列，其余口径（排序/行映射）与个人列表同款。 */
+    private static final String LIST_BY_ORG_SQL =
+            "SELECT id, client_id, client_name, client_authentication_methods, redirect_uris,"
+                    + " client_id_issued_at FROM oauth2_registered_client WHERE owner_org_id = ?"
+                    + " ORDER BY client_id_issued_at DESC, id ASC";
+
     private static final RowMapper<OwnedApp> OWNED_APP_ROW_MAPPER = new RowMapper<>() {
         @Override
         public OwnedApp mapRow(ResultSet rs, int rowNum) throws SQLException {
@@ -82,6 +88,12 @@ public class JdbcOwnedAppService extends OwnedAppService {
     public List<OwnedApp> list(String userId) {
         Assert.hasText(userId, "userId cannot be empty");
         return this.jdbcOperations.query(LIST_BY_OWNER_SQL, OWNED_APP_ROW_MAPPER, userId);
+    }
+
+    @Override
+    public List<OwnedApp> listOrg(String orgId) {
+        Assert.hasText(orgId, "orgId cannot be empty");
+        return this.jdbcOperations.query(LIST_BY_ORG_SQL, OWNED_APP_ROW_MAPPER, orgId);
     }
 
     /** 框架 redirect_uris 列按逗号拼接（JdbcRegisteredClientRepository 的 String.join(",")）。 */

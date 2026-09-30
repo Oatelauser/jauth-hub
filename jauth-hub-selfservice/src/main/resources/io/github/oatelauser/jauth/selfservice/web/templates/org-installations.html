@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<!--/* 安装审批页（B11：流向 A 两步制 OWNER 面）:PENDING 待批(requested_scopes 勾选默认全选=ceiling 收窄) + 全量安装行(状态徽标/ceiling/审批痕迹) + 面向 org 的安装发起表单 */-->
+<html lang="zh" xmlns:th="https://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('jauth.orginst.title')}">
+  <title>安装审批</title>
+</head>
+<body>
+  <!--/* 自助页补充样式（ss- 前缀自成命名空间，照 my-apps 同款） */-->
+  <style>
+    .ss-wide { max-width: 860px; }
+    .ss-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .ss-table th, .ss-table td { border-bottom: 1px solid #dfe3ef; padding: 8px 10px; text-align: left; }
+    .ss-table th { color: #5a607a; font-weight: 600; }
+    .ss-mono { font-family: ui-monospace, Consolas, monospace; font-size: 13px; word-break: break-all; }
+    .ss-badge { display: inline-block; border-radius: 6px; padding: 1px 8px; font-size: 12px;
+                background: #eef2fd; color: #3352a4; }
+    .ss-badge.approved { background: #eefaf0; color: #1f7a3d; }
+    .ss-badge.rejected, .ss-badge.revoked { background: #fdeef1; color: #b02a37; }
+    .ss-pending { border: 1px solid #dfe3ef; border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+    .ss-pending .scope-item { display: block; margin: 4px 0; }
+    .card h2 { margin: 20px 0 12px; font-size: 17px; }
+    .btn.danger { background: #fff; color: #b02a37; border: 1px solid #e3b7bd; }
+  </style>
+  <div class="page">
+    <main class="card ss-wide">
+      <p class="brand" th:text="#{jauth.brand}">jauth-hub</p>
+      <h1>
+        <span th:text="#{jauth.orginst.title}">安装审批</span>
+        <span class="ss-badge" th:text="${org.name}">acme</span>
+      </h1>
+      <details class="teach" th:if="${educational}">
+        <summary th:text="#{jauth.teach.what-happened}">发生了什么</summary>
+        <p th:text="#{jauth.orginst.teach}">安装审批教学说明</p>
+      </details>
+
+      <div class="alert" th:if="${!installationsSupported}" th:text="#{jauth.orginst.unsupported}">当前装配不支持</div>
+
+      <th:block th:if="${installationsSupported}">
+        <h2 th:text="#{jauth.orginst.pending-title}">待批请求</h2>
+        <p class="hint" th:if="${#lists.isEmpty(pending)}" th:text="#{jauth.orginst.pending-empty}">没有待批请求</p>
+        <div class="ss-pending" th:each="row : ${pending}">
+          <p>
+            <strong class="scope-name" th:text="${row.clientName}">Org App</strong>
+            <span class="ss-mono" th:text="${row.clientLabel}">app_xxxxxxxx</span>
+          </p>
+          <p>
+            <span th:text="#{jauth.orginst.col-requester}">发起人</span>:
+            <span th:text="${row.requestedByName}">alice</span>
+            · <span th:text="#{jauth.orginst.requested-scopes}">请求范围</span>:
+            <span class="ss-mono" th:text="${#strings.listJoin(row.requestedScopes, ' ')}">openid profile</span>
+          </p>
+          <!--/* 勾选集即 ceiling：默认全选，OWNER 可收窄（空勾选由服务端 A0511 拒） */-->
+          <label class="scope-item" th:each="scope : ${row.requestedScopes}">
+            <input type="checkbox" name="ceilingScope" th:value="${scope}" checked="checked" />
+            <span class="scope-name" th:text="${scope}">openid</span>
+          </label>
+          <p>
+            <button class="btn primary" type="button"
+                    th:attr="data-approve-url=@{/selfservice/orgs/{orgId}/installations/{installationId}/approve(orgId=${org.id},installationId=${row.id})}"
+                    th:text="#{jauth.orginst.approve}">批准</button>
+            <button class="btn danger" type="button"
+                    th:attr="data-reject-url=@{/selfservice/orgs/{orgId}/installations/{installationId}/reject(orgId=${org.id},installationId=${row.id})}"
+                    th:text="#{jauth.orginst.reject}">驳回</button>
+          </p>
+        </div>
+
+        <h2 th:text="#{jauth.orginst.all-title}">全部安装</h2>
+        <p class="hint" th:if="${#lists.isEmpty(installations)}" th:text="#{jauth.orginst.all-empty}">还没有安装</p>
+        <table class="ss-table" th:if="${!#lists.isEmpty(installations)}">
+          <thead>
+            <tr>
+              <th th:text="#{jauth.orginst.col-client}">应用</th>
+              <th th:text="#{jauth.orginst.col-status}">状态</th>
+              <th th:text="#{jauth.orginst.col-ceiling}">封顶范围</th>
+              <th th:text="#{jauth.orginst.col-requester}">发起人</th>
+              <th th:text="#{jauth.orginst.col-approver}">审批人/时间</th>
+              <th th:text="#{jauth.orginst.col-created}">发起时间</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr th:each="row : ${installations}">
+              <td>
+                <span class="scope-name" th:text="${row.clientName}">Org App</span><br />
+                <span class="ss-mono" th:text="${row.clientLabel}">app_xxxxxxxx</span>
+              </td>
+              <td>
+                <span class="ss-badge" th:classappend="${#strings.toLowerCase(row.status.name())}"
+                      th:text="#{${row.statusKey()}}">PENDING</span>
+              </td>
+              <td class="ss-mono"
+                  th:text="${#lists.isEmpty(row.ceilingScopes)} ? '—' : ${#strings.listJoin(row.ceilingScopes, ' ')}">openid</td>
+              <td th:text="${row.requestedByName}">alice</td>
+              <td>
+                <span th:if="${row.approvedByName != null}"
+                      th:text="${row.approvedByName}">owner</span>
+                <span th:if="${row.approvedAt != null}"
+                      th:text="${#temporals.format(row.approvedAt, 'yyyy-MM-dd HH:mm')}">2026-09-30 10:00</span>
+                <span th:if="${row.approvedByName == null}">—</span>
+              </td>
+              <td th:text="${#temporals.format(row.createdAt, 'yyyy-MM-dd HH:mm')}">2026-09-30 10:00</td>
+              <td>
+                <button class="btn danger" type="button" th:if="${row.status.name() == 'APPROVED'}"
+                        th:attr="data-revoke-url=@{/selfservice/orgs/{orgId}/installations/{installationId}/revoke(orgId=${org.id},installationId=${row.id})}"
+                        th:text="#{jauth.orginst.revoke}">撤销</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2 th:text="#{jauth.orginst.request-title}">发起安装</h2>
+        <form class="form" id="installation-request-form">
+          <meta name="_csrf" th:if="${_csrf != null}" th:content="${_csrf.token}" />
+          <meta name="_csrf_header" th:if="${_csrf != null}" th:content="${_csrf.headerName}" />
+          <label class="field">
+            <span th:text="#{jauth.orginst.field-client-id}">Client ID</span>
+            <input type="text" name="clientId" required="required" class="ss-mono"
+                   th:placeholder="'app_xxxxxxxx'" />
+            <span class="hint" th:text="#{jauth.orginst.client-id-hint}">向应用开发方索取</span>
+          </label>
+          <fieldset class="field">
+            <span th:text="#{jauth.orginst.field-scopes}">请求范围</span>
+            <label class="scope-item" th:each="scope : ${scopes}">
+              <input type="checkbox" name="scope" th:value="${scope.name}" />
+              <span class="scope-name" th:text="${scope.name}">openid</span>
+              <span class="scope-desc" th:text="${scope.description}">描述</span>
+            </label>
+          </fieldset>
+          <button class="btn primary" type="submit" th:text="#{jauth.orginst.request-submit}">发起安装请求</button>
+        </form>
+      </th:block>
+    </main>
+  </div>
+  <script th:if="${installationsSupported}" th:inline="javascript">
+    (function () {
+      var csrfMeta = document.querySelector('meta[name="_csrf"]');
+      var csrfHeaderMeta = document.querySelector('meta[name="_csrf_header"]');
+      var requestBase = /*[[ @{/selfservice/orgs/{orgId}/installations(orgId=${org.id})} ]]*/ '/selfservice/orgs/org/installations';
+
+      function postJson(url, body) {
+        var headers = { 'Content-Type': 'application/json' };
+        if (csrfMeta && csrfHeaderMeta) { headers[csrfHeaderMeta.content] = csrfMeta.content; }
+        return fetch(url, { method: 'POST', headers: headers, credentials: 'same-origin', body: JSON.stringify(body) })
+          .then(function (response) { return response.json(); })
+          .then(function (payload) {
+            if (payload.code !== '00000') { window.alert(payload.message); return; }
+            window.location.reload();
+          });
+      }
+
+      // 批准：同区块内勾选的 ceilingScope 收集为 ceiling（空勾选由服务端 A0511 拒）
+      document.querySelectorAll('[data-approve-url]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          var scopes = Array.prototype.map.call(
+              button.closest('.ss-pending').querySelectorAll('input[name="ceilingScope"]:checked'),
+              function (input) { return input.value; });
+          postJson(button.getAttribute('data-approve-url'), { scopes: scopes });
+        });
+      });
+      document.querySelectorAll('[data-reject-url]').forEach(function (button) {
+        button.addEventListener('click', function () { postJson(button.getAttribute('data-reject-url'), {}); });
+      });
+      document.querySelectorAll('[data-revoke-url]').forEach(function (button) {
+        button.addEventListener('click', function () { postJson(button.getAttribute('data-revoke-url'), {}); });
+      });
+
+      var requestForm = document.getElementById('installation-request-form');
+      requestForm.addEventListener('submit', function (event) {
+        event.preventDefault();
+        var scopes = Array.prototype.map.call(
+            requestForm.querySelectorAll('input[name="scope"]:checked'),
+            function (input) { return input.value; });
+        postJson(requestBase, {
+            clientId: requestForm.querySelector('input[name="clientId"]').value.trim(),
+            scopes: scopes
+          });
+      });
+    })();
+  </script>
+</body>
+</html>

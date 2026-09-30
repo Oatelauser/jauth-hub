@@ -57,6 +57,23 @@ class JdbcOwnedAppServiceTest extends AbstractOwnedAppServiceContractTest {
         assertThat(ownerUserId.trim()).isEqualTo(USER_ID);
     }
 
+    /** B11 org 应用归属列：registerOrg 落 owner_org_id 且 owner_user_id 保持空（两列互斥）。 */
+    @Test
+    void ownerColumnsCarryOrgIdAfterRegisterOrg() {
+        OwnedAppService.Registration registration = this.service.registerOrg(ORG_ID, "组织门户", REDIRECTS, true);
+
+        String ownerOrgId = this.jdbcTemplate.queryForObject(
+                "SELECT owner_org_id FROM oauth2_registered_client WHERE client_id = ?",
+                String.class,
+                registration.app().clientId());
+        String ownerUserId = this.jdbcTemplate.queryForObject(
+                "SELECT owner_user_id FROM oauth2_registered_client WHERE client_id = ?",
+                String.class,
+                registration.app().clientId());
+        assertThat(ownerOrgId.trim()).isEqualTo(ORG_ID);
+        assertThat(ownerUserId).isNull();
+    }
+
     @Test
     void platformBuiltInRowsStayOutOfPersonalList() {
         // 平台内置（owner 皆空）：列表按 owner_user_id 收紧，不可见

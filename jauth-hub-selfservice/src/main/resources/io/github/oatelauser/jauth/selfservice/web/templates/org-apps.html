@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<!--/* org 应用页（B11）：org 应用注册/列表（OWNER 面）;构造同个人应用(JS → JSON),机密 secret 仅此一次横幅;scope 封顶走安装审批 ceiling */-->
+<html lang="zh" xmlns:th="https://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('jauth.orgapps.title')}">
+  <title>组织应用</title>
+</head>
+<body>
+  <!--/* 自助页补充样式（ss- 前缀自成命名空间，照 my-apps/my-app-new 同款） */-->
+  <style>
+    .ss-wide { max-width: 760px; }
+    .ss-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .ss-table th, .ss-table td { border-bottom: 1px solid #dfe3ef; padding: 8px 10px; text-align: left; }
+    .ss-table th { color: #5a607a; font-weight: 600; }
+    .ss-mono { font-family: ui-monospace, Consolas, monospace; font-size: 13px; word-break: break-all; }
+    .ss-badge { display: inline-block; margin-left: 6px; border-radius: 6px; padding: 1px 8px;
+                font-size: 12px; background: #eef2fd; color: #3352a4; }
+    .ss-badge.confidential { background: #fdeef1; color: #b02a37; }
+    .ss-token-banner code { display: block; margin-top: 6px; word-break: break-all;
+                            font-family: ui-monospace, Consolas, monospace; font-size: 14px; }
+    .field textarea { border: 1px solid #dfe3ef; border-radius: 8px; padding: 10px 12px; font-size: 15px;
+                      font-family: ui-monospace, Consolas, monospace; min-height: 96px; }
+    .field select { border: 1px solid #dfe3ef; border-radius: 8px; padding: 10px 12px; font-size: 15px; }
+    .card h2 { margin: 20px 0 12px; font-size: 17px; }
+  </style>
+  <div class="page">
+    <main class="card ss-wide">
+      <p class="brand" th:text="#{jauth.brand}">jauth-hub</p>
+      <h1>
+        <span th:text="#{jauth.orgapps.title}">组织应用</span>
+        <span class="ss-badge" th:text="${org.name}">acme</span>
+      </h1>
+      <details class="teach" th:if="${educational}">
+        <summary th:text="#{jauth.teach.what-happened}">发生了什么</summary>
+        <p th:text="#{jauth.orgapps.teach}">组织应用教学说明</p>
+      </details>
+
+      <div class="alert" th:if="${!orgAppsSupported}" th:text="#{jauth.orgapps.unsupported}">当前装配不支持</div>
+
+      <th:block th:if="${orgAppsSupported}">
+        <!--/* secret 唯一出现位：注册成功后由脚本填入，刷新即失（对齐 PAT/my-apps 展示惯例） */-->
+        <div class="alert ss-token-banner" id="secret-banner" hidden="hidden">
+          <p th:text="#{jauth.orgapps.created-banner}">应用注册成功</p>
+          <p><span th:text="#{jauth.orgapps.col-client-id}">Client ID</span>: <code id="client-id-value"></code></p>
+          <p id="secret-row" hidden="hidden">
+            <span th:text="#{jauth.orgapps.secret-once}">client_secret 只显示这一次</span>
+            <code id="secret-value"></code>
+          </p>
+          <p><a th:href="@{/selfservice/orgs/{orgId}/apps(orgId=${org.id})}"
+                th:text="#{jauth.orgapps.register-another}">注册另一个应用</a></p>
+        </div>
+
+        <h2 th:text="#{jauth.orgapps.list-title}">组织应用</h2>
+        <table class="ss-table" th:if="${!#lists.isEmpty(apps)}">
+          <thead>
+            <tr>
+              <th th:text="#{jauth.orgapps.col-name}">应用名</th>
+              <th th:text="#{jauth.orgapps.col-client-id}">Client ID</th>
+              <th th:text="#{jauth.orgapps.col-type}">类型</th>
+              <th th:text="#{jauth.orgapps.col-redirects}">回调地址</th>
+              <th th:text="#{jauth.orgapps.col-created}">创建时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr th:each="app : ${apps}">
+              <td class="scope-name" th:text="${app.name}">组织应用</td>
+              <td class="ss-mono" th:text="${app.clientId}">app_xxxxxxxx</td>
+              <td>
+                <span class="ss-badge" th:classappend="${app.confidential} ? confidential"
+                      th:text="${app.confidential} ? #{jauth.orgapps.type-confidential} : #{jauth.orgapps.type-public}">类型</span>
+              </td>
+              <td class="ss-mono" th:text="${#strings.listJoin(app.redirectUris, ' ')}">https://app.example.com/callback</td>
+              <td th:text="${#temporals.format(app.createdAt, 'yyyy-MM-dd HH:mm')}">2026-09-30 10:00</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <form class="form" id="org-app-form">
+          <meta name="_csrf" th:if="${_csrf != null}" th:content="${_csrf.token}" />
+          <meta name="_csrf_header" th:if="${_csrf != null}" th:content="${_csrf.headerName}" />
+          <h2 th:text="#{jauth.orgapps.register-title}">注册组织应用</h2>
+          <label class="field">
+            <span th:text="#{jauth.orgapps.field-name}">应用名</span>
+            <input type="text" name="name" maxlength="100" required="required" />
+          </label>
+          <label class="field">
+            <span th:text="#{jauth.orgapps.field-redirects}">回调地址（Redirect URIs，每行一个）</span>
+            <textarea name="redirectUris" required="required"
+                      th:placeholder="'https://app.example.com/callback'"></textarea>
+            <span class="hint" th:text="#{jauth.orgapps.redirects-hint}">精确 URL，每行一个</span>
+          </label>
+          <label class="field">
+            <span th:text="#{jauth.orgapps.field-type}">客户端类型</span>
+            <select name="confidential">
+              <option value="public" selected="selected" th:text="#{jauth.orgapps.type-public-desc}">公开</option>
+              <option value="confidential" th:text="#{jauth.orgapps.type-confidential-desc}">机密</option>
+            </select>
+          </label>
+          <button class="btn primary" type="submit" th:text="#{jauth.orgapps.create-submit}">注册应用</button>
+        </form>
+      </th:block>
+    </main>
+  </div>
+  <script th:if="${orgAppsSupported}" th:inline="javascript">
+    (function () {
+      var csrfMeta = document.querySelector('meta[name="_csrf"]');
+      var csrfHeaderMeta = document.querySelector('meta[name="_csrf_header"]');
+      var form = document.getElementById('org-app-form');
+      form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        var confidential = form.querySelector('select[name="confidential"]').value === 'confidential';
+        var headers = { 'Content-Type': 'application/json' };
+        if (csrfMeta && csrfHeaderMeta) { headers[csrfHeaderMeta.content] = csrfMeta.content; }
+        fetch(/*[[ @{/selfservice/orgs/{orgId}/apps(orgId=${org.id})} ]]*/ '/selfservice/orgs/org/apps', {
+            method: 'POST', headers: headers, credentials: 'same-origin',
+            body: JSON.stringify({
+              name: form.querySelector('input[name="name"]').value.trim(),
+              redirectUris: form.querySelector('textarea[name="redirectUris"]').value,
+              confidential: confidential
+            })
+          })
+          .then(function (response) { return response.json(); })
+          .then(function (body) {
+            if (body.code !== '00000') { window.alert(body.message); return; }
+            document.getElementById('client-id-value').textContent = body.data.clientId;
+            if (body.data.clientSecret) {
+              document.getElementById('secret-value').textContent = body.data.clientSecret;
+              document.getElementById('secret-row').hidden = false;
+            }
+            document.getElementById('secret-banner').hidden = false;
+            form.hidden = true;
+          });
+      });
+    })();
+  </script>
+</body>
+</html>

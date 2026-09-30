@@ -21,7 +21,10 @@ class JdbcInstallationServiceTest extends AbstractInstallationServiceContractTes
         seedUser(OWNER_ID, "install-owner");
         seedUser(MEMBER_ID, "install-member");
         seedUser(OUTSIDER_ID, "install-outsider");
-        seedClient();
+        // findByOrg 契约需同 org 多行多状态：(client, org) 唯一键要求行间 client 互异，另播两枚种子
+        seedClient(CLIENT_ID);
+        seedClient("install-client-other-1");
+        seedClient("install-client-other-2");
     }
 
     @Override
@@ -47,13 +50,13 @@ class JdbcInstallationServiceTest extends AbstractInstallationServiceContractTes
                 PLACEHOLDER_HASH);
     }
 
-    private void seedClient() {
+    private void seedClient(String registeredClientId) {
         this.jdbcTemplate.update(
                 "INSERT INTO oauth2_registered_client (id, client_id, client_name,"
                         + " client_authentication_methods, authorization_grant_types, scopes,"
                         + " client_settings, token_settings) VALUES (?, ?, 'install-app', 'none',"
                         + " 'client_credentials', 'openid', '{}', '{}')",
-                CLIENT_ID,
-                CLIENT_ID);
+                registeredClientId,
+                registeredClientId);
     }
 }

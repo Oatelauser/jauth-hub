@@ -35,5 +35,22 @@
       <artifactId>h2</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- B11 旗舰 E2E（照 starter 的 CeilingEnforcementIntegrationTest）：selfservice 页面/服务跑在 starter
+         真实协议链上（authorize/consent/token）。仅 test 域——编译面模块边界不变（selfservice 不依赖 starter） -->
+    <dependency>
+      <groupId>io.github.oatelauser</groupId>
+      <artifactId>jauth-hub-starter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webmvc-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-test</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 </project>

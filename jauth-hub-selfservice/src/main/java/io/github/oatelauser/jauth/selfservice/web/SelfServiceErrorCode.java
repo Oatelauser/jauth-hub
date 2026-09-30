@@ -18,14 +18,17 @@ public enum SelfServiceErrorCode implements ErrorCode {
     /** 当前存储模式不支持该自助操作（memory 模式禁用 PAT 与授权看板查询，04 票）。 */
     A0504("A0504", "当前存储模式不支持该自助操作"),
 
-    /** 创建 PAT 的 scope 勾选为空或含目录外 scope。 */
+    /** scope 勾选为空或含目录外 scope（PAT 创建与安装发起共用语义，B11 起双面）。 */
     A0505("A0505", "scope 勾选为空或不在目录内"),
 
     /** 应用注册的名称缺失或非法（空或超 100 字符，B10）。 */
     A0509("A0509", "应用名缺失或非法"),
 
     /** 应用注册的 redirect URIs 缺失或非法（须为 http/https 精确 URL，B10）。 */
-    A0510("A0510", "redirect URI 缺失或非法");
+    A0510("A0510", "redirect URI 缺失或非法"),
+
+    /** 安装审批的 ceiling 勾选为空（批准即封顶，空集无意义；驳回走专用动作，B11）。 */
+    A0511("A0511", "安装审批的 ceiling 勾选为空");
 
     private final String code;
 

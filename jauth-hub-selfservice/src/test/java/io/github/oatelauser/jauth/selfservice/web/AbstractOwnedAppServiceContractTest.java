@@ -33,6 +33,9 @@ abstract class AbstractOwnedAppServiceContractTest {
 
     protected static final String OTHER_USER_ID = "0192ab00-0000-7000-8000-00000000000b";
 
+    /** 占位 org id（B11 org 应用契约；同 CHAR(36) 满位形状）。 */
+    protected static final String ORG_ID = "0192ab00-0000-7000-8000-0000000000c1";
+
     protected static final Instant T0 = Instant.parse("2026-09-30T10:00:00Z");
 
     protected static final Set<String> REDIRECTS = Set.of("https://app.example.com/callback");
@@ -100,6 +103,33 @@ abstract class AbstractOwnedAppServiceContractTest {
         assertThat(service().list(USER_ID))
                 .extracting(OwnedAppService.OwnedApp::name)
                 .containsExactly("我的应用");
+    }
+
+    /** B11 org 应用契约：构造惯例同源（app_ 头/PKCE/consent/目录全集）+ 与个人列表双向隔离。 */
+    @Test
+    void registerOrgConstructsSameWayAndIsolatesFromPersonalList() {
+        OwnedAppService.Registration registration = service().registerOrg(ORG_ID, "组织门户", REDIRECTS, false);
+
+        assertThat(registration.app().clientId()).startsWith("app_");
+        RegisteredClient stored =
+                clientRepository().findByClientId(registration.app().clientId());
+        assertThat(stored).isNotNull();
+        assertThat(stored.getClientSettings().isRequireProofKey())
+                .as("org 应用同 PKCE 强制")
+                .isTrue();
+        assertThat(stored.getClientSettings().isRequireAuthorizationConsent())
+                .as("consent 开")
+                .isTrue();
+        assertThat(stored.getScopes()).containsExactlyInAnyOrder("openid", "profile", "email");
+
+        // 双向隔离：org 应用不进个人列表、个人应用不进 org 列表（owner 维度两列互斥）
+        service().register(USER_ID, "个人应用", REDIRECTS, false);
+        assertThat(service().listOrg(ORG_ID))
+                .extracting(OwnedAppService.OwnedApp::name)
+                .containsExactly("组织门户");
+        assertThat(service().list(USER_ID))
+                .extracting(OwnedAppService.OwnedApp::name)
+                .containsExactly("个人应用");
     }
 
     @Test

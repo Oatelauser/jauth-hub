@@ -2,6 +2,10 @@ package io.github.oatelauser.jauth.selfservice;
 
 import io.github.oatelauser.jauth.core.client.InMemoryClientOwnerResolver;
 import io.github.oatelauser.jauth.core.client.JauthJdbcRegisteredClientRepository;
+import io.github.oatelauser.jauth.core.org.InstallationRepository;
+import io.github.oatelauser.jauth.core.org.InstallationService;
+import io.github.oatelauser.jauth.core.org.OrgRepository;
+import io.github.oatelauser.jauth.core.org.OrgService;
 import io.github.oatelauser.jauth.core.response.ResponseRenderer;
 import io.github.oatelauser.jauth.core.scope.ScopeCatalog;
 import io.github.oatelauser.jauth.core.user.UserRepository;
@@ -13,6 +17,9 @@ import io.github.oatelauser.jauth.selfservice.web.AuthorizedAppsController;
 import io.github.oatelauser.jauth.selfservice.web.InMemoryOwnedAppService;
 import io.github.oatelauser.jauth.selfservice.web.JdbcOwnedAppService;
 import io.github.oatelauser.jauth.selfservice.web.MyAppsController;
+import io.github.oatelauser.jauth.selfservice.web.MyOrgsController;
+import io.github.oatelauser.jauth.selfservice.web.OrgAppsController;
+import io.github.oatelauser.jauth.selfservice.web.OrgInstallationsController;
 import io.github.oatelauser.jauth.selfservice.web.OwnedAppService;
 import io.github.oatelauser.jauth.selfservice.web.PatController;
 import java.nio.charset.StandardCharsets;
@@ -131,8 +138,69 @@ public class JauthSelfServiceAutoConfiguration {
         }
 
         /**
+         * 我的组织/安装审批/org 应用页（B11）：领域 bean（OrgService/InstallationService/两仓储）由 starter
+         * 无条件供给，经 ObjectProvider 可缺省——宿主未引 starter 时整组已让位，个别 bean 缺席的装配边角渲染
+         * "不支持"提示态（页面不 500，JSON 回 A0504）。
+         */
+        @Bean
+        @ConditionalOnMissingBean
+        MyOrgsController jauthMyOrgsController(
+                ObjectProvider<OrgService> orgService,
+                UserRepository userRepository,
+                EducationalFlag educational,
+                ResponseRenderer responseRenderer) {
+            return new MyOrgsController(orgService.getIfAvailable(), userRepository, educational, responseRenderer);
+        }
+
+        /** 安装审批页（B11）：OWNER 面，scope 目录项经 MessageSource 出 i18n 描述（照 PatController）。 */
+        @Bean
+        @ConditionalOnMissingBean
+        OrgInstallationsController jauthOrgInstallationsController(
+                ObjectProvider<OrgService> orgService,
+                ObjectProvider<InstallationService> installationService,
+                ObjectProvider<InstallationRepository> installationRepository,
+                ObjectProvider<OrgRepository> orgRepository,
+                UserRepository userRepository,
+                RegisteredClientRepository clientRepository,
+                ScopeCatalog scopeCatalog,
+                MessageSource messageSource,
+                EducationalFlag educational,
+                ResponseRenderer responseRenderer) {
+            return new OrgInstallationsController(
+                    orgService.getIfAvailable(),
+                    installationService.getIfAvailable(),
+                    installationRepository.getIfAvailable(),
+                    orgRepository.getIfAvailable(),
+                    userRepository,
+                    clientRepository,
+                    scopeCatalog,
+                    messageSource,
+                    educational,
+                    responseRenderer);
+        }
+
+        /** org 应用页（B11）：注册/列表面，OWNER 门在控制器入口。 */
+        @Bean
+        @ConditionalOnMissingBean
+        OrgAppsController jauthOrgAppsController(
+                ObjectProvider<OwnedAppService> ownedAppService,
+                ObjectProvider<OrgService> orgService,
+                ObjectProvider<OrgRepository> orgRepository,
+                UserRepository userRepository,
+                EducationalFlag educational,
+                ResponseRenderer responseRenderer) {
+            return new OrgAppsController(
+                    ownedAppService.getIfAvailable(),
+                    orgService.getIfAvailable(),
+                    orgRepository.getIfAvailable(),
+                    userRepository,
+                    educational,
+                    responseRenderer);
+        }
+
+        /**
          * selfservice 视图解析器：自带引擎 + 双解析器链（本模块命名空间优先，core 命名空间兜底供 fragments/layout
-         * 解析），消息源自持 basename 并挂 parent。viewNames 白名单钉死只认领本模块四个视图名
+         * 解析），消息源自持 basename 并挂 parent。viewNames 白名单钉死只认领本模块七个视图名
          * （thymeleaf-spring6 的 ThymeleafViewResolver 无 checkExistence），其余视图穿透宿主/Boot 默认解析器；
          * core 三页仍走共享引擎，两套视图名不相交。
          */
@@ -157,7 +225,10 @@ public class JauthSelfServiceAutoConfiguration {
                 PatController.VIEW_PAT,
                 AuthorizedAppsController.VIEW_APPS,
                 MyAppsController.VIEW_MY_APPS,
-                MyAppsController.VIEW_MY_APP_NEW
+                MyAppsController.VIEW_MY_APP_NEW,
+                MyOrgsController.VIEW_MY_ORGS,
+                OrgInstallationsController.VIEW_ORG_INSTALLATIONS,
+                OrgAppsController.VIEW_ORG_APPS
             });
             viewResolver.setContentType("text/html;charset=UTF-8");
             viewResolver.setForceContentType(true);

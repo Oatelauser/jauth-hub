@@ -19,6 +19,9 @@ import io.github.oatelauser.jauth.selfservice.web.AuthorizedAppsController;
 import io.github.oatelauser.jauth.selfservice.web.InMemoryOwnedAppService;
 import io.github.oatelauser.jauth.selfservice.web.JdbcOwnedAppService;
 import io.github.oatelauser.jauth.selfservice.web.MyAppsController;
+import io.github.oatelauser.jauth.selfservice.web.MyOrgsController;
+import io.github.oatelauser.jauth.selfservice.web.OrgAppsController;
+import io.github.oatelauser.jauth.selfservice.web.OrgInstallationsController;
 import io.github.oatelauser.jauth.selfservice.web.OwnedAppService;
 import io.github.oatelauser.jauth.selfservice.web.PatController;
 import java.nio.charset.StandardCharsets;
@@ -79,6 +82,10 @@ class JauthSelfServiceAutoConfigurationTest {
                     assertThat(context).hasSingleBean(PatController.class);
                     assertThat(context).hasSingleBean(AuthorizedAppsController.class);
                     assertThat(context).hasSingleBean(MyAppsController.class);
+                    // B11 org 三页：领域 bean 缺席（本 runner 无 starter 域件）也不拦控制器注册，页面提示态
+                    assertThat(context).hasSingleBean(MyOrgsController.class);
+                    assertThat(context).hasSingleBean(OrgInstallationsController.class);
+                    assertThat(context).hasSingleBean(OrgAppsController.class);
                     assertThat(context).hasBean("jauthSelfServiceViewResolver");
                 });
     }
@@ -97,6 +104,9 @@ class JauthSelfServiceAutoConfigurationTest {
                     assertThat(context).hasSingleBean(PatController.class);
                     assertThat(context).hasSingleBean(AuthorizedAppsController.class);
                     assertThat(context).hasSingleBean(MyAppsController.class);
+                    assertThat(context).hasSingleBean(MyOrgsController.class);
+                    assertThat(context).hasSingleBean(OrgInstallationsController.class);
+                    assertThat(context).hasSingleBean(OrgAppsController.class);
                 });
     }
 

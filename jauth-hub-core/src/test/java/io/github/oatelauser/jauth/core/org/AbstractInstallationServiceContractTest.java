@@ -266,4 +266,70 @@ abstract class AbstractInstallationServiceContractTest extends AbstractOrgServic
         assertThatThrownBy(() -> fixture().installationService().request(CLIENT_ID, org.id(), Set.of(), MEMBER_ID))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    /** B11 审批页查询面：按 org 取全量安装行（各状态皆含、新在前），他 org 行不混入。 */
+    @Test
+    void findByOrgListsAllStatusesNewestFirstScopedToOrg() {
+        Org org = fixture().orgService().create("acme", OWNER_ID);
+        Org otherOrg = fixture().orgService().create("globex", OUTSIDER_ID);
+
+        // (client, org) 唯一键限制单 org 内一行一 client：直接经仓储落三行不同状态（仓储契约面，不经服务状态机）
+        InstallationRepository repository = fixture().installationRepository();
+        Installation pending = new Installation(
+                "00000000-0000-7000-8000-0000000000a1",
+                CLIENT_ID,
+                org.id(),
+                InstallationStatus.PENDING,
+                Set.of(),
+                MEMBER_ID,
+                Set.of("openid"),
+                null,
+                null,
+                FIXED_NOW);
+        Installation approved = new Installation(
+                "00000000-0000-7000-8000-0000000000a2",
+                "install-client-other-1",
+                org.id(),
+                InstallationStatus.APPROVED,
+                Set.of("openid"),
+                MEMBER_ID,
+                Set.of("openid"),
+                OWNER_ID,
+                FIXED_NOW,
+                FIXED_NOW.minusSeconds(60));
+        Installation revoked = new Installation(
+                "00000000-0000-7000-8000-0000000000a3",
+                "install-client-other-2",
+                org.id(),
+                InstallationStatus.REVOKED,
+                Set.of(),
+                MEMBER_ID,
+                Set.of("openid"),
+                OWNER_ID,
+                FIXED_NOW,
+                FIXED_NOW.minusSeconds(120));
+        Installation otherOrgRow = new Installation(
+                "00000000-0000-7000-8000-0000000000b1",
+                CLIENT_ID,
+                otherOrg.id(),
+                InstallationStatus.PENDING,
+                Set.of(),
+                MEMBER_ID,
+                Set.of("openid"),
+                null,
+                null,
+                FIXED_NOW);
+        repository.save(pending);
+        repository.save(approved);
+        repository.save(revoked);
+        repository.save(otherOrgRow);
+
+        assertThat(fixture().installationRepository().findByOrg(org.id()))
+                .extracting(Installation::id)
+                .as("createdAt 新在前（pending 先落、approved/revoke 依次更早），他 org 行不混入")
+                .containsExactly(pending.id(), approved.id(), revoked.id());
+        assertThat(fixture().installationRepository().findByOrg(otherOrg.id()))
+                .extracting(Installation::id)
+                .containsExactly(otherOrgRow.id());
+    }
 }

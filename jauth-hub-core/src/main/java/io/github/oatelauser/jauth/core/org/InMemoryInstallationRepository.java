@@ -1,5 +1,6 @@
 package io.github.oatelauser.jauth.core.org;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -40,6 +41,17 @@ public class InMemoryInstallationRepository implements InstallationRepository {
         Assert.hasText(registeredClientId, "registeredClientId cannot be empty");
         return this.installationsById.values().stream()
                 .filter(installation -> installation.registeredClientId().equals(registeredClientId))
+                .toList();
+    }
+
+    @Override
+    public List<Installation> findByOrg(String orgId) {
+        Assert.hasText(orgId, "orgId cannot be empty");
+        // 排序口径与 jdbc 实现对齐（createdAt DESC, id ASC）：ConcurrentHashMap 值序不定，页面渲染需确定序
+        return this.installationsById.values().stream()
+                .filter(installation -> installation.orgId().equals(orgId))
+                .sorted(Comparator.comparing(Installation::createdAt, Comparator.reverseOrder())
+                        .thenComparing(Installation::id))
                 .toList();
     }
 
