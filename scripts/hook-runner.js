@@ -320,6 +320,13 @@ async function runFormatter(files, result) {
   const mvn = detectMaven();
   if (!mvn) return result.notes.push('格式化未执行: 未找到 mvnw / mvn');
 
+  // 在途防护不只覆盖失败路径:spotless 成功运行时,mvn 读→写回窗口内落进的并发编辑
+  // 会被旧快照静默 clobber 且记为"已格式化"(丢更新归因污染)。存在在途文件(30s 内有改动)
+  // 即整体推迟本轮格式化,复用"下回合复跑自愈"语义。
+  if (files.some(isInFlight)) {
+    return result.notes.push(`格式化推迟:存在在途写入(30s 内有改动)的文件,疑并发 subagent 未定稿,下回合复跑: ${files.filter(isInFlight).map(f => path.basename(f)).join(', ')}`);
+  }
+
   const before = new Map(files.map(f => [f, fileHash(f)]));
   const r = run(mvn.cmd, ['-q', 'spotless:apply'], { timeoutMs: 600000, cwd: ROOT });
   if (r.status !== 0) {
