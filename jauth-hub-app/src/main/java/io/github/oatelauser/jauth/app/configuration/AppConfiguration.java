@@ -1,4 +1,4 @@
-package io.github.oatelauser.jauth.app;
+package io.github.oatelauser.jauth.app.configuration;
 
 import io.github.oatelauser.jauth.app.bootstrap.SuperAdminProperties;
 import io.github.oatelauser.jauth.app.bootstrap.SuperAdminSeeder;

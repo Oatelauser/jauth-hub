@@ -16,7 +16,9 @@ import org.springframework.util.StringUtils;
  */
 public class SuperAdminSeeder {
 
-    /** 构造期快照账号（SpotBugs EI_EXPOSE_REP2：properties 对象可变，字符串值落字段定死播种定义）。 */
+    /**
+     * 构造期快照账号（SpotBugs EI_EXPOSE_REP2：properties 对象可变，字符串值落字段定死播种定义）。
+     */
     private final String username;
 
     private final String password;
