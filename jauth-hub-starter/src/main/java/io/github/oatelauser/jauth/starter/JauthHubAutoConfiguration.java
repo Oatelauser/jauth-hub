@@ -263,13 +263,22 @@ public class JauthHubAutoConfiguration {
 
     /**
      * org 域服务（自助创建 + OWNER 门）：仓储由下方两段 storage 配置按 {@code jauth-hub.storage} 供给
-     * （memory/jdbc 皆注册 OrgRepository，此处单点装配）。
+     * （memory/jdbc 皆注册 OrgRepository，此处单点装配）。事务模板经 provider 取"在场即用"——jdbc 模式命中
+     * jauthSeedingTransactionTemplate（或宿主自带模板，既定让位语义），memory 模式无模板 bean 传 null 直通
+     * （B10 滑账①收口，OrgService 类注释）。
      */
     @Bean
     @ConditionalOnMissingBean
     OrgService jauthOrgService(
-            OrgRepository orgRepository, AuditEventPublisher auditPublisher, ObjectProvider<Clock> clock) {
-        return new OrgService(orgRepository, auditPublisher, clock.getIfAvailable(Clock::systemUTC));
+            OrgRepository orgRepository,
+            AuditEventPublisher auditPublisher,
+            ObjectProvider<Clock> clock,
+            ObjectProvider<TransactionTemplate> transactionTemplate) {
+        return new OrgService(
+                orgRepository,
+                auditPublisher,
+                clock.getIfAvailable(Clock::systemUTC),
+                transactionTemplate.getIfAvailable());
     }
 
     /** 安装两步制（流向 A）：request/approve/reject/revoke 状态机 + 生命周期审计。 */

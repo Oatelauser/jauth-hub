@@ -9,14 +9,18 @@ import io.github.oatelauser.jauth.core.util.UuidV7;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.util.Assert;
 
 /**
  * org 域服务：自助创建（任何登录用户可建，创建者自动成为 OWNER，2026-09-30 拍板）+ 查询 + OWNER 门。
  *
- * <p>创建的 org 与成员两写非原子（无事务包裹）：jauth_org 落库后成员写失败会留下无主 org，
- * TransactionTemplate 收口留 B10 统一处理；本批调用方（域测试/后续 B11 页面）皆为单线程路径。
+ * <p>创建的 org 与成员两写包<b>可选事务</b>（B10 滑账①收口）：构造器注入 {@link TransactionOperations}（spring-tx
+ * 接口，TransactionTemplate 即其实现），有则 org+member 两写同成同败——成员写失败不再留下无主 org；无（null，
+ * memory 仓储或容器无事务管理器）直通两条语句，语义同 B8（内存仓储无回滚概念）。审计发布在事务块之后：发布
+ * 失败只缺事件行，不回滚已成立的领域写。
  *
  * <p>成员增删管理面（邀请/移除/转让）不做：无调用方，YAGNI，B11 有页面语义时再定。
  *
@@ -30,16 +34,24 @@ public class OrgService {
 
     private final Clock clock;
 
-    public OrgService(OrgRepository orgRepository, AuditEventPublisher auditPublisher, Clock clock) {
+    private final @Nullable TransactionOperations transactionOperations;
+
+    public OrgService(
+            OrgRepository orgRepository,
+            AuditEventPublisher auditPublisher,
+            Clock clock,
+            @Nullable TransactionOperations transactionOperations) {
         this.orgRepository = orgRepository;
         this.auditPublisher = auditPublisher;
         this.clock = clock;
+        this.transactionOperations = transactionOperations;
     }
 
     /**
      * 自助创建 org：创建者自动成为 OWNER 成员，发布 org.created 审计。
      *
-     * <p>重名拒绝走先查后插 + 唯一约束兜底（并发窗口内撞约束同样翻译为业务异常）。
+     * <p>重名拒绝走先查后插 + 唯一约束兜底（并发窗口内撞约束同样翻译为业务异常）。org+member 两写在
+     * {@link TransactionOperations} 在场时同成同败（类注释：成员写失败回滚 org 落库）。
      *
      * @param name 组织名（全局唯一）
      * @param creatorUserId 创建者（即首任 OWNER，登录主体）
@@ -53,13 +65,20 @@ public class OrgService {
         }
         Instant now = this.clock.instant();
         Org org = new Org(UuidV7.generate().toString(), name, now);
-        try {
-            this.orgRepository.save(org);
-        } catch (DataIntegrityViolationException ex) {
-            // 先查后插的窗口内并发撞名：唯一约束兜底，统一以业务异常对外
-            throw new JauthException(JauthErrorCode.A0506);
+        Runnable writes = () -> {
+            try {
+                this.orgRepository.save(org);
+            } catch (DataIntegrityViolationException ex) {
+                // 先查后插的窗口内并发撞名：唯一约束兜底，统一以业务异常对外（事务内同样触发回滚）
+                throw new JauthException(JauthErrorCode.A0506);
+            }
+            this.orgRepository.saveMember(new OrgMember(org.id(), creatorUserId, OrgRole.OWNER, now));
+        };
+        if (this.transactionOperations != null) {
+            this.transactionOperations.executeWithoutResult(status -> writes.run());
+        } else {
+            writes.run();
         }
-        this.orgRepository.saveMember(new OrgMember(org.id(), creatorUserId, OrgRole.OWNER, now));
         this.auditPublisher.publish(
                 AuditEvent.of(AuditEventType.ORG_CREATED, creatorUserId, "org", org.id(), "name=" + name));
         return org;

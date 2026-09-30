@@ -40,6 +40,11 @@
         <form class="form" id="pat-form" th:action="@{/selfservice/pat}" method="post">
           <meta name="_csrf" th:if="${_csrf != null}" th:content="${_csrf.token}" />
           <meta name="_csrf_header" th:if="${_csrf != null}" th:content="${_csrf.headerName}" />
+          <label class="field">
+            <span th:text="#{jauth.pat.name}">名称</span>
+            <input type="text" name="name" maxlength="100" required="required"
+                   th:placeholder="#{jauth.pat.name-placeholder}" />
+          </label>
           <p class="scopes-label" th:text="#{jauth.pat.scopes}">授权范围</p>
           <ul class="scopes">
             <li class="scope-item" th:each="scope : ${scopes}">
@@ -64,6 +69,7 @@
         <table class="ss-table" th:if="${!#lists.isEmpty(pats)}">
           <thead>
             <tr>
+              <th th:text="#{jauth.pat.col-name}">名称</th>
               <th th:text="#{jauth.pat.col-prefix}">前缀</th>
               <th th:text="#{jauth.pat.col-scopes}">范围</th>
               <th th:text="#{jauth.pat.col-created}">创建时间</th>
@@ -74,6 +80,8 @@
           </thead>
           <tbody>
             <tr th:each="pat : ${pats}" th:id="'pat-row-' + ${pat.id}">
+              <!--/* 存量行（V7 前）name 为 NULL：回退 i18n 未命名，不展示空白单元格 */-->
+              <td class="scope-name" th:text="${pat.name == null} ? #{jauth.pat.unnamed} : ${pat.name}">令牌名</td>
               <td class="scope-name" th:text="${pat.tokenPrefix}">jpat_xxxxxxx</td>
               <td th:text="${#strings.setJoin(pat.scopes, ' ')}">openid profile</td>
               <td th:text="${#temporals.format(pat.createdAt, 'yyyy-MM-dd HH:mm')}">2026-09-29 10:00</td>
@@ -106,13 +114,14 @@
       var form = document.getElementById('pat-form');
       form.addEventListener('submit', function (event) {
         event.preventDefault();
+        var name = form.querySelector('input[name="name"]').value.trim();
         var scopes = Array.prototype.slice.call(form.querySelectorAll('input[name="scope"]:checked'))
           .map(function (input) { return input.value; });
         var validityDays = Number(form.querySelector('select[name="validityDays"]').value);
         var headers = { 'Content-Type': 'application/json' };
         if (csrfMeta && csrfHeaderMeta) { headers[csrfHeaderMeta.content] = csrfMeta.content; }
         fetch(form.action, { method: 'POST', headers: headers, credentials: 'same-origin',
-            body: JSON.stringify({ scopes: scopes, validityDays: validityDays }) })
+            body: JSON.stringify({ name: name, scopes: scopes, validityDays: validityDays }) })
           .then(function (response) { return response.json(); })
           .then(function (body) {
             if (body.code !== '00000') { window.alert(body.message); return; }

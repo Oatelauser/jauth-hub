@@ -16,8 +16,8 @@ import org.junit.jupiter.api.Test;
 /**
  * PAT 存储契约（内存/JDBC 两实现共用，照 core 的 Abstract*ContractTest 模式）。
  *
- * <p>关键断言面：明文只在 {@link PatService#create} 返回值出现一次（列表无明文）；前缀取明文头；过期时间 =
- * 创建时间 + 有效期；吊销后列表清空、重复吊销/他人吊销 B0502。
+ * <p>关键断言面：明文只在 {@link PatService#create} 返回值出现一次（列表无明文）；名称必填且列表带名（V7 列，
+ * B10）；前缀取明文头；过期时间 = 创建时间 + 有效期；吊销后列表清空、重复吊销/他人吊销 B0502。
  *
  * @author oatelauser
  */
@@ -37,7 +37,7 @@ abstract class AbstractPatServiceContractTest {
 
     @Test
     void createReturnsPlaintextOnceAndListCarriesOnlyPrefix() {
-        PatService.PatIssuance issuance = service().create(USER_ID, SCOPES, Duration.ofDays(90));
+        PatService.PatIssuance issuance = service().create(USER_ID, "CI 部署", SCOPES, Duration.ofDays(90));
 
         String plaintext = issuance.plaintextToken();
         assertThat(plaintext).startsWith(PatTokens.TOKEN_HEADER).hasSize(48);
@@ -48,14 +48,22 @@ abstract class AbstractPatServiceContractTest {
         List<PatRecord> active = service().listActive(USER_ID);
         assertThat(active).hasSize(1);
         assertThat(active.get(0).tokenPrefix()).isEqualTo(issuance.record().tokenPrefix());
+        assertThat(active.get(0).name()).isEqualTo("CI 部署");
         assertThat(active.get(0).scopes()).isEqualTo(SCOPES);
         // 明文纪律：列表/记录的任何字段都不含明文（record toString 覆盖全组件）
         assertThat(active.get(0).toString()).doesNotContain(plaintext);
     }
 
     @Test
+    void createRejectsBlankName() {
+        // 名称必填（V7 列，B10 起创建面强制）：空名直接拒（服务层 Assert 兜底）
+        assertThatThrownBy(() -> service().create(USER_ID, "  ", SCOPES, Duration.ofDays(90)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void expiryIsCreatedAtPlusValidity() {
-        PatService.PatIssuance issuance = service().create(USER_ID, SCOPES, Duration.ofDays(30));
+        PatService.PatIssuance issuance = service().create(USER_ID, "短效", SCOPES, Duration.ofDays(30));
 
         assertThat(issuance.record().createdAt()).isEqualTo(T0);
         assertThat(issuance.record().expiresAt()).isEqualTo(T0.plus(Duration.ofDays(30)));
@@ -65,7 +73,7 @@ abstract class AbstractPatServiceContractTest {
 
     @Test
     void revokeRemovesFromListAndSecondRevokeFails() {
-        PatService.PatIssuance issuance = service().create(USER_ID, SCOPES, Duration.ofDays(90));
+        PatService.PatIssuance issuance = service().create(USER_ID, "待吊销", SCOPES, Duration.ofDays(90));
 
         service().revoke(USER_ID, issuance.record().id());
         assertThat(service().listActive(USER_ID)).isEmpty();
@@ -78,7 +86,7 @@ abstract class AbstractPatServiceContractTest {
 
     @Test
     void revokingAnotherUsersPatFailsAndKeepsItActive() {
-        PatService.PatIssuance issuance = service().create(USER_ID, SCOPES, Duration.ofDays(90));
+        PatService.PatIssuance issuance = service().create(USER_ID, "他人令牌", SCOPES, Duration.ofDays(90));
 
         assertThatThrownBy(
                         () -> service().revoke(OTHER_USER_ID, issuance.record().id()))
@@ -88,9 +96,9 @@ abstract class AbstractPatServiceContractTest {
 
     @Test
     void listActiveOnlyShowsOwnActivePatsLatestFirst() {
-        PatService.PatIssuance first = service().create(USER_ID, Set.of("openid"), Duration.ofDays(30));
-        PatService.PatIssuance second = service().create(USER_ID, Set.of("profile"), Duration.ofDays(90));
-        service().create(OTHER_USER_ID, SCOPES, Duration.ofDays(90));
+        PatService.PatIssuance first = service().create(USER_ID, "甲", Set.of("openid"), Duration.ofDays(30));
+        PatService.PatIssuance second = service().create(USER_ID, "乙", Set.of("profile"), Duration.ofDays(90));
+        service().create(OTHER_USER_ID, "他池", SCOPES, Duration.ofDays(90));
 
         List<PatRecord> active = service().listActive(USER_ID);
         assertThat(active).hasSize(2);

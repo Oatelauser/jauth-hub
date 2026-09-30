@@ -14,7 +14,9 @@ import io.github.oatelauser.jauth.core.user.JauthUser;
 import io.github.oatelauser.jauth.core.user.UserRepository;
 import io.github.oatelauser.jauth.core.web.EducationalFlag;
 import io.github.oatelauser.jauth.selfservice.pat.InMemoryPatService;
+import io.github.oatelauser.jauth.selfservice.pat.PatRecord;
 import io.github.oatelauser.jauth.selfservice.pat.PatService;
+import io.github.oatelauser.jauth.selfservice.pat.PatStatus;
 import io.github.oatelauser.jauth.selfservice.support.Providers;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -69,9 +71,9 @@ class SelfServicePagesTest {
     }
 
     @Test
-    @DisplayName("PAT 页：表单/scope 勾选带描述/有效期三档默认 90/列表含前缀与过期徽标/zh 文案")
+    @DisplayName("PAT 页：表单含名称必填输入/scope 勾选/有效期三档默认 90/列表含名称与前缀及过期徽标/zh 文案")
     void patPageRendersFormScopesValidityAndExpiredBadge() throws Exception {
-        this.patService.create("user-alice", Set.of("openid"), Duration.ofDays(30));
+        this.patService.create("user-alice", "CI 部署脚本", Set.of("openid"), Duration.ofDays(30));
 
         patPage(EducationalFlag.ON, this.patService, Clock.fixed(T0.plus(Duration.ofDays(40)), ZoneOffset.UTC))
                 .perform(get("/selfservice/pat").principal(() -> ALICE))
@@ -79,14 +81,40 @@ class SelfServicePagesTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML))
                 .andExpect(content().string(containsString("个人访问令牌")))
                 .andExpect(content().string(containsString("action=\"/selfservice/pat\"")))
+                .andExpect(content().string(containsString("name=\"name\"")))
+                .andExpect(content().string(containsString("required=\"required\"")))
                 .andExpect(content().string(containsString("type=\"checkbox\" name=\"scope\"" + " value=\"openid\"")))
                 .andExpect(content().string(containsString("确认你的身份标识（openid）")))
                 .andExpect(content().string(containsString("name=\"validityDays\"")))
                 .andExpect(content().string(containsString("selected=\"selected\">90 天")))
+                .andExpect(content().string(containsString("CI 部署脚本")))
                 .andExpect(content().string(containsString("jpat_")))
                 .andExpect(content().string(containsString("已过期")))
                 .andExpect(content().string(containsString("发生了什么")))
                 .andExpect(content().string(containsString("明文只显示这一次")));
+    }
+
+    @Test
+    @DisplayName("PAT 页存量行空名回退：V7 前的行（name=NULL）展示 i18n 未命名")
+    void patPageFallsBackToUnnamedForLegacyNullNameRows() throws Exception {
+        PatService legacy = mock(PatService.class);
+        PatRecord unnamed = new PatRecord(
+                "pat-legacy",
+                "user-alice",
+                null,
+                "jpat_legacy00",
+                Set.of("openid"),
+                PatStatus.ACTIVE,
+                T0,
+                T0.plus(Duration.ofDays(90)),
+                null);
+        when(legacy.listActive("user-alice")).thenReturn(List.of(unnamed));
+
+        patPage(EducationalFlag.ON, legacy, Clock.fixed(T0, ZoneOffset.UTC))
+                .perform(get("/selfservice/pat").principal(() -> ALICE))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("未命名")))
+                .andExpect(content().string(containsString("jpat_legacy00")));
     }
 
     @Test

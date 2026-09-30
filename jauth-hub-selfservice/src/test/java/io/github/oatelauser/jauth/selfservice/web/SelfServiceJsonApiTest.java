@@ -85,7 +85,7 @@ class SelfServiceJsonApiTest {
         this.patApi
                 .perform(post("/selfservice/pat")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"scopes\":[\"openid\",\"profile\"],\"validityDays\":90}")
+                        .content("{\"name\":\"甲\",\"scopes\":[\"openid\",\"profile\"],\"validityDays\":90}")
                         .principal(() -> ALICE))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("00000"))
@@ -96,7 +96,7 @@ class SelfServiceJsonApiTest {
         MvcResult created = this.patApi
                 .perform(post("/selfservice/pat")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"scopes\":[\"openid\"],\"validityDays\":30}")
+                        .content("{\"name\":\"乙\",\"scopes\":[\"openid\"],\"validityDays\":30}")
                         .principal(() -> ALICE))
                 .andReturn();
         String plaintext = plaintextOf(created.getResponse().getContentAsString(StandardCharsets.UTF_8));
@@ -117,7 +117,7 @@ class SelfServiceJsonApiTest {
     @DisplayName("PAT 吊销：成功后列表清空，再吊销回 B0502")
     void revokeClearsListAndSecondRevokeFails() throws Exception {
         String patId = this.patService
-                .create("user-alice", Set.of("openid"), Duration.ofDays(90))
+                .create("user-alice", "待吊销", Set.of("openid"), Duration.ofDays(90))
                 .record()
                 .id();
 
@@ -141,19 +141,19 @@ class SelfServiceJsonApiTest {
         this.patApi
                 .perform(post("/selfservice/pat")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"scopes\":[\"openid\",\"write:admin\"],\"validityDays\":90}")
+                        .content("{\"name\":\"x\",\"scopes\":[\"openid\",\"write:admin\"],\"validityDays\":90}")
                         .principal(() -> ALICE))
                 .andExpect(jsonPath("$.code").value("A0505"));
         this.patApi
                 .perform(post("/selfservice/pat")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"scopes\":[],\"validityDays\":90}")
+                        .content("{\"name\":\"x\",\"scopes\":[],\"validityDays\":90}")
                         .principal(() -> ALICE))
                 .andExpect(jsonPath("$.code").value("A0505"));
         this.patApi
                 .perform(post("/selfservice/pat")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"scopes\":[\"openid\"],\"validityDays\":7}")
+                        .content("{\"name\":\"x\",\"scopes\":[\"openid\"],\"validityDays\":7}")
                         .principal(() -> ALICE))
                 .andExpect(jsonPath("$.code").value("A0502"));
     }
@@ -213,6 +213,33 @@ class SelfServiceJsonApiTest {
 
         appsApi.perform(post("/selfservice/apps/client-a/revoke"))
                 .andExpect(jsonPath("$.code").value("A0503"));
+    }
+
+    @Test
+    @DisplayName("PAT 名称必填：缺名/空名回 A0501，列表视图带名称")
+    void createValidatesName() throws Exception {
+        this.patApi
+                .perform(post("/selfservice/pat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"scopes\":[\"openid\"],\"validityDays\":90}")
+                        .principal(() -> ALICE))
+                .andExpect(jsonPath("$.code").value("A0501"));
+        this.patApi
+                .perform(post("/selfservice/pat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"  \",\"scopes\":[\"openid\"],\"validityDays\":90}")
+                        .principal(() -> ALICE))
+                .andExpect(jsonPath("$.code").value("A0501"));
+        this.patApi
+                .perform(post("/selfservice/pat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"CI 部署\",\"scopes\":[\"openid\"],\"validityDays\":90}")
+                        .principal(() -> ALICE))
+                .andExpect(jsonPath("$.code").value("00000"))
+                .andExpect(jsonPath("$.data.name").value("CI 部署"));
+        this.patApi
+                .perform(get("/selfservice/pat/list").principal(() -> ALICE))
+                .andExpect(jsonPath("$.data[0].name").value("CI 部署"));
     }
 
     /** 从创建响应提取明文令牌（测试辅助；响应即明文的唯一出现点）。 */

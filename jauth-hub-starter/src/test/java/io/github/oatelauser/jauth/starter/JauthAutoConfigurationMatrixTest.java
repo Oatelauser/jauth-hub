@@ -90,7 +90,7 @@ class JauthAutoConfigurationMatrixTest {
     }
 
     @Test
-    @DisplayName("jdbc 模式：JDBC 件在场、内存件缺席、私有 Flyway 表建到 v6")
+    @DisplayName("jdbc 模式：JDBC 件在场、内存件缺席、私有 Flyway 表建到 v7")
     void jdbcModeMatrix() {
         DataSource dataSource = testDataSource("matrix-jdbc");
         runner.withPropertyValues("jauth-hub.storage=jdbc")
@@ -106,7 +106,7 @@ class JauthAutoConfigurationMatrixTest {
                     assertThat(context).hasBean("jauthSeedingTransactionTemplate");
                     String maxVersion = new JdbcTemplate(context.getBean(DataSource.class))
                             .queryForObject("SELECT MAX(version) FROM jauth_flyway_schema_history", String.class);
-                    assertThat(maxVersion).isEqualTo("6");
+                    assertThat(maxVersion).isEqualTo("7");
                 });
     }
 

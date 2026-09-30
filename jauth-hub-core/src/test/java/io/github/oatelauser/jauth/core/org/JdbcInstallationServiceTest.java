@@ -28,7 +28,7 @@ class JdbcInstallationServiceTest extends AbstractInstallationServiceContractTes
     protected OrgDomainFixture createFixture() {
         AuditEventPublisher recorder = this.auditLog::add;
         JdbcOrgRepository orgRepository = new JdbcOrgRepository(this.jdbcTemplate);
-        OrgService orgService = new OrgService(orgRepository, recorder, this.clock);
+        OrgService orgService = new OrgService(orgRepository, recorder, this.clock, null);
         JdbcInstallationRepository installationRepository = new JdbcInstallationRepository(this.jdbcTemplate);
         return new OrgDomainFixture(
                 orgRepository,

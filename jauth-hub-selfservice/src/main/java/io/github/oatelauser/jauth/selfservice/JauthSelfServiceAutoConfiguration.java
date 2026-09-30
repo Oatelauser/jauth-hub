@@ -1,5 +1,7 @@
 package io.github.oatelauser.jauth.selfservice;
 
+import io.github.oatelauser.jauth.core.client.InMemoryClientOwnerResolver;
+import io.github.oatelauser.jauth.core.client.JauthJdbcRegisteredClientRepository;
 import io.github.oatelauser.jauth.core.response.ResponseRenderer;
 import io.github.oatelauser.jauth.core.scope.ScopeCatalog;
 import io.github.oatelauser.jauth.core.user.UserRepository;
@@ -8,6 +10,10 @@ import io.github.oatelauser.jauth.selfservice.pat.JdbcPatService;
 import io.github.oatelauser.jauth.selfservice.pat.PatService;
 import io.github.oatelauser.jauth.selfservice.web.AuthorizedAppService;
 import io.github.oatelauser.jauth.selfservice.web.AuthorizedAppsController;
+import io.github.oatelauser.jauth.selfservice.web.InMemoryOwnedAppService;
+import io.github.oatelauser.jauth.selfservice.web.JdbcOwnedAppService;
+import io.github.oatelauser.jauth.selfservice.web.MyAppsController;
+import io.github.oatelauser.jauth.selfservice.web.OwnedAppService;
 import io.github.oatelauser.jauth.selfservice.web.PatController;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -23,9 +29,11 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.core.Ordered;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.servlet.ViewResolver;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 import org.thymeleaf.spring6.templateresolver.SpringResourceTemplateResolver;
@@ -41,7 +49,8 @@ import org.thymeleaf.templatemode.TemplateMode;
  * 探测，宿主未引 starter 时本模块整体静默让位（页面 404），不制造半残装配。不改动 starter 任何既有装配。
  *
  * <p><b>存储门控</b>（04 票）：PAT 与看板查询服务只在 {@code jauth-hub.storage=jdbc} 注册；memory 模式页面
- * 控制器仍在（渲染"当前存储模式不支持"提示，不 500）。
+ * 控制器仍在（渲染"当前存储模式不支持"提示，不 500）。<b>我的应用（B10）例外</b>：memory 模式可用（框架内存
+ * 仓库 + owner 登记表，MemorySelfServiceConfiguration），只有 PAT/看板维持 jdbc-only 门控。
  *
  * <p><b>视图与 i18n 命名空间</b>：selfservice 自持一套模板解析器（前缀指向本模块命名空间，checkExistence +
  * 高序位，未命中穿透宿主默认解析器）与消息链（本模块 basename 优先，parent 挂上下文 messageSource——core 的
@@ -109,11 +118,23 @@ public class JauthSelfServiceAutoConfiguration {
                     responseRenderer);
         }
 
+        /** 我的应用页（B10）：memory 模式也可用（与 PAT/看板不同），服务 bean 由两段存储配置按模式供给。 */
+        @Bean
+        @ConditionalOnMissingBean
+        MyAppsController jauthMyAppsController(
+                ObjectProvider<OwnedAppService> ownedAppService,
+                UserRepository userRepository,
+                EducationalFlag educational,
+                ResponseRenderer responseRenderer) {
+            return new MyAppsController(
+                    ownedAppService.getIfAvailable(), userRepository, educational, responseRenderer);
+        }
+
         /**
          * selfservice 视图解析器：自带引擎 + 双解析器链（本模块命名空间优先，core 命名空间兜底供 fragments/layout
-         * 解析），消息源自持 basename 并挂 parent。viewNames 白名单钉死只认领 pat/apps 两个视图名（thymeleaf-spring6
-         * 的 ThymeleafViewResolver 无 checkExistence），其余视图穿透宿主/Boot 默认解析器；core 三页仍走共享引擎，
-         * 两套视图名不相交。
+         * 解析），消息源自持 basename 并挂 parent。viewNames 白名单钉死只认领本模块四个视图名
+         * （thymeleaf-spring6 的 ThymeleafViewResolver 无 checkExistence），其余视图穿透宿主/Boot 默认解析器；
+         * core 三页仍走共享引擎，两套视图名不相交。
          */
         @Bean
         @ConditionalOnMissingBean(name = "jauthSelfServiceViewResolver")
@@ -132,7 +153,12 @@ public class JauthSelfServiceAutoConfiguration {
             ThymeleafViewResolver viewResolver = new ThymeleafViewResolver();
             viewResolver.setTemplateEngine(engine);
             viewResolver.setOrder(Ordered.HIGHEST_PRECEDENCE + 100);
-            viewResolver.setViewNames(new String[] {PatController.VIEW_PAT, AuthorizedAppsController.VIEW_APPS});
+            viewResolver.setViewNames(new String[] {
+                PatController.VIEW_PAT,
+                AuthorizedAppsController.VIEW_APPS,
+                MyAppsController.VIEW_MY_APPS,
+                MyAppsController.VIEW_MY_APP_NEW
+            });
             viewResolver.setContentType("text/html;charset=UTF-8");
             viewResolver.setForceContentType(true);
             return viewResolver;
@@ -150,8 +176,11 @@ public class JauthSelfServiceAutoConfiguration {
     }
 
     /**
-     * jdbc 模式的自助数据服务：PAT 存储 + 授权看板查询。jauth_pat / oauth2_authorization 表由 starter 的 Flyway
-     * 迁移建立（context 刷新完成先于首个请求），本组 bean 构造不触库、无需重复迁移守卫。
+     * jdbc 模式的自助数据服务：PAT 存储 + 授权看板查询 + 我的应用（client+owner 两写包事务，B10 滑账①收口）。
+     * jauth_pat / oauth2_authorization 表由 starter 的 Flyway 迁移建立（context 刷新完成先于首个请求），本组
+     * bean 构造不触库、无需重复迁移守卫。事务模板取法照 seeder：ObjectProvider 可缺省（容器无事务管理器时
+     * 退化为两条语句直跑，JdbcOwnedAppService 类注释），starter 的 jauthSeedingTransactionTemplate 或宿主
+     * 自带模板均可让位复用。
      */
     @Configuration(proxyBeanMethods = false)
     @ConditionalOnProperty(name = "jauth-hub.storage", havingValue = "jdbc")
@@ -167,6 +196,52 @@ public class JauthSelfServiceAutoConfiguration {
         @ConditionalOnMissingBean(AuthorizedAppService.class)
         AuthorizedAppService jauthAuthorizedAppService(DataSource dataSource) {
             return new AuthorizedAppService(new JdbcTemplate(dataSource));
+        }
+
+        /** 以 JauthJdbc 仓储在场为前提（宿主整体换掉 client 仓储时应用管理退为页面提示态，不半残装配）。 */
+        @Bean
+        @ConditionalOnMissingBean(OwnedAppService.class)
+        @ConditionalOnBean(JauthJdbcRegisteredClientRepository.class)
+        JdbcOwnedAppService jauthOwnedAppService(
+                JauthJdbcRegisteredClientRepository clientRepository,
+                DataSource dataSource,
+                ObjectProvider<TransactionTemplate> transactionTemplate,
+                PasswordEncoder passwordEncoder,
+                ScopeCatalog scopeCatalog,
+                Clock clock) {
+            return new JdbcOwnedAppService(
+                    clientRepository,
+                    new JdbcTemplate(dataSource),
+                    transactionTemplate.getIfAvailable(),
+                    passwordEncoder,
+                    scopeCatalog,
+                    clock);
+        }
+    }
+
+    /**
+     * memory 模式的我的应用服务（B10：应用管理与 PAT 不同，memory 可用）：client 落框架内存仓库、owner 走
+     * InMemoryClientOwnerResolver 登记表，两者皆 starter memory 装配供给（缺任一即本组静默让位，页面提示态）。
+     */
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnProperty(name = "jauth-hub.storage", havingValue = "memory", matchIfMissing = true)
+    static class MemorySelfServiceConfiguration {
+
+        @Bean
+        @ConditionalOnMissingBean(OwnedAppService.class)
+        @ConditionalOnBean({RegisteredClientRepository.class, InMemoryClientOwnerResolver.class})
+        InMemoryOwnedAppService jauthOwnedAppService(
+                RegisteredClientRepository clientRepository,
+                InMemoryClientOwnerResolver ownerResolver,
+                PasswordEncoder passwordEncoder,
+                ScopeCatalog scopeCatalog,
+                ObjectProvider<Clock> clock) {
+            return new InMemoryOwnedAppService(
+                    clientRepository,
+                    ownerResolver,
+                    passwordEncoder,
+                    scopeCatalog,
+                    clock.getIfAvailable(Clock::systemUTC));
         }
     }
 }

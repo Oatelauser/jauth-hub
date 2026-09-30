@@ -13,7 +13,7 @@ class InMemoryOrgServiceTest extends AbstractOrgServiceContractTest {
     protected OrgDomainFixture createFixture() {
         AuditEventPublisher recorder = this.auditLog::add;
         InMemoryOrgRepository orgRepository = new InMemoryOrgRepository();
-        OrgService orgService = new OrgService(orgRepository, recorder, this.clock);
+        OrgService orgService = new OrgService(orgRepository, recorder, this.clock, null);
         InMemoryInstallationRepository installationRepository = new InMemoryInstallationRepository();
         return new OrgDomainFixture(
                 orgRepository,

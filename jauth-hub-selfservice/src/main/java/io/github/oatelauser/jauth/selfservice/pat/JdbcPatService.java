@@ -36,6 +36,7 @@ public class JdbcPatService implements PatService {
             return new PatRecord(
                     rs.getString("id"),
                     rs.getString("user_id"),
+                    rs.getString("name"),
                     rs.getString("token_prefix"),
                     splitScopes(rs.getString("scopes")),
                     PatStatus.valueOf(rs.getString("status")),
@@ -57,8 +58,9 @@ public class JdbcPatService implements PatService {
     }
 
     @Override
-    public PatIssuance create(String userId, Set<String> scopes, Duration validity) {
+    public PatIssuance create(String userId, String name, Set<String> scopes, Duration validity) {
         Assert.hasText(userId, "userId cannot be empty");
+        Assert.hasText(name, "name cannot be empty");
         Assert.notEmpty(scopes, "scopes cannot be empty");
         Assert.notNull(validity, "validity cannot be null");
         Instant now = this.clock.instant();
@@ -66,6 +68,7 @@ public class JdbcPatService implements PatService {
         PatRecord record = new PatRecord(
                 UuidV7.generate().toString(),
                 userId,
+                name.trim(),
                 PatTokens.displayPrefix(rawToken),
                 scopes,
                 PatStatus.ACTIVE,
@@ -73,10 +76,11 @@ public class JdbcPatService implements PatService {
                 now.plus(validity),
                 null);
         this.jdbcOperations.update(
-                "INSERT INTO jauth_pat (id, user_id, token_sha256, token_prefix, scopes,"
-                        + " expires_at, last_used_at, status, created_at) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)",
+                "INSERT INTO jauth_pat (id, user_id, name, token_sha256, token_prefix, scopes,"
+                        + " expires_at, last_used_at, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)",
                 record.id(),
                 record.userId(),
+                record.name(),
                 TokenHash.sha256Hex(rawToken),
                 record.tokenPrefix(),
                 joinScopes(record.scopes()),
@@ -90,7 +94,7 @@ public class JdbcPatService implements PatService {
     public List<PatRecord> listActive(String userId) {
         Assert.hasText(userId, "userId cannot be empty");
         return this.jdbcOperations.query(
-                "SELECT id, user_id, token_prefix, scopes, expires_at, last_used_at, status,"
+                "SELECT id, user_id, name, token_prefix, scopes, expires_at, last_used_at, status,"
                         + " created_at FROM jauth_pat WHERE user_id = ? AND status = ? ORDER BY created_at DESC, id ASC",
                 PAT_ROW_MAPPER,
                 userId,

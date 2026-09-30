@@ -10,7 +10,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Flyway 迁移单测：H2(PostgreSQL 兼容模式) 上从零跑完 V1-V6，验证全部业务表齐建、 框架三表 owner CHECK 生效、spring_session 两表
+ * Flyway 迁移单测：H2(PostgreSQL 兼容模式) 上从零跑完 V1-V7，验证全部业务表齐建、 框架三表 owner CHECK 生效、spring_session 两表
  * vendored DDL 可执行。
  *
  * <p>表清单 14 张 = 框架 3 + 自有 9（含 B2 补定的 jauth_jwk）+ vendored 2，对齐 SPEC §3 "14 表"。
@@ -50,7 +50,7 @@ class FlywayMigrationTest {
     void flywayHistoryRecordsAllMigrations() {
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE type = 'SQL'", Integer.class);
-        assertThat(count).isEqualTo(6);
+        assertThat(count).isEqualTo(7);
     }
 
     @Test
@@ -60,6 +60,20 @@ class FlywayMigrationTest {
                 "SELECT column_name FROM information_schema.columns WHERE table_name =" + " 'jauth_installation'",
                 String.class);
         assertThat(columns).contains("requested_by", "requested_scopes");
+    }
+
+    @Test
+    void patNameColumnExistsAndDefaultsToNull() {
+        // V7 补列（B10）：名称可空，存量行不炸（回退展示"未命名"）
+        jdbcTemplate.update("INSERT INTO jauth_user (id, username, password_hash, role, status, created_at)"
+                + " VALUES ('legacy-user-1', 'legacy-user', 'placeholder-hash-not-real',"
+                + " 'USER', 'ACTIVE', CURRENT_TIMESTAMP)");
+        jdbcTemplate.update("INSERT INTO jauth_pat (id, user_id, token_sha256, token_prefix, scopes, expires_at,"
+                + " status, created_at) VALUES ('legacy-pat-1', 'legacy-user-1',"
+                + " 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',"
+                + " 'jpat_legacy', 'openid', CURRENT_TIMESTAMP, 'ACTIVE', CURRENT_TIMESTAMP)");
+        String name = jdbcTemplate.queryForObject("SELECT name FROM jauth_pat WHERE id = 'legacy-pat-1'", String.class);
+        assertThat(name).isNull();
     }
 
     @Test

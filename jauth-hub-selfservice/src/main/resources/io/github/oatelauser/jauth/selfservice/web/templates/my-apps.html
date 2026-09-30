@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<!--/* 我的应用列表页（B10：个人应用免安装审批）:应用行(名称/Client ID/类型/回调/创建时间) + 注册入口;secret 永不回显 */-->
+<html lang="zh" xmlns:th="https://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('jauth.myapps.title')}">
+  <title>我的应用</title>
+</head>
+<body>
+  <!--/* 自助页补充样式（ss- 前缀自成命名空间）：core 单文件 CSS 属 core 模块不可改，列表样式在本页就地补齐 */-->
+  <style>
+    .ss-wide { max-width: 760px; }
+    .ss-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .ss-table th, .ss-table td { border-bottom: 1px solid #dfe3ef; padding: 8px 10px; text-align: left; }
+    .ss-table th { color: #5a607a; font-weight: 600; }
+    .ss-mono { font-family: ui-monospace, Consolas, monospace; font-size: 13px; word-break: break-all; }
+    .ss-badge { display: inline-block; margin-left: 6px; border-radius: 6px; padding: 1px 8px;
+                font-size: 12px; background: #eef2fd; color: #3352a4; }
+    .ss-badge.confidential { background: #fdeef1; color: #b02a37; }
+    .card h2 { margin: 20px 0 12px; font-size: 17px; }
+  </style>
+  <div class="page">
+    <main class="card ss-wide">
+      <p class="brand" th:text="#{jauth.brand}">jauth-hub</p>
+      <h1 th:text="#{jauth.myapps.title}">我的应用</h1>
+      <details class="teach" th:if="${educational}">
+        <summary th:text="#{jauth.teach.what-happened}">发生了什么</summary>
+        <p th:text="#{jauth.myapps.teach}">我的应用教学说明</p>
+      </details>
+
+      <div class="alert" th:if="${!appsSupported}" th:text="#{jauth.myapps.unsupported}">当前装配不支持</div>
+
+      <th:block th:if="${appsSupported}">
+        <p>
+          <a class="btn primary" th:href="@{/selfservice/my-apps/new}" th:text="#{jauth.myapps.new-link}">注册新应用</a>
+        </p>
+        <p class="hint" th:if="${#lists.isEmpty(apps)}" th:text="#{jauth.myapps.empty}">还没有应用</p>
+        <table class="ss-table" th:if="${!#lists.isEmpty(apps)}">
+          <thead>
+            <tr>
+              <th th:text="#{jauth.myapps.col-name}">应用名</th>
+              <th th:text="#{jauth.myapps.col-client-id}">Client ID</th>
+              <th th:text="#{jauth.myapps.col-type}">类型</th>
+              <th th:text="#{jauth.myapps.col-redirects}">回调地址</th>
+              <th th:text="#{jauth.myapps.col-created}">创建时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr th:each="app : ${apps}">
+              <td class="scope-name" th:text="${app.name}">我的应用</td>
+              <td class="ss-mono" th:text="${app.clientId}">app_xxxxxxxx</td>
+              <td>
+                <span class="ss-badge" th:classappend="${app.confidential} ? confidential"
+                      th:text="${app.confidential} ? #{jauth.myapps.type-confidential} : #{jauth.myapps.type-public}">类型</span>
+              </td>
+              <td class="ss-mono" th:text="${#strings.listJoin(app.redirectUris, ' ')}">https://app.example.com/callback</td>
+              <td th:text="${#temporals.format(app.createdAt, 'yyyy-MM-dd HH:mm')}">2026-09-30 10:00</td>
+            </tr>
+          </tbody>
+        </table>
+      </th:block>
+    </main>
+  </div>
+</body>
+</html>

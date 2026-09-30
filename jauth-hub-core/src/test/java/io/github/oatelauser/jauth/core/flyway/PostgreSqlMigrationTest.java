@@ -74,4 +74,27 @@ class PostgreSqlMigrationTest {
         }
         assertThat(installationColumns).contains("requested_by", "requested_scopes");
     }
+
+    @Test
+    void patNameColumnExistsOnRealPostgreSql() throws SQLException {
+        Flyway.configure()
+                .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+                .locations(IntegrationTestSupport.FLYWAY_LOCATION)
+                .load()
+                .migrate();
+
+        // V7 补列（B10）：名称可空，存量行不炸
+        List<String> patColumns = new ArrayList<>();
+        try (Statement statement = POSTGRES.createConnection("").createStatement();
+                ResultSet resultSet = statement.executeQuery(
+                        "SELECT column_name, is_nullable FROM information_schema.columns WHERE table_name ="
+                                + " 'jauth_pat'")) {
+            while (resultSet.next()) {
+                if ("name".equals(resultSet.getString(1))) {
+                    patColumns.add(resultSet.getString(1) + ":" + resultSet.getString(2));
+                }
+            }
+        }
+        assertThat(patColumns).containsExactly("name:YES");
+    }
 }

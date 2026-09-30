@@ -59,6 +59,9 @@ public class PatController {
 
     static final int DEFAULT_VALIDITY_DAYS = 90;
 
+    /** 名称上限（jauth_pat.name VARCHAR(100)，V7）。 */
+    static final int NAME_MAX_LENGTH = 100;
+
     private final @Nullable PatService patService;
 
     private final ScopeCatalog scopeCatalog;
@@ -135,7 +138,7 @@ public class PatController {
     /**
      * 创建 JSON：唯一一次回显明文令牌。
      *
-     * @param request 创建请求（scope 集 + 有效期天数）
+     * @param request 创建请求（名称 + scope 集 + 有效期天数）
      * @param principal 当前登录主体
      * @return SPI 渲染的成功体（data.token 为明文，仅此一次）
      */
@@ -144,13 +147,19 @@ public class PatController {
     public Object create(@RequestBody CreateRequest request, @Nullable Principal principal) {
         PatService service = requireService();
         JauthUser user = requireUser(principal);
+        String name = request.name() == null ? "" : request.name().trim();
+        if (name.isEmpty() || name.length() > NAME_MAX_LENGTH) {
+            // 名称必填（V7 列，B10 起创建面强制）；缺参走 A0501
+            throw new JauthException(JauthErrorCode.A0501);
+        }
         Set<String> scopes = validatedScopes(request.scopes());
         int validityDays = request.validityDays() == null ? DEFAULT_VALIDITY_DAYS : request.validityDays();
         if (!VALIDITY_DAYS.contains(validityDays)) {
             throw new JauthException(JauthErrorCode.A0502);
         }
-        PatIssuance issuance = service.create(user.id(), scopes, Duration.ofDays(validityDays));
-        Map<String, Object> data = new LinkedHashMap<>(4);
+        PatIssuance issuance = service.create(user.id(), name, scopes, Duration.ofDays(validityDays));
+        Map<String, Object> data = new LinkedHashMap<>(8);
+        data.put("name", issuance.record().name());
         data.put("token", issuance.plaintextToken());
         data.put("prefix", issuance.record().tokenPrefix());
         data.put("scopes", issuance.record().scopes());
@@ -220,6 +229,7 @@ public class PatController {
     private Map<String, Object> patView(PatRecord record, Instant now) {
         Map<String, Object> view = new LinkedHashMap<>(8);
         view.put("id", record.id());
+        view.put("name", record.name());
         view.put("prefix", record.tokenPrefix());
         view.put("scopes", record.scopes());
         view.put("status", record.status().name());
@@ -233,7 +243,7 @@ public class PatController {
     }
 
     /** 创建请求体：scopes 归一为不可空不可变集（缺失即空集，由校验路径拒绝）。 */
-    public record CreateRequest(Set<String> scopes, Integer validityDays) {
+    public record CreateRequest(String name, Set<String> scopes, Integer validityDays) {
 
         /** 防御性拷贝（SpotBugs EI_EXPOSE_REP 双向）：JSON 反序列化的 Set 不透传引用。 */
         public CreateRequest {

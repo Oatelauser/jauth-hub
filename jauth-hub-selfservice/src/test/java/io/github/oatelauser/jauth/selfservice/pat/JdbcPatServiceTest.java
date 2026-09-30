@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.github.oatelauser.jauth.core.token.TokenHash;
 import io.github.oatelauser.jauth.selfservice.support.IntegrationTestSupport;
 import java.time.Duration;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,7 +48,7 @@ class JdbcPatServiceTest extends AbstractPatServiceContractTest {
 
     @Test
     void databaseColumnHoldsHashNotPlaintext() {
-        PatService.PatIssuance issuance = this.service.create(USER_ID, SCOPES, Duration.ofDays(90));
+        PatService.PatIssuance issuance = this.service.create(USER_ID, "哈希锚", SCOPES, Duration.ofDays(90));
 
         String storedHash = this.jdbcTemplate.queryForObject(
                 "SELECT token_sha256 FROM jauth_pat WHERE id = ?",
@@ -59,7 +60,7 @@ class JdbcPatServiceTest extends AbstractPatServiceContractTest {
 
     @Test
     void revokeUpdatesStatusInsteadOfDeleting() {
-        PatService.PatIssuance issuance = this.service.create(USER_ID, SCOPES, Duration.ofDays(90));
+        PatService.PatIssuance issuance = this.service.create(USER_ID, "状态行", SCOPES, Duration.ofDays(90));
 
         this.service.revoke(USER_ID, issuance.record().id());
 
@@ -72,7 +73,8 @@ class JdbcPatServiceTest extends AbstractPatServiceContractTest {
 
     @Test
     void scopesRoundTripThroughJoinedColumn() {
-        PatService.PatIssuance issuance = this.service.create(USER_ID, Set.of("openid", "email"), Duration.ofDays(90));
+        PatService.PatIssuance issuance =
+                this.service.create(USER_ID, "范围回读", Set.of("openid", "email"), Duration.ofDays(90));
 
         String storedScopes = this.jdbcTemplate.queryForObject(
                 "SELECT scopes FROM jauth_pat WHERE id = ?",
@@ -80,5 +82,28 @@ class JdbcPatServiceTest extends AbstractPatServiceContractTest {
                 issuance.record().id());
         assertThat(storedScopes).contains("openid", "email");
         assertThat(this.service.listActive(USER_ID).get(0).scopes()).containsExactlyInAnyOrder("openid", "email");
+    }
+
+    @Test
+    void legacyRowWithoutNameSurvivesV7AndListsAsNull() {
+        // V7 前的存量行 name 为 NULL：不炸、列表照常返回（展示层回退"未命名"）
+        this.jdbcTemplate.update(
+                "INSERT INTO jauth_pat (id, user_id, token_sha256, token_prefix, scopes, expires_at,"
+                        + " status, created_at) VALUES ('legacy-pat-9', ?, 'bbbb', 'jpat_legacy',"
+                        + " 'openid', CURRENT_TIMESTAMP, 'ACTIVE', CURRENT_TIMESTAMP)",
+                USER_ID);
+        this.service.create(USER_ID, "新名", Set.of("openid"), Duration.ofDays(30));
+
+        List<PatRecord> active = this.service.listActive(USER_ID);
+        assertThat(active).extracting(PatRecord::name).containsExactlyInAnyOrder("新名", null);
+    }
+
+    @Test
+    void nameRoundTripsThroughNameColumn() {
+        this.service.create(USER_ID, "名称列往返", SCOPES, Duration.ofDays(90));
+
+        String storedName =
+                this.jdbcTemplate.queryForObject("SELECT name FROM jauth_pat WHERE user_id = ?", String.class, USER_ID);
+        assertThat(storedName).isEqualTo("名称列往返");
     }
 }

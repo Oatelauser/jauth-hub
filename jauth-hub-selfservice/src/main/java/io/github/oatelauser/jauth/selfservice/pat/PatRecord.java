@@ -11,11 +11,15 @@ import java.util.Set;
  *
  * <p>last_used 本批恒为 null（留位列）：B7 审计/内省接线时回填，届时 PAT 校验路径负责更新。
  *
+ * <p>{@code name} 可空：V7 前建库的存量行该列为 NULL，创建面（B10 起）强制命名——展示层对空名回退
+ * i18n"未命名"，不把可空性外溢到调用方。
+ *
  * @author oatelauser
  */
 public record PatRecord(
         String id,
         String userId,
+        String name,
         String tokenPrefix,
         Set<String> scopes,
         PatStatus status,

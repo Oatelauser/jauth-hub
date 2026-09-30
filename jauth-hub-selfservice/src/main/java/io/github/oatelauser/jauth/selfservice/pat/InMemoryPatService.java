@@ -36,8 +36,9 @@ public class InMemoryPatService implements PatService {
     }
 
     @Override
-    public synchronized PatIssuance create(String userId, Set<String> scopes, Duration validity) {
+    public synchronized PatIssuance create(String userId, String name, Set<String> scopes, Duration validity) {
         Assert.hasText(userId, "userId cannot be empty");
+        Assert.hasText(name, "name cannot be empty");
         Assert.notEmpty(scopes, "scopes cannot be empty");
         Assert.notNull(validity, "validity cannot be null");
         String rawToken = PatTokens.generate();
@@ -45,6 +46,7 @@ public class InMemoryPatService implements PatService {
         PatRecord record = new PatRecord(
                 UuidV7.generate().toString(),
                 userId,
+                name.trim(),
                 PatTokens.displayPrefix(rawToken),
                 scopes,
                 PatStatus.ACTIVE,
@@ -84,6 +86,7 @@ public class InMemoryPatService implements PatService {
         return new PatRecord(
                 record.id(),
                 record.userId(),
+                record.name(),
                 record.tokenPrefix(),
                 record.scopes(),
                 PatStatus.REVOKED,

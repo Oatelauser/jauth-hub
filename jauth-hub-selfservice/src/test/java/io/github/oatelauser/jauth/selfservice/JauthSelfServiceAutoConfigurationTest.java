@@ -3,6 +3,8 @@ package io.github.oatelauser.jauth.selfservice;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
+import io.github.oatelauser.jauth.core.client.InMemoryClientOwnerResolver;
+import io.github.oatelauser.jauth.core.client.JauthJdbcRegisteredClientRepository;
 import io.github.oatelauser.jauth.core.response.DefaultResponseRenderer;
 import io.github.oatelauser.jauth.core.response.ResponseRenderer;
 import io.github.oatelauser.jauth.core.scope.InMemoryScopeCatalog;
@@ -14,6 +16,10 @@ import io.github.oatelauser.jauth.selfservice.pat.JdbcPatService;
 import io.github.oatelauser.jauth.selfservice.pat.PatService;
 import io.github.oatelauser.jauth.selfservice.web.AuthorizedAppService;
 import io.github.oatelauser.jauth.selfservice.web.AuthorizedAppsController;
+import io.github.oatelauser.jauth.selfservice.web.InMemoryOwnedAppService;
+import io.github.oatelauser.jauth.selfservice.web.JdbcOwnedAppService;
+import io.github.oatelauser.jauth.selfservice.web.MyAppsController;
+import io.github.oatelauser.jauth.selfservice.web.OwnedAppService;
 import io.github.oatelauser.jauth.selfservice.web.PatController;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -26,13 +32,16 @@ import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.MessageSource;
 import org.springframework.context.support.ResourceBundleMessageSource;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 
 /**
- * 自助装配矩阵：jdbc 门控（PAT/看板服务只在 jdbc 注册）、memory 形态（控制器在、服务缺、页面渲染提示态）、无
- * starter 探针（RegisteredClientRepository 缺席时整组让位）、selfservice i18n basename 可解析。
+ * 自助装配矩阵：jdbc 门控（PAT/看板服务只在 jdbc 注册）、memory 形态（控制器在、PAT/看板服务缺、页面渲染提示态；
+ * 我的应用服务 memory 可用——B10 与 PAT 的门控差异）、无 starter 探针（RegisteredClientRepository 缺席时整组
+ * 让位）、selfservice i18n basename 可解析。
  *
  * @author oatelauser
  */
@@ -47,20 +56,29 @@ class JauthSelfServiceAutoConfigurationTest {
             .withBean(UserRepository.class, InMemoryUserRepository::new)
             .withBean(EducationalFlag.class, () -> EducationalFlag.ON)
             .withBean(ResponseRenderer.class, DefaultResponseRenderer::new)
+            .withBean(PasswordEncoder.class, BCryptPasswordEncoder::new)
             .withBean(MessageSource.class, JauthSelfServiceAutoConfigurationTest::messageSource)
             .withBean(Clock.class, () -> Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
 
     @Test
     void jdbcModeRegistersPatAndDashboardServices() {
-        withStarterProbe(this.runner)
+        // JauthJdbc 仓储 mock 即 starter 探针（instance type 满足 OnBean(RegisteredClientRepository)），
+        // 不再另挂接口 mock——两个 RegisteredClientRepository bean 会打爆按类型注入
+        this.runner
                 .withPropertyValues("jauth-hub.storage=jdbc")
                 .withBean(DataSource.class, () -> mock(DataSource.class))
+                .withBean(
+                        JauthJdbcRegisteredClientRepository.class,
+                        () -> mock(JauthJdbcRegisteredClientRepository.class))
                 .run(context -> {
                     assertThat(context).hasSingleBean(PatService.class);
                     assertThat(context).hasSingleBean(JdbcPatService.class);
                     assertThat(context).hasSingleBean(AuthorizedAppService.class);
+                    assertThat(context).hasSingleBean(OwnedAppService.class);
+                    assertThat(context).hasSingleBean(JdbcOwnedAppService.class);
                     assertThat(context).hasSingleBean(PatController.class);
                     assertThat(context).hasSingleBean(AuthorizedAppsController.class);
+                    assertThat(context).hasSingleBean(MyAppsController.class);
                     assertThat(context).hasBean("jauthSelfServiceViewResolver");
                 });
     }
@@ -69,11 +87,16 @@ class JauthSelfServiceAutoConfigurationTest {
     void memoryModeKeepsPagesButSkipsServices() {
         withStarterProbe(this.runner)
                 .withPropertyValues("jauth-hub.storage=memory")
+                .withBean(InMemoryClientOwnerResolver.class, InMemoryClientOwnerResolver::new)
                 .run(context -> {
                     assertThat(context).doesNotHaveBean(PatService.class);
                     assertThat(context).doesNotHaveBean(AuthorizedAppService.class);
+                    // 我的应用（B10）：memory 模式可用（client 入框架内存仓库 + owner 登记表）
+                    assertThat(context).hasSingleBean(OwnedAppService.class);
+                    assertThat(context).hasSingleBean(InMemoryOwnedAppService.class);
                     assertThat(context).hasSingleBean(PatController.class);
                     assertThat(context).hasSingleBean(AuthorizedAppsController.class);
+                    assertThat(context).hasSingleBean(MyAppsController.class);
                 });
     }
 
@@ -105,6 +128,10 @@ class JauthSelfServiceAutoConfigurationTest {
                 .isEqualTo("个人访问令牌");
         assertThat(messages.getMessage("jauth.apps.title", null, Locale.SIMPLIFIED_CHINESE))
                 .isEqualTo("已授权应用");
+        assertThat(messages.getMessage("jauth.myapps.title", null, Locale.SIMPLIFIED_CHINESE))
+                .isEqualTo("我的应用");
+        assertThat(messages.getMessage("jauth.pat.unnamed", null, Locale.SIMPLIFIED_CHINESE))
+                .isEqualTo("未命名");
     }
 
     private static MessageSource messageSource() {

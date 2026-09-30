@@ -10,6 +10,8 @@ import java.util.Set;
  * <p><b>明文纪律</b>（SPEC §3）：明文令牌只在 {@link #create} 的返回值中出现一次，此后任何查询面（列表/审计/日志）
  * 只有 SHA-256 哈希与展示前缀。调用方（控制器）须把明文直接送进创建响应，禁止中转日志。
  *
+ * <p><b>名称列</b>（V7，B10）：创建强制命名；存量行 name 为 NULL，列表展示回退"未命名"。
+ *
  * <p><b>装配门控</b>（04 票：memory 模式禁用 PAT）：本接口的 bean 只在 {@code jauth-hub.storage=jdbc} 时注册——
  * PAT 是持久化语义的凭据，memory 模式（重启即失、面向 demo）不承载；页面侧渲染"当前存储模式不支持"提示。
  *
@@ -20,16 +22,18 @@ import java.util.Set;
 public interface PatService {
 
     /**
-     * 创建一枚 PAT：生成高熵明文令牌，落库哈希与前缀。
+     * 创建一枚 PAT：生成高熵明文令牌，落库哈希、前缀与名称（V7 列）。
      *
-     * <p>前置约束（控制器层守门）：scopes 非空且均在 ScopeCatalog 目录内；validity ∈ {30, 90, 365} 天（SPEC §6）。
+     * <p>前置约束（控制器层守门）：name 非空（≤100 字符）；scopes 非空且均在 ScopeCatalog 目录内；
+     * validity ∈ {30, 90, 365} 天（SPEC §6）。
      *
      * @param userId 归属用户 id（表 jauth_user.id）
+     * @param name 令牌名称（用户可辨识"是哪一枚"）
      * @param scopes 授权 scope 集
      * @param validity 有效期
      * @return 记录 + 仅此一次的明文令牌
      */
-    PatIssuance create(String userId, Set<String> scopes, Duration validity);
+    PatIssuance create(String userId, String name, Set<String> scopes, Duration validity);
 
     /**
      * 列出用户名下未吊销的 PAT（含已过期行，过期以时间判定由展示层标注），按创建时间倒序。
