@@ -6,7 +6,7 @@
   <parent>
     <groupId>io.github.oatelauser</groupId>
     <artifactId>jauth-hub</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
   </parent>
 
   <artifactId>jauth-hub-starter</artifactId>
