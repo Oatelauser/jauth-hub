@@ -4,6 +4,7 @@
 #   2. java -cp <classpath> ...ConfigEncryptor encrypt '<密钥>' '<明文>' → 输出 ENC(xJ8f...)
 #   3. 替换下方占位，例如 password: ENC(xJ8f...)
 # 环境准备阶段自动解密（EnvironmentPostProcessor），业务侧零感知；密钥丢失密文不可恢复，换钥先验证 decrypt。
+# 教学客户端（demo-public/demo-rs）不在 prod 播种：种子只在 local/dev 档；prod 客户端走库/自配。
 spring:
   datasource:
     url: jdbc:postgresql://${JAUTH_DB_HOST:localhost}:5432/${JAUTH_DB_NAME:jauth_hub}

@@ -1,0 +1,47 @@
+# local：本机开发默认档（application.yml 默认激活）。H2 PostgreSQL 兼容文件库零外部依赖，
+# 拿来即跑；敏感项为明文占位——仅限本机，勿用于共享环境。
+spring:
+  datasource:
+    # H2 PostgreSQL 兼容模式（SPEC §1 双兼容 SQL 的 dev 落点）；文件库随工作目录 ./data 持久化
+    url: jdbc:h2:file:./data/jauth-hub;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password: "" # 本地文件库空密码
+
+jauth-hub:
+  issuer: http://localhost:8080
+  # 首启超管（04 票：properties 定义 → 启动 seeding，幂等；存在即跳过）。local 占位密码
+  bootstrap:
+    superadmin:
+      username: admin
+      password: admin-dev-only-placeholder
+  # /demo 教学区客户端种子（SPEC §2：播种器不是第二真源，运行期以库为准）
+  clients:
+    - client-id: demo-public
+      client-name: /demo 教学区公开客户端（PKCE）
+      # 无 client-secret = 公开客户端（NONE 认证方式），强制 PKCE 由播种器统一附加
+      # 教学第 2 步：授权同意页可见（consent 页演示）
+      require-authorization-consent: true
+      grant-types:
+        - authorization_code
+        - refresh_token
+      redirect-uris:
+        - http://localhost:8080/demo/callback
+      scopes:
+        - openid
+        - profile
+    - client-id: demo-rs
+      client-name: /demo 内省演示机密客户端
+      # local 占位 secret；内省调用方须为机密客户端（SPEC §4）
+      client-secret: demo-rs-dev-only-placeholder
+      # 仅作内省凭证使用，不走浏览器重定向；播种校验要求 redirect 非空故给占位值
+      grant-types:
+        - client_credentials
+      redirect-uris:
+        - http://localhost:8080/demo/unused-rs-placeholder
+      scopes:
+        - openid
+  # rs-starter：/api/demo/** 经自身内省端点验 opaque token（同 app 闭环，06 Q1 模式）
+  rs:
+    introspection-uri: http://localhost:8080/oauth2/introspect
+    client-id: demo-rs
+    client-secret: demo-rs-dev-only-placeholder

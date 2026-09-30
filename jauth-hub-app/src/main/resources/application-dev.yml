@@ -1,0 +1,44 @@
+# dev：联调环境档。与 prod 同构（PostgreSQL + 环境变量注入），但所有变量带 dev 缺省值，
+# 空环境也能起跑；共享环境勿沿用缺省密码（或改用 ENC()，生成方式见 application-prod.yml 头注）。
+spring:
+  datasource:
+    url: jdbc:postgresql://${JAUTH_DB_HOST:localhost}:5432/${JAUTH_DB_NAME:jauth_hub_dev}
+    username: ${JAUTH_DB_USER:jauth}
+    password: ${JAUTH_DB_PASSWORD:jauth-dev-only-placeholder}
+
+jauth-hub:
+  issuer: ${JAUTH_ISSUER:http://localhost:8080}
+  bootstrap:
+    superadmin:
+      username: ${JAUTH_SUPERADMIN_USERNAME:admin}
+      password: ${JAUTH_SUPERADMIN_PASSWORD:admin-dev-only-placeholder}
+  # /demo 教学区种子：回调地址随部署面走（JAUTH_DEMO_REDIRECT_BASE 缺省本机）
+  clients:
+    - client-id: demo-public
+      client-name: /demo 教学区公开客户端（PKCE）
+      # 无 client-secret = 公开客户端（NONE 认证方式），强制 PKCE 由播种器统一附加
+      require-authorization-consent: true
+      grant-types:
+        - authorization_code
+        - refresh_token
+      redirect-uris:
+        - ${JAUTH_DEMO_REDIRECT_BASE:http://localhost:8080}/demo/callback
+      scopes:
+        - openid
+        - profile
+    - client-id: demo-rs
+      client-name: /demo 内省演示机密客户端
+      # 内省调用方须为机密客户端（SPEC §4）
+      client-secret: ${JAUTH_DEMO_RS_SECRET:demo-rs-dev-only-placeholder}
+      # 仅作内省凭证使用，不走浏览器重定向；播种校验要求 redirect 非空故给占位值
+      grant-types:
+        - client_credentials
+      redirect-uris:
+        - ${JAUTH_DEMO_REDIRECT_BASE:http://localhost:8080}/demo/unused-rs-placeholder
+      scopes:
+        - openid
+  # rs-starter：/api/demo/** 经自身内省端点验 opaque token（同 app 闭环，06 Q1 模式）
+  rs:
+    introspection-uri: ${JAUTH_ISSUER:http://localhost:8080}/oauth2/introspect
+    client-id: demo-rs
+    client-secret: ${JAUTH_DEMO_RS_SECRET:demo-rs-dev-only-placeholder}

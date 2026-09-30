@@ -55,7 +55,7 @@ java -jar jauth-hub-app/target/jauth-hub-app-1.0.0.jar
 
 打开 <http://localhost:8080/demo> —— 教学区会带你走完 **登录 → 授权确认 → 换令牌 → 内省 → 调 API** 的完整闭环，每步 HTTP 明细实时可见。
 
-首启自动创建超管（`application.yml` 可改）：
+首启自动创建超管（默认 local 档在 `application-local.yml` 可改，dev/prod 档见 `application-dev.yml` / `application-prod.yml`）：
 
 ```yaml
 jauth-hub:
