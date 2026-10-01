@@ -122,6 +122,7 @@ A complete runnable example lives in `examples/embedded-demo`.
 | 🧩 My apps | `/selfservice/my-apps` | Register personal OAuth apps (client_id/secret, redirect allowlist); org apps live at `/selfservice/orgs/{orgId}/apps` |
 | 🔖 Personal access tokens | `/selfservice/pat` | Pick scopes + lifetime (30/90/365 days); the plaintext is **shown exactly once** |
 | 🔐 Passkeys | `/selfservice/passkey` | Register and manage passkeys (name them, delete to revoke); off by default, see the configuration table |
+| 🔐 Sudo verification | `/selfservice/sudo` | In-session passkey step-up page shown when a sensitive operation is blocked (A0515); returns to the original form afterwards; off by default |
 
 > **Issued scopes for org apps** = requested ∩ user consent ∩ org ceiling, intersected at runtime — narrow any of the three and the token narrows with it.
 
@@ -175,6 +176,8 @@ OIDC discovery endpoint: <http://localhost:8080/.well-known/openid-configuration
 | `jauth-hub.rate-limit.login-max-failures` | `5` | 5 misses lock the account for 15 minutes |
 | `jauth-hub.cors.allowed-origins` | empty | Set when an SPA hits the token endpoint directly from the browser |
 | `jauth-hub.passkey.enabled` | `false` | Passkey sign-in and management toggle; `rp-id`/`allowed-origins` default to values derived from `issuer` (host as rp-id, full URL as origin); startup fails fast when not derivable |
+| `jauth-hub.sudo.enabled` | `false` | sudo re-verification toggle (depends on passkey; enabling it alone fails startup); sensitive operations (password change / admin password reset / role change) outside the strong-auth TTL get A0515 and the page redirects to the verification page |
+| `jauth-hub.sudo.ttl-minutes` | `15` | sudo strong-auth validity window in minutes; a successful passkey verification stamps `strong_auth_at`, no re-verification inside the window |
 
 **Default policies** (overridable per client): access 2h · refresh 30d, rotate on use (replay → whole family revoked) · PAT 90d · authorization code 5min + mandatory PKCE · keys rotate every 90d with a 14d overlap. ⚠️ Framework guardrail: public clients never receive refresh tokens.
 

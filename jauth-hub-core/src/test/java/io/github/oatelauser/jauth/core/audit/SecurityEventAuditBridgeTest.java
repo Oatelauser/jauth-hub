@@ -67,7 +67,12 @@ class SecurityEventAuditBridgeTest {
                 T0));
         // 阈值 3：三次失败即锁——测试断言登锁状态差分的最小配置
         this.rateLimiter = new RateLimiter(1000, 3, Duration.ofMinutes(15), Clock.fixed(T0, ZoneOffset.UTC));
-        this.bridge = new SecurityEventAuditBridge(this.auditLog::add, this.rateLimiter, this.users);
+        // v1.2 C3：桥打点用固定钟（T0+1h），断言 strong_auth_at 落钟值
+        this.bridge = new SecurityEventAuditBridge(
+                this.auditLog::add,
+                this.rateLimiter,
+                this.users,
+                Clock.fixed(T0.plus(Duration.ofHours(1)), ZoneOffset.UTC));
     }
 
     @Test
@@ -124,6 +129,19 @@ class SecurityEventAuditBridgeTest {
         assertThat(this.auditLog.get(0).actorUserId()).isNull();
         assertThat(this.auditLog.get(0).targetId()).isNull();
         assertThat(this.auditLog.get(0).detail()).isEqualTo("factor=webauthn; cause=BadCredentialsException");
+    }
+
+    @Test
+    @DisplayName("passkey 成功打点 strong_auth_at（sudo 位），表单成功不打点")
+    void passkeySuccessStampsStrongAuthAtButFormDoesNot() {
+        this.bridge.onLoginSuccess(new AuthenticationSuccessEvent(webauthnAuthentication()));
+        assertThat(this.users.findById(ALICE_ID).strongAuthAt()).isEqualTo(T0.plus(Duration.ofHours(1)));
+
+        UsernamePasswordAuthenticationToken form = UsernamePasswordAuthenticationToken.authenticated(
+                "alice", "N/A", List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        this.users.updateStrongAuthAt(ALICE_ID, null);
+        this.bridge.onLoginSuccess(new AuthenticationSuccessEvent(form));
+        assertThat(this.users.findById(ALICE_ID).strongAuthAt()).isNull();
     }
 
     @Test

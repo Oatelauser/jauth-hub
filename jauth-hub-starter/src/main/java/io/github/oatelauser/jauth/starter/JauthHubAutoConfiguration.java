@@ -50,6 +50,7 @@ import io.github.oatelauser.jauth.core.token.key.JdbcJwkRepository;
 import io.github.oatelauser.jauth.core.token.key.JwkRotationService;
 import io.github.oatelauser.jauth.core.user.InMemoryUserRepository;
 import io.github.oatelauser.jauth.core.user.JdbcUserRepository;
+import io.github.oatelauser.jauth.core.user.SudoGate;
 import io.github.oatelauser.jauth.core.user.UserRepository;
 import io.github.oatelauser.jauth.core.web.AccessTokenPlatformTokenResolver;
 import io.github.oatelauser.jauth.core.web.ConsentController;
@@ -262,13 +263,37 @@ public class JauthHubAutoConfiguration {
     // ------------------------------------------------------------------ 审计与 /me（SPEC §5 横切）
 
     /**
-     * Spring Security 认证事件接线桥：登录成功/失败 → 审计 + 登录失败锁定计数（core 类注释的事件源
-     * 过滤论证）。audit publisher 与 UserRepository 按存储模式由两个配置分支供给。
+     * Spring Security 认证事件接线桥：登录成功/失败 → 审计 + 登录失败锁定计数 + passkey 成功的强认证
+     * 打点（core 类注释的事件源过滤论证）。audit publisher 与 UserRepository 按存储模式由两个配置分支供给；
+     * Clock 照限流器先例 ObjectProvider 可缺省（jdbc 模式默认 systemUTC，测试可注可变钟）。
      */
     @Bean
     SecurityEventAuditBridge jauthSecurityEventAuditBridge(
-            AuditEventPublisher auditPublisher, RateLimiter rateLimiter, UserRepository userRepository) {
-        return new SecurityEventAuditBridge(auditPublisher, rateLimiter, userRepository);
+            AuditEventPublisher auditPublisher,
+            RateLimiter rateLimiter,
+            UserRepository userRepository,
+            ObjectProvider<Clock> clock) {
+        return new SecurityEventAuditBridge(
+                auditPublisher, rateLimiter, userRepository, clock.getIfAvailable(Clock::systemUTC));
+    }
+
+    /**
+     * sudo 判官（v1.2 C3）：仅 {@code jauth-hub.sudo.enabled=true} 注册（默认关 = 零 bean 零拦截）。
+     * SPEC §5：sudo 依赖 passkey——passkey 关而 sudo 开是配置矛盾（强认证无因子来源，验证页也无处可跳），
+     * 启动 fail-fast 不静默放行。
+     */
+    @Bean
+    @ConditionalOnProperty(name = "jauth-hub.sudo.enabled", havingValue = "true")
+    @ConditionalOnMissingBean(SudoGate.class)
+    SudoGate jauthSudoGate(JauthHubProperties properties, UserRepository userRepository, ObjectProvider<Clock> clock) {
+        if (!properties.getPasskey().isEnabled()) {
+            throw new IllegalStateException("jauth-hub.sudo.enabled=true requires jauth-hub.passkey.enabled=true: "
+                    + "sudo mode re-verifies the user with a passkey, without it there is no strong-auth factor");
+        }
+        return new SudoGate(
+                userRepository,
+                Duration.ofMinutes(properties.getSudo().getTtlMinutes()),
+                clock.getIfAvailable(Clock::systemUTC));
     }
 
     /** /me 平台端点（core）：认证面 = PlatformTokenResolver 本进程内省（SPEC §4）。 */

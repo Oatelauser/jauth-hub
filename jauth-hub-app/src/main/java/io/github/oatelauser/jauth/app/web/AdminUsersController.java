@@ -7,6 +7,7 @@ import io.github.oatelauser.jauth.core.user.JauthUser;
 import io.github.oatelauser.jauth.core.user.UserRepository;
 import io.github.oatelauser.jauth.core.util.UuidV7;
 import io.github.oatelauser.jauth.core.web.EducationalFlag;
+import io.github.oatelauser.jauth.core.web.RequiresSudo;
 import io.github.oatelauser.springplus.security.annotation.Principal;
 import io.github.oatelauser.springplus.security.annotation.RequiresRole;
 import java.time.Instant;
@@ -131,11 +132,13 @@ public class AdminUsersController {
 
     /**
      * 改角色 JSON：SUPERADMIN↔USER 翻转，不可作用于自己（A0513）。
+     * 敏感操作（v1.2 C3）：{@code @RequiresSudo}——sudo 开启时强认证过期即 A0515，页面跳 /selfservice/sudo。
      *
      * @param id 目标用户 id
      * @param admin 操作者（spring-plus 注入的登录主体）
      * @return SPI 渲染的成功体（data.role 为翻转后的新角色）
      */
+    @RequiresSudo
     @RequiresRole(role = RequiresRole.ROLE_SUPER_ADMIN)
     @PostMapping(
             value = "/api/admin/users/{id}/role",
@@ -182,11 +185,13 @@ public class AdminUsersController {
 
     /**
      * 重置密码 JSON：新密码由管理员在请求中给定（≥8 位），更新后响应只回摘要不回显明文。
+     * 敏感操作（v1.2 C3）：{@code @RequiresSudo}——sudo 开启时强认证过期即 A0515，页面跳 /selfservice/sudo。
      *
      * @param id 目标用户 id
      * @param request 重置请求
      * @return SPI 渲染的成功体（data 仅含 id/username）
      */
+    @RequiresSudo
     @RequiresRole(role = RequiresRole.ROLE_SUPER_ADMIN)
     @PostMapping(
             value = "/api/admin/users/{id}/password",

@@ -1,5 +1,6 @@
 package io.github.oatelauser.jauth.selfservice;
 
+import io.github.oatelauser.jauth.core.audit.AuditEventPublisher;
 import io.github.oatelauser.jauth.core.client.InMemoryClientOwnerResolver;
 import io.github.oatelauser.jauth.core.client.JauthJdbcRegisteredClientRepository;
 import io.github.oatelauser.jauth.core.org.InstallationRepository;
@@ -8,6 +9,7 @@ import io.github.oatelauser.jauth.core.org.OrgRepository;
 import io.github.oatelauser.jauth.core.org.OrgService;
 import io.github.oatelauser.jauth.core.response.ResponseRenderer;
 import io.github.oatelauser.jauth.core.scope.ScopeCatalog;
+import io.github.oatelauser.jauth.core.user.SudoGate;
 import io.github.oatelauser.jauth.core.user.UserRepository;
 import io.github.oatelauser.jauth.core.web.EducationalFlag;
 import io.github.oatelauser.jauth.core.web.PasskeyFlag;
@@ -24,6 +26,8 @@ import io.github.oatelauser.jauth.selfservice.web.OrgInstallationsController;
 import io.github.oatelauser.jauth.selfservice.web.OwnedAppService;
 import io.github.oatelauser.jauth.selfservice.web.PasskeyController;
 import io.github.oatelauser.jauth.selfservice.web.PatController;
+import io.github.oatelauser.jauth.selfservice.web.SudoController;
+import io.github.oatelauser.jauth.selfservice.web.SudoInterceptor;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import javax.sql.DataSource;
@@ -45,6 +49,8 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 import org.springframework.security.web.webauthn.management.UserCredentialRepository;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.servlet.ViewResolver;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 import org.thymeleaf.spring6.templateresolver.SpringResourceTemplateResolver;
 import org.thymeleaf.spring6.view.ThymeleafViewResolver;
@@ -145,6 +151,34 @@ public class JauthSelfServiceAutoConfiguration {
             return new PasskeyController(credentials, userRepository, educational);
         }
 
+        /**
+         * sudo 验证页（v1.2 C3）：SudoGate 经 ObjectProvider 持有——缺席（sudo 关）即页面渲染"未启用"
+         * 提示态（照 PasskeyController 门控形态）；PasskeyFlag 宿主缺它时降级 OFF 同看板先例。
+         */
+        @Bean
+        @ConditionalOnMissingBean
+        SudoController jauthSudoController(
+                ObjectProvider<SudoGate> sudoGate, ObjectProvider<PasskeyFlag> passkey, EducationalFlag educational) {
+            return new SudoController(sudoGate, passkey.getIfAvailable(() -> PasskeyFlag.OFF), educational);
+        }
+
+        /**
+         * sudo 拦截门（v1.2 C3）：仅 SudoGate bean 在场（= {@code jauth-hub.sudo.enabled=true}，starter
+         * 装配并已校验 passkey 依赖）时注册——关 = 零拦截零开销；WebMvcConfigurer 形态照 starter 的
+         * jauthStaticResourcesConfigurer 先例。
+         */
+        @Bean
+        @ConditionalOnBean(SudoGate.class)
+        WebMvcConfigurer jauthSudoInterceptorConfigurer(
+                SudoGate sudoGate, AuditEventPublisher auditPublisher, UserRepository userRepository) {
+            return new WebMvcConfigurer() {
+                @Override
+                public void addInterceptors(InterceptorRegistry registry) {
+                    registry.addInterceptor(new SudoInterceptor(sudoGate, auditPublisher, userRepository));
+                }
+            };
+        }
+
         /** 我的应用页（B10）：memory 模式也可用（与 PAT/看板不同），服务 bean 由两段存储配置按模式供给。 */
         @Bean
         @ConditionalOnMissingBean
@@ -220,7 +254,7 @@ public class JauthSelfServiceAutoConfiguration {
 
         /**
          * selfservice 视图解析器：自带引擎 + 双解析器链（本模块命名空间优先，core 命名空间兜底供 fragments/layout
-         * 解析），消息源自持 basename 并挂 parent。viewNames 白名单钉死只认领本模块八个视图名
+         * 解析），消息源自持 basename 并挂 parent。viewNames 白名单钉死只认领本模块九个视图名
          * （thymeleaf-spring6 的 ThymeleafViewResolver 无 checkExistence），其余视图穿透宿主/Boot 默认解析器；
          * core 三页仍走共享引擎，两套视图名不相交。
          */
@@ -245,6 +279,7 @@ public class JauthSelfServiceAutoConfiguration {
                 PatController.VIEW_PAT,
                 AuthorizedAppsController.VIEW_APPS,
                 PasskeyController.VIEW_PASSKEY,
+                SudoController.VIEW_SUDO,
                 MyAppsController.VIEW_MY_APPS,
                 MyAppsController.VIEW_MY_APP_NEW,
                 MyOrgsController.VIEW_MY_ORGS,

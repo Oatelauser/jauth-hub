@@ -122,6 +122,7 @@ jauth-hub.rs:
 | 🧩 我的应用 | `/selfservice/my-apps` | 注册个人 OAuth 应用（client_id/secret、redirect 白名单），org 应用在 `/selfservice/orgs/{orgId}/apps` |
 | 🔖 个人访问令牌 | `/selfservice/pat` | 勾选 scope + 有效期（30/90/365 天）生成长期令牌，**明文只显示一次** |
 | 🔐 通行密钥 | `/selfservice/passkey` | 注册/管理 passkey（命名、删除即失效）；默认关，开启方式见下方配置表 |
+| 🔐 sudo 验证 | `/selfservice/sudo` | 敏感操作被拦（A0515）后的 passkey 就地升权页，验证后回原表单页重交；默认关 |
 
 > **org 应用发行范围** = 请求 scope ∩ 用户 consent ∩ org ceiling，运行时取交——三方任何一个收窄，令牌立即跟着收窄。
 
@@ -174,6 +175,8 @@ OIDC 发现端点：<http://localhost:8080/.well-known/openid-configuration> （
 | `jauth-hub.rate-limit.login-max-failures` | `5` | 连错锁 15 分钟 |
 | `jauth-hub.cors.allowed-origins` | 空 | SPA 浏览器直连 token 端点时配 |
 | `jauth-hub.passkey.enabled` | `false` | Passkey 登录与管理页开关；`rp-id`/`allowed-origins` 缺省由 `issuer` 推导（host 即 rp-id、origin 即完整 URL），不可解析时启动 fail-fast |
+| `jauth-hub.sudo.enabled` | `false` | sudo 强验证开关（依赖 passkey，单独开启启动失败）；敏感操作（改密/管理员重置密码/角色变更）在强认证 TTL 外触达即 A0515，页面跳验证页 |
+| `jauth-hub.sudo.ttl-minutes` | `15` | sudo 强认证有效窗口（分钟）；passkey 验证成功即打点 `strong_auth_at`，窗口内免重复验证 |
 
 **默认策略**（每客户端可覆盖）：access 2h · refresh 30d 用后即轮转（重放→整族熔断）· PAT 90d · 授权码 5min+强制 PKCE · 密钥 90d 轮转+14d 重叠。⚠️ 框架防线：公开客户端不发 refresh token。
 

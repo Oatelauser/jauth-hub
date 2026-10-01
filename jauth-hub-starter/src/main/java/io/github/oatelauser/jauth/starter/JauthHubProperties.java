@@ -41,6 +41,9 @@ public class JauthHubProperties {
     /** Passkey 强化层（SPEC §5 v1.2：默认关——协议链端点与凭据仓储仅在显式开启时装配）。 */
     private Passkey passkey = new Passkey();
 
+    /** sudo 强验证层（SPEC §5 v1.2 C3：默认关；依赖 passkey，passkey 关而 sudo 开 → 启动 fail-fast）。 */
+    private Sudo sudo = new Sudo();
+
     /** 播种清单（透传 core 的种子结构，两模式通用，幂等）。 */
     private List<ClientSeedProperties.ClientSeed> clients = new ArrayList<>();
 
@@ -91,6 +94,20 @@ public class JauthHubProperties {
         this.passkey.setRpId(source.getRpId());
         this.passkey.setRpName(source.getRpName());
         this.passkey.setAllowedOrigins(source.getAllowedOrigins());
+    }
+
+    /** 防御性拷贝出入（与 Cors 同款理由）。 */
+    public Sudo getSudo() {
+        Sudo copy = new Sudo();
+        copy.setEnabled(this.sudo.isEnabled());
+        copy.setTtlMinutes(this.sudo.getTtlMinutes());
+        return copy;
+    }
+
+    public void setSudo(Sudo sudo) {
+        Sudo source = sudo == null ? new Sudo() : sudo;
+        this.sudo.setEnabled(source.isEnabled());
+        this.sudo.setTtlMinutes(source.getTtlMinutes());
     }
 
     public List<ClientSeedProperties.ClientSeed> getClients() {
@@ -232,6 +249,34 @@ public class JauthHubProperties {
 
         public void setAllowedOrigins(List<String> allowedOrigins) {
             this.allowedOrigins = allowedOrigins == null ? new ArrayList<>() : new ArrayList<>(allowedOrigins);
+        }
+    }
+
+    /**
+     * sudo 强验证层参数（SPEC §5 v1.2 C3）：敏感操作（@RequiresSudo 端点）要求最近一次 passkey 强认证
+     * 仍在 TTL 内；依赖 passkey（强认证因子唯一来源），装配层校验 fail-fast。
+     */
+    public static class Sudo {
+
+        private boolean enabled = false;
+
+        /** 强认证新鲜窗口（分钟），窗口内敏感操作免重验（GitHub 同款语义）。 */
+        private int ttlMinutes = 15;
+
+        public boolean isEnabled() {
+            return this.enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public int getTtlMinutes() {
+            return this.ttlMinutes;
+        }
+
+        public void setTtlMinutes(int ttlMinutes) {
+            this.ttlMinutes = ttlMinutes;
         }
     }
 }

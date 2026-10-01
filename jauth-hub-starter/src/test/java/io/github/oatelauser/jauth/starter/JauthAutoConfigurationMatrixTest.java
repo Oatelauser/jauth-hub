@@ -224,6 +224,24 @@ class JauthAutoConfigurationMatrixTest {
         return dataSource;
     }
 
+    @Test
+    @DisplayName("sudo 依赖 passkey（SPEC §5）：passkey 关而 sudo 开启动失败；双开时 SudoGate 在场")
+    void sudoRequiresPasskeyFailFast() {
+        this.runner.withPropertyValues("jauth-hub.sudo.enabled=true").run(context -> assertThat(context)
+                .hasFailed()
+                .getFailure()
+                .hasMessageContaining("requires jauth-hub.passkey.enabled=true"));
+        this.runner
+                .withPropertyValues(
+                        "jauth-hub.passkey.enabled=true",
+                        "jauth-hub.sudo.enabled=true",
+                        "jauth-hub.sudo.ttl-minutes=30")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).hasBean("jauthSudoGate");
+                });
+    }
+
     /**
      * HttpSecurity 基座：spring-security 的 HttpSecurity/WebSecurity 装配不在 Boot 自动配置清单内，
      * 由 @EnableWebSecurity 拉起（@SpringBootTest 场景里 Boot 的安全自动配置承担同一角色）。

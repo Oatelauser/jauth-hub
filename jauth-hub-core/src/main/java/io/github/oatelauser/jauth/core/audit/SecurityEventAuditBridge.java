@@ -4,6 +4,7 @@ import io.github.oatelauser.jauth.core.passkey.JauthUserEntityRepository;
 import io.github.oatelauser.jauth.core.ratelimit.RateLimiter;
 import io.github.oatelauser.jauth.core.user.JauthUser;
 import io.github.oatelauser.jauth.core.user.UserRepository;
+import java.time.Clock;
 import org.jspecify.annotations.Nullable;
 import org.springframework.context.event.EventListener;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -31,6 +32,10 @@ import org.springframework.util.Assert;
  * 事件主体即用户实体（getName() = 登录名），照常清锁；失败事件经 userHandle 反查用户池，查得到才计数，
  * detail 不回记原始 userHandle——未验签的断言字段是攻击者可控输入，进审计徒占列。
  *
+ * <p><b>passkey 成功即强认证打点</b>（v1.2 C3，sudo 依赖）：passkey 成功是"最近一次强认证"的唯一服务器侧
+ * 汇聚点——此处落 {@code updateStrongAuthAt}（表单登录不打点：密码 ≠ 强认证）。打点与审计/限流同源同现，
+ * sudo 判官（user 域 {@code SudoGate}）只读该列。
+ *
  * <p>由 starter 注册为 bean（core 无组件扫描）；memory/jdbc 两模式通用。
  *
  * @author oatelauser
@@ -45,14 +50,18 @@ public class SecurityEventAuditBridge {
 
     private final UserRepository userRepository;
 
+    private final Clock clock;
+
     public SecurityEventAuditBridge(
-            AuditEventPublisher auditPublisher, RateLimiter rateLimiter, UserRepository userRepository) {
+            AuditEventPublisher auditPublisher, RateLimiter rateLimiter, UserRepository userRepository, Clock clock) {
         Assert.notNull(auditPublisher, "auditPublisher cannot be null");
         Assert.notNull(rateLimiter, "rateLimiter cannot be null");
         Assert.notNull(userRepository, "userRepository cannot be null");
+        Assert.notNull(clock, "clock cannot be null");
         this.auditPublisher = auditPublisher;
         this.rateLimiter = rateLimiter;
         this.userRepository = userRepository;
+        this.clock = clock;
     }
 
     @EventListener
@@ -72,8 +81,17 @@ public class SecurityEventAuditBridge {
             // WebAuthnAuthentication 的 principal = 用户实体，getName() = 登录名
             String username = authentication.getName();
             rateLimiter.onLoginSuccess(username);
+            JauthUser user = this.userRepository.findByUsername(username);
+            if (user != null) {
+                // 强认证打点（sudo 位）：passkey 成功是唯一汇聚点，表单成功不打点（类注释）
+                this.userRepository.updateStrongAuthAt(user.id(), this.clock.instant());
+            }
             auditPublisher.publish(AuditEvent.of(
-                    AuditEventType.LOGIN_SUCCESS, resolveUserId(username), "user", username, DETAIL_FACTOR_WEBAUTHN));
+                    AuditEventType.LOGIN_SUCCESS,
+                    user == null ? null : user.id(),
+                    "user",
+                    username,
+                    DETAIL_FACTOR_WEBAUTHN));
         }
     }
 

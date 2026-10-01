@@ -28,7 +28,10 @@ public enum SelfServiceErrorCode implements ErrorCode {
     A0510("A0510", "redirect URI 缺失或非法"),
 
     /** 安装审批的 ceiling 勾选为空（批准即封顶，空集无意义；驳回走专用动作，B11）。 */
-    A0511("A0511", "安装审批的 ceiling 勾选为空");
+    A0511("A0511", "安装审批的 ceiling 勾选为空"),
+
+    /** 需要强验证（sudo）：敏感操作前最近一次 passkey 强认证已过期或缺失，先去 /selfservice/sudo 验证（v1.2 C3）。 */
+    A0515("A0515", "需要强验证（sudo）");
 
     private final String code;
 

@@ -6,7 +6,7 @@ package io.github.oatelauser.jauth.core.audit;
  * <p>v1.0 覆盖：登录（成功/失败）、令牌（签发/刷新/撤销）、consent 接受；v1.1（B8）追加 org/安装域：
  * org 创建与安装两步制全生命周期（发起/批准/驳回/撤销），由 OrgService/InstallationService 服务路径发布；
  * v1.2（C1）追加 Passkey 凭据生命周期（注册/移除），挂在凭据仓储 save/delete 路径（框架过滤器在 HTTP 层，
- * 仓储包装是 jauth 侧唯一可控挂点）。
+ * 仓储包装是 jauth 侧唯一可控挂点）；（C3）追加 sudo 门拦截事件。
  *
  * @author oatelauser
  */
@@ -49,7 +49,10 @@ public enum AuditEventType {
     PASSKEY_REGISTERED("passkey.registered"),
 
     /** Passkey 凭据移除（DELETE /webauthn/register/{id} → 仓储 delete 路径，v1.2）。 */
-    PASSKEY_REMOVED("passkey.removed");
+    PASSKEY_REMOVED("passkey.removed"),
+
+    /** sudo 门拦截（@RequiresSudo 端点强认证过期/缺失被拒，v1.2 C3；通过路径不另记——LOGIN_SUCCESS factor=webauthn 即打点可见）。 */
+    SUDO_REQUIRED("sudo.required");
 
     private final String wireName;
 

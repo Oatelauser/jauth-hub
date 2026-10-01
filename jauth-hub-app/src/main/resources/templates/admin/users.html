@@ -99,7 +99,15 @@
                             body: JSON.stringify(body) })
           .then(function (response) { return response.json(); });
       }
-      function fail(body) { window.alert(body.message || body.code); }
+      function fail(body) {
+        /* A0515 = sudo 强验证过期（v1.2 C3）：跳验证页，returnTo 带回本页重交 */
+        if (body.code === 'A0515') {
+          window.location.href = /*[[@{/selfservice/sudo}]]*/ '/selfservice/sudo'
+              + '?returnTo=' + encodeURIComponent(location.pathname);
+          return;
+        }
+        window.alert(body.message || body.code);
+      }
       var form = document.getElementById('user-create-form');
       form.addEventListener('submit', function (event) {
         event.preventDefault();

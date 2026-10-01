@@ -6,6 +6,7 @@ import io.github.oatelauser.jauth.core.response.ResponseRenderer;
 import io.github.oatelauser.jauth.core.user.JauthUser;
 import io.github.oatelauser.jauth.core.user.UserRepository;
 import io.github.oatelauser.jauth.core.web.EducationalFlag;
+import io.github.oatelauser.jauth.core.web.RequiresSudo;
 import io.github.oatelauser.jauth.selfservice.web.SelfServiceErrorCode;
 import java.security.Principal;
 import java.util.LinkedHashMap;
@@ -103,11 +104,13 @@ public class ProfileController {
 
     /**
      * 改密 JSON：旧密码核验（错/锁定 → A0514 并联动登录失败计数），新密码 ≥8 位；成功不回显任何凭据。
+     * 敏感操作（v1.2 C3）：{@code @RequiresSudo}——sudo 开启时强认证过期即 A0515，页面跳 /selfservice/sudo。
      *
      * @param request 改密请求
      * @param principal 当前登录主体
      * @return SPI 渲染的成功体（data 仅含 username）
      */
+    @RequiresSudo
     @PostMapping(
             value = "/api/profile/password",
             consumes = MediaType.APPLICATION_JSON_VALUE,

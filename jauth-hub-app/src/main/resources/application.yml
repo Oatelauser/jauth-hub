@@ -44,3 +44,8 @@ jauth-hub:
   #   rp-id: auth.example.com            # 缺省 = issuer host
   #   rp-name: jauth-hub                 # 缺省 = jauth-hub
   #   allowed-origins: [https://auth.example.com]   # 缺省 = issuer origin
+  # ── sudo（v1.2，默认关：敏感操作前的 passkey 强验证；依赖 passkey——开 sudo 必开 passkey，否则启动失败）
+  # gate 面：自助改密、管理员重置密码、角色变更；TTL 内免重复验证（GitHub 同款默认 15 分钟）。
+  # sudo:
+  #   enabled: true
+  #   ttl-minutes: 15
