@@ -40,7 +40,14 @@ final class ContributedClaims {
         return merged;
     }
 
-    /** 主体名：优先取授权行（刷新/内省路径上下文里授权已存在），退回认证主体。 */
+    /**
+     * 主体名：优先取授权行（刷新/内省路径上下文里授权已存在），退回认证主体。
+     *
+     * <p><b>认证形态兼容（v1.2 C1）</b>：这里只经 {@link Authentication#getName()} 取名，不向
+     * UserDetails 强转——表单登录主体（AppUserDetails）与 passkey 主体（WebAuthnAuthentication，principal =
+     * PublicKeyCredentialUserEntity，getName() 即登录名）同键：SS7 WebAuthnAuthenticationProvider 先经宿主
+     * UserDetailsService 按登录名装 authorities，故 sub/username 贡献语义对两种登录形态一致。
+     */
     private static String principalName(OAuth2TokenContext context) {
         OAuth2Authorization authorization = context.getAuthorization();
         if (authorization != null) {

@@ -42,6 +42,11 @@
       <groupId>io.micrometer</groupId>
       <artifactId>micrometer-core</artifactId>
     </dependency>
+    <!-- Passkey（SPEC §8 选型：SS7 原生 webauthn，webauthn4j-core 传递引入）；版本走 spring-security-bom（Boot 4.1.1 链） -->
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-webauthn</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -52,6 +57,13 @@
     <dependency>
       <groupId>com.h2database</groupId>
       <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- Passkey 回路测试：合成注册/断言凭据；版本与 webauthn4j-core 传递版对齐 -->
+    <dependency>
+      <groupId>com.webauthn4j</groupId>
+      <artifactId>webauthn4j-test</artifactId>
+      <version>0.31.9.RELEASE</version>
       <scope>test</scope>
     </dependency>
     <!-- PG 真库验证（Testcontainers，Docker 不可用时自动跳过，CI 补跑）。2.x 坐标带 testcontainers- 前缀 -->

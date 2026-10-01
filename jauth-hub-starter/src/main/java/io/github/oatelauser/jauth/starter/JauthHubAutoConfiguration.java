@@ -30,6 +30,9 @@ import io.github.oatelauser.jauth.core.org.OrgRepository;
 import io.github.oatelauser.jauth.core.org.OrgScopeGate;
 import io.github.oatelauser.jauth.core.org.OrgService;
 import io.github.oatelauser.jauth.core.org.OrgsClaimsContributor;
+import io.github.oatelauser.jauth.core.passkey.InMemoryPasskeyCredentialRepository;
+import io.github.oatelauser.jauth.core.passkey.JauthUserEntityRepository;
+import io.github.oatelauser.jauth.core.passkey.JdbcPasskeyCredentialRepository;
 import io.github.oatelauser.jauth.core.ratelimit.RateLimiter;
 import io.github.oatelauser.jauth.core.response.DefaultResponseRenderer;
 import io.github.oatelauser.jauth.core.response.JauthResponseAdvice;
@@ -58,6 +61,7 @@ import io.github.oatelauser.jauth.core.web.LoginLockoutFilter;
 import io.github.oatelauser.jauth.core.web.MeController;
 import io.github.oatelauser.jauth.core.web.PlatformTokenResolver;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.net.URI;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
@@ -65,10 +69,12 @@ import java.security.interfaces.RSAPublicKey;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
+import java.util.Set;
 import java.util.UUID;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
@@ -124,6 +130,8 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
+import org.springframework.security.web.webauthn.management.PublicKeyCredentialUserEntityRepository;
+import org.springframework.security.web.webauthn.management.UserCredentialRepository;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.accept.ContentNegotiationStrategy;
@@ -182,6 +190,15 @@ public class JauthHubAutoConfiguration {
 
     /** core 单文件 CSS 的出网路径（模板内 @{/css/jauth.css}）。 */
     static final String CSS_PATTERN = "/css/**";
+
+    /** WebAuthn 端点根（passkey 开启时认领：注册/选项端点、框架默认注册页与其静态资源都在其下）。 */
+    static final String WEBAUTHN_PATTERN = "/webauthn/**";
+
+    /** passkey 登录端点（框架 WebAuthnAuthenticationFilter；独立于 /login 表单提交路径，须单独认领）。 */
+    static final String WEBAUTHN_LOGIN_PATH = "/login/webauthn";
+
+    /** passkey 认证选项端点（挑战下发是登录第一步，permitAll）。 */
+    static final String WEBAUTHN_AUTH_OPTIONS_PATH = "/webauthn/authenticate/options";
 
     /** core 资源命名空间根（模板/i18n/静态资源与 Flyway 脚本同居其下，防撞宿主同名资源）。 */
     static final String CORE_NAMESPACE = "io/github/oatelauser/jauth/core";
@@ -257,6 +274,19 @@ public class JauthHubAutoConfiguration {
     @Bean
     MeController jauthMeController(PlatformTokenResolver tokenResolver) {
         return new MeController(tokenResolver);
+    }
+
+    // ------------------------------------------------------------------ Passkey 强化层（SPEC §5 v1.2，默认关）
+
+    /**
+     * WebAuthn 用户句柄仓储（storage 无关，只依赖 UserRepository；凭据仓储按存储模式在下方两段供给）。
+     * 仅 passkey 开启时注册；WebAuthnConfigurer 按 bean 类型自动发现（容器内有即用，否则退框架内存版）。
+     */
+    @Bean
+    @ConditionalOnProperty(name = "jauth-hub.passkey.enabled", havingValue = "true")
+    @ConditionalOnMissingBean(PublicKeyCredentialUserEntityRepository.class)
+    JauthUserEntityRepository jauthUserEntityRepository(UserRepository userRepository) {
+        return new JauthUserEntityRepository(userRepository);
     }
 
     // ------------------------------------------------------------------ org 域装配（B8）
@@ -598,13 +628,19 @@ public class JauthHubAutoConfiguration {
         OAuth2AuthorizationServerConfigurer authorizationServerConfigurer =
                 http.getConfigurer(OAuth2AuthorizationServerConfigurer.class);
         RequestMatcher endpointsMatcher = authorizationServerConfigurer.getEndpointsMatcher();
-        http.securityMatcher(new OrRequestMatcher(
+        List<RequestMatcher> claimedMatchers = new ArrayList<>(List.of(
                 endpointsMatcher,
                 PathPatternRequestMatcher.withDefaults().matcher(LOGIN_PATH),
                 PathPatternRequestMatcher.withDefaults().matcher(CONSENT_PAGE_PATH),
                 PathPatternRequestMatcher.withDefaults().matcher(DEVICE_VERIFY_PATH),
                 PathPatternRequestMatcher.withDefaults().matcher(ME_PATH),
                 PathPatternRequestMatcher.withDefaults().matcher(CSS_PATTERN)));
+        if (properties.getPasskey().isEnabled()) {
+            // /login 的精确 matcher 不匹配子路径，passkey 登录端点须单独认领（C1）
+            claimedMatchers.add(PathPatternRequestMatcher.withDefaults().matcher(WEBAUTHN_PATTERN));
+            claimedMatchers.add(PathPatternRequestMatcher.withDefaults().matcher(WEBAUTHN_LOGIN_PATH));
+        }
+        http.securityMatcher(new OrRequestMatcher(claimedMatchers.toArray(RequestMatcher[]::new)));
 
         // 登录锁定闸：用户名口令认证之前（锁定期内不触达口令校验）
         http.addFilterBefore(
@@ -625,6 +661,23 @@ public class JauthHubAutoConfiguration {
                 .requestMatchers(CONSENT_PAGE_PATH, DEVICE_VERIFY_PATH)
                 .authenticated());
 
+        // Passkey 端点授权与 DSL（SPEC §5 v1.2：默认关 = 端点不认领不装配；开时仍逐路径显式，无 anyRequest 兜底）
+        if (properties.getPasskey().isEnabled()) {
+            http.authorizeHttpRequests(authorize -> authorize
+                    .requestMatchers(WEBAUTHN_AUTH_OPTIONS_PATH, WEBAUTHN_LOGIN_PATH)
+                    .permitAll()
+                    .requestMatchers(WEBAUTHN_PATTERN)
+                    .authenticated());
+            PasskeyRelyingPartyIdentity rpIdentity = resolvePasskeyRelyingPartyIdentity(properties);
+            http.webAuthn(webAuthn -> webAuthn.rpId(rpIdentity.rpId())
+                    .rpName(rpIdentity.rpName())
+                    .allowedOrigins(rpIdentity.allowedOrigins())
+                    // C1 只接 API 地基（POST options/register/login）；框架内置注册页引用的
+                    // /default-ui.css、/login/webauthn.js 不在协议链认领范围，留着是一张加载不出
+                    // 脚本的残页——禁用之，页面/JS 归 C2 自有 UI
+                    .disableDefaultRegistrationPage(true));
+        }
+
         http.formLogin(form -> form.loginPage(LOGIN_PATH).permitAll());
 
         ContentNegotiationStrategy contentNegotiationStrategy = http.getSharedObject(ContentNegotiationStrategy.class);
@@ -639,6 +692,51 @@ public class JauthHubAutoConfiguration {
 
         return new OrderedSecurityFilterChain(properties.getFilterChainOrder(), http.build());
     }
+
+    /**
+     * passkey RP 三元组解析：显式配置优先，缺口从 {@code jauth-hub.issuer} 推导（host 即 rpId、
+     * scheme://host[:port] 即 origin）——issuer 是 jauth 唯一既有的对外基准 URL。issuer 不可解析而 rpId 或
+     * origins 仍缺时启动 fail-fast：WebAuthn 的 RP 身份猜错是运行期全量认证失败，静默兜底毫无意义。
+     */
+    private static PasskeyRelyingPartyIdentity resolvePasskeyRelyingPartyIdentity(JauthHubProperties properties) {
+        JauthHubProperties.Passkey passkey = properties.getPasskey();
+        String rpId = passkey.getRpId();
+        Set<String> allowedOrigins = new LinkedHashSet<>(passkey.getAllowedOrigins());
+        String rpName = passkey.getRpName() == null ? "jauth-hub" : passkey.getRpName();
+        if (rpId == null || allowedOrigins.isEmpty()) {
+            URI issuerUrl = parseIssuerUrl(properties.getIssuer());
+            if (issuerUrl == null) {
+                throw new IllegalStateException("jauth-hub.passkey.enabled=true requires jauth-hub.passkey.rp-id"
+                        + " and allowed-origins (or a parseable jauth-hub.issuer URL to derive them from),"
+                        + " but issuer is not a URL with host: " + properties.getIssuer());
+            }
+            if (rpId == null) {
+                rpId = issuerUrl.getHost();
+            }
+            if (allowedOrigins.isEmpty()) {
+                allowedOrigins.add(originOf(issuerUrl));
+            }
+        }
+        return new PasskeyRelyingPartyIdentity(rpId, rpName, allowedOrigins);
+    }
+
+    /** issuer 可解析为带 scheme/host 的 URL 则返回，否则 null（调用方 fail-fast）。 */
+    private static @Nullable URI parseIssuerUrl(String issuer) {
+        try {
+            URI uri = URI.create(issuer);
+            return uri.getScheme() == null || uri.getHost() == null ? null : uri;
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private static String originOf(URI uri) {
+        int port = uri.getPort();
+        return uri.getScheme() + "://" + uri.getHost() + (port == -1 ? "" : ":" + port);
+    }
+
+    /** 解析后的 WebAuthn RP 三元组（rpId/rpName/allowedOrigins，均已非空）。 */
+    private record PasskeyRelyingPartyIdentity(String rpId, String rpName, Set<String> allowedOrigins) {}
 
     /**
      * 序位可配的安全链包装：SecurityFilterChain 的排序看 Ordered/@Order，注解无法携带运行期属性值，故以薄
@@ -789,6 +887,14 @@ public class JauthHubAutoConfiguration {
         @ConditionalOnMissingBean(UserRepository.class)
         InMemoryUserRepository jauthUserRepository() {
             return new InMemoryUserRepository();
+        }
+
+        /** passkey 凭据仓储（memory 版，仅 passkey 开启；宿主可整体替换，凭据生命周期审计在仓储内）。 */
+        @Bean
+        @ConditionalOnProperty(name = "jauth-hub.passkey.enabled", havingValue = "true")
+        @ConditionalOnMissingBean(UserCredentialRepository.class)
+        InMemoryPasskeyCredentialRepository jauthPasskeyCredentialRepository(AuditEventPublisher auditPublisher) {
+            return new InMemoryPasskeyCredentialRepository(auditPublisher);
         }
 
         /**
@@ -947,6 +1053,15 @@ public class JauthHubAutoConfiguration {
         @ConditionalOnMissingBean(UserRepository.class)
         JdbcUserRepository jauthUserRepository(DataSource dataSource, FlywayMigrationGuard migrationGuard) {
             return new JdbcUserRepository(new JdbcTemplate(dataSource));
+        }
+
+        /** passkey 凭据仓储（jdbc 版，V8 迁移后的 15 列表；依赖迁移先行建仓储）。 */
+        @Bean
+        @ConditionalOnProperty(name = "jauth-hub.passkey.enabled", havingValue = "true")
+        @ConditionalOnMissingBean(UserCredentialRepository.class)
+        JdbcPasskeyCredentialRepository jauthPasskeyCredentialRepository(
+                DataSource dataSource, AuditEventPublisher auditPublisher, FlywayMigrationGuard migrationGuard) {
+            return new JdbcPasskeyCredentialRepository(new JdbcTemplate(dataSource), auditPublisher);
         }
 
         /** owner 解析（B9）：jdbc 模式读 owner 两列（JauthJdbcRegisteredClientRepository 既有路径）。 */

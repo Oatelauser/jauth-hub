@@ -87,12 +87,12 @@ class JauthJdbcModeIntegrationTest {
     }
 
     @Test
-    @DisplayName("私有 Flyway 表迁移到 v7，与宿主默认表并存不撞（隔离决议的实证）")
+    @DisplayName("私有 Flyway 表迁移到 v8，与宿主默认表并存不撞（隔离决议的实证）")
     void flywayPrivateHistoryTable() {
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
         String maxVersion =
                 jdbcTemplate.queryForObject("SELECT MAX(version) FROM jauth_flyway_schema_history", String.class);
-        assertThat(maxVersion).isEqualTo("7");
+        assertThat(maxVersion).isEqualTo("8");
         Integer clientRows = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM oauth2_registered_client WHERE client_id = 'jdbc-client'", Integer.class);
         assertThat(clientRows).isEqualTo(1);

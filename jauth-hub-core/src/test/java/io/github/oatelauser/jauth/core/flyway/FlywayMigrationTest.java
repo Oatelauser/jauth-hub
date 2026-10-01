@@ -5,12 +5,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.oatelauser.jauth.core.support.IntegrationTestSupport;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Flyway 迁移单测：H2(PostgreSQL 兼容模式) 上从零跑完 V1-V7，验证全部业务表齐建、 框架三表 owner CHECK 生效、spring_session 两表
+ * Flyway 迁移单测：H2(PostgreSQL 兼容模式) 上从零跑完 V1-V8，验证全部业务表齐建、 框架三表 owner CHECK 生效、spring_session 两表
  * vendored DDL 可执行。
  *
  * <p>表清单 14 张 = 框架 3 + 自有 9（含 B2 补定的 jauth_jwk）+ vendored 2，对齐 SPEC §3 "14 表"。
@@ -50,7 +51,7 @@ class FlywayMigrationTest {
     void flywayHistoryRecordsAllMigrations() {
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE type = 'SQL'", Integer.class);
-        assertThat(count).isEqualTo(7);
+        assertThat(count).isEqualTo(8);
     }
 
     @Test
@@ -74,6 +75,29 @@ class FlywayMigrationTest {
                 + " 'jpat_legacy', 'openid', CURRENT_TIMESTAMP, 'ACTIVE', CURRENT_TIMESTAMP)");
         String name = jdbcTemplate.queryForObject("SELECT name FROM jauth_pat WHERE id = 'legacy-pat-1'", String.class);
         assertThat(name).isNull();
+    }
+
+    @Test
+    void passkeyCredentialColumnsExistWithDefaults() {
+        // V8 补列（v1.2 C1）：SS7 CredentialRecord 字段面；存量行（空表）带默认无感
+        jdbcTemplate.update("INSERT INTO jauth_user (id, username, password_hash, role, status, created_at)"
+                + " VALUES ('pk-user-1', 'pk-user', 'placeholder-hash-not-real',"
+                + " 'USER', 'ACTIVE', CURRENT_TIMESTAMP)");
+        jdbcTemplate.update("INSERT INTO jauth_user_credential (id, user_id, credential_id, public_key,"
+                + " sign_count, created_at) VALUES ('pk-cred-1', 'pk-user-1', 'cred-id-1', 'cGJr', 0,"
+                + " CURRENT_TIMESTAMP)");
+        Map<String, Object> row = jdbcTemplate.queryForMap(
+                "SELECT credential_type, backup_eligible, backup_state, uv_initialized, transports,"
+                        + " attestation_object, attestation_client_data_json, label FROM jauth_user_credential"
+                        + " WHERE id = 'pk-cred-1'");
+        assertThat(row.get("credential_type")).isEqualTo("public-key");
+        assertThat(row.get("backup_eligible")).isEqualTo(Boolean.FALSE);
+        assertThat(row.get("backup_state")).isEqualTo(Boolean.FALSE);
+        assertThat(row.get("uv_initialized")).isEqualTo(Boolean.FALSE);
+        assertThat(row.get("transports")).isNull();
+        assertThat(row.get("attestation_object")).isNull();
+        assertThat(row.get("attestation_client_data_json")).isNull();
+        assertThat(row.get("label")).isNull();
     }
 
     @Test

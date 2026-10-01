@@ -38,6 +38,9 @@ public class JauthHubProperties {
     /** 限流与登录锁定（SPEC §6 默认值：5000/小时、连错 5 次锁 15 分钟）。 */
     private RateLimit rateLimit = new RateLimit();
 
+    /** Passkey 强化层（SPEC §5 v1.2：默认关——协议链端点与凭据仓储仅在显式开启时装配）。 */
+    private Passkey passkey = new Passkey();
+
     /** 播种清单（透传 core 的种子结构，两模式通用，幂等）。 */
     private List<ClientSeedProperties.ClientSeed> clients = new ArrayList<>();
 
@@ -70,6 +73,24 @@ public class JauthHubProperties {
 
     public void setCors(Cors cors) {
         this.cors.setAllowedOrigins(cors == null ? List.of() : cors.getAllowedOrigins());
+    }
+
+    /** 防御性拷贝出入（与 Cors 同款理由）。 */
+    public Passkey getPasskey() {
+        Passkey copy = new Passkey();
+        copy.setEnabled(this.passkey.isEnabled());
+        copy.setRpId(this.passkey.getRpId());
+        copy.setRpName(this.passkey.getRpName());
+        copy.setAllowedOrigins(this.passkey.getAllowedOrigins());
+        return copy;
+    }
+
+    public void setPasskey(Passkey passkey) {
+        Passkey source = passkey == null ? new Passkey() : passkey;
+        this.passkey.setEnabled(source.isEnabled());
+        this.passkey.setRpId(source.getRpId());
+        this.passkey.setRpName(source.getRpName());
+        this.passkey.setAllowedOrigins(source.getAllowedOrigins());
     }
 
     public List<ClientSeedProperties.ClientSeed> getClients() {
@@ -157,6 +178,53 @@ public class JauthHubProperties {
     public static class Cors {
 
         private List<String> allowedOrigins = new ArrayList<>();
+
+        public List<String> getAllowedOrigins() {
+            return new ArrayList<>(this.allowedOrigins);
+        }
+
+        public void setAllowedOrigins(List<String> allowedOrigins) {
+            this.allowedOrigins = allowedOrigins == null ? new ArrayList<>() : new ArrayList<>(allowedOrigins);
+        }
+    }
+
+    /**
+     * Passkey（WebAuthn）强化层参数（SPEC §5 v1.2）。rpId/rpName/allowedOrigins 未显式配时由装配层从
+     * {@code jauth-hub.issuer} 推导（host 即 rpId、scheme://host:port 即 origin），rpName 兜底 "jauth-hub"。
+     */
+    public static class Passkey {
+
+        private boolean enabled = false;
+
+        private String rpId;
+
+        private String rpName;
+
+        private List<String> allowedOrigins = new ArrayList<>();
+
+        public boolean isEnabled() {
+            return this.enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getRpId() {
+            return this.rpId;
+        }
+
+        public void setRpId(String rpId) {
+            this.rpId = rpId;
+        }
+
+        public String getRpName() {
+            return this.rpName;
+        }
+
+        public void setRpName(String rpName) {
+            this.rpName = rpName;
+        }
 
         public List<String> getAllowedOrigins() {
             return new ArrayList<>(this.allowedOrigins);

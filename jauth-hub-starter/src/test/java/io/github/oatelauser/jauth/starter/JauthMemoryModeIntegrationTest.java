@@ -106,10 +106,30 @@ class JauthMemoryModeIntegrationTest {
         assertThat(chain.matches(request("GET", "/css/jauth.css")))
                 .as("core CSS")
                 .isTrue();
+        assertThat(chain.matches(request("POST", "/webauthn/register/options")))
+                .as("passkey 默认关：webauthn 端点不认领")
+                .isFalse();
+        assertThat(chain.matches(request("POST", "/login/webauthn")))
+                .as("passkey 默认关：passkey 登录端点不认领")
+                .isFalse();
         assertThat(chain.matches(request("GET", "/api/foo"))).as("宿主路径绝不吞").isFalse();
         assertThat(chain.matches(request("GET", "/anything/else")))
                 .as("任意未认领路径")
                 .isFalse();
+    }
+
+    @Test
+    @DisplayName("passkey 默认关（零影响）：端点不在链上即 404，凭据仓储 bean 不装配")
+    void passkeyDisabledByDefault() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.post("/webauthn/register/options"))
+                .andExpect(MockMvcResultMatchers.status().isNotFound());
+        assertThat(applicationContext.getBeanNamesForType(
+                        org.springframework.security.web.webauthn.management.UserCredentialRepository.class))
+                .isEmpty();
+        assertThat(applicationContext.getBeanNamesForType(
+                        org.springframework.security.web.webauthn.management.PublicKeyCredentialUserEntityRepository
+                                .class))
+                .isEmpty();
     }
 
     @Test

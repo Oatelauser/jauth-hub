@@ -106,7 +106,7 @@ class JauthAutoConfigurationMatrixTest {
                     assertThat(context).hasBean("jauthSeedingTransactionTemplate");
                     String maxVersion = new JdbcTemplate(context.getBean(DataSource.class))
                             .queryForObject("SELECT MAX(version) FROM jauth_flyway_schema_history", String.class);
-                    assertThat(maxVersion).isEqualTo("7");
+                    assertThat(maxVersion).isEqualTo("8");
                 });
     }
 

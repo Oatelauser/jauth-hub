@@ -4,7 +4,9 @@ package io.github.oatelauser.jauth.core.audit;
  * 审计事件类型词表（票 07：词表归代码枚举所有，DB 列不加 CHECK）。
  *
  * <p>v1.0 覆盖：登录（成功/失败）、令牌（签发/刷新/撤销）、consent 接受；v1.1（B8）追加 org/安装域：
- * org 创建与安装两步制全生命周期（发起/批准/驳回/撤销），由 OrgService/InstallationService 服务路径发布。
+ * org 创建与安装两步制全生命周期（发起/批准/驳回/撤销），由 OrgService/InstallationService 服务路径发布；
+ * v1.2（C1）追加 Passkey 凭据生命周期（注册/移除），挂在凭据仓储 save/delete 路径（框架过滤器在 HTTP 层，
+ * 仓储包装是 jauth 侧唯一可控挂点）。
  *
  * @author oatelauser
  */
@@ -41,7 +43,13 @@ public enum AuditEventType {
     INSTALL_REJECTED("installation.rejected"),
 
     /** 安装撤销（OWNER 对 APPROVED 行收回，InstallationService.revoke 路径）。 */
-    INSTALL_REVOKED("installation.revoked");
+    INSTALL_REVOKED("installation.revoked"),
+
+    /** Passkey 凭据注册（框架 WebAuthnRegistrationFilter → 仓储 save 的插入路径，v1.2）。 */
+    PASSKEY_REGISTERED("passkey.registered"),
+
+    /** Passkey 凭据移除（DELETE /webauthn/register/{id} → 仓储 delete 路径，v1.2）。 */
+    PASSKEY_REMOVED("passkey.removed");
 
     private final String wireName;
 

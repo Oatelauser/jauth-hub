@@ -97,4 +97,33 @@ class PostgreSqlMigrationTest {
         }
         assertThat(patColumns).containsExactly("name:YES");
     }
+
+    @Test
+    void passkeyCredentialColumnsExistOnRealPostgreSql() throws SQLException {
+        Flyway.configure()
+                .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+                .locations(IntegrationTestSupport.FLYWAY_LOCATION)
+                .load()
+                .migrate();
+
+        // V8 补列（v1.2 C1）：单条 ALTER 多列在真 PG 可执行，默认值齐
+        List<String> credentialColumns = new ArrayList<>();
+        try (Statement statement = POSTGRES.createConnection("").createStatement();
+                ResultSet resultSet = statement.executeQuery("SELECT column_name FROM"
+                        + " information_schema.columns WHERE table_name = 'jauth_user_credential'")) {
+            while (resultSet.next()) {
+                credentialColumns.add(resultSet.getString(1));
+            }
+        }
+        assertThat(credentialColumns)
+                .contains(
+                        "label",
+                        "credential_type",
+                        "backup_eligible",
+                        "backup_state",
+                        "uv_initialized",
+                        "transports",
+                        "attestation_object",
+                        "attestation_client_data_json");
+    }
 }
