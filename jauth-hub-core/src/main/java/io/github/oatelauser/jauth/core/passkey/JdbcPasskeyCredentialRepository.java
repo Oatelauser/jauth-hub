@@ -82,9 +82,7 @@ public class JdbcPasskeyCredentialRepository extends AbstractPasskeyCredentialRe
             ps.setString(1, UuidV7.generate().toString());
             ps.setString(2, JauthUserEntityRepository.userHandle(record.getUserEntityUserId()));
             ps.setString(3, record.getCredentialId().toBase64UrlString());
-            ps.setString(
-                    4,
-                    CredentialRecordRowMapper.encodeBinary(record.getPublicKey().getBytes()));
+            ps.setString(4, CredentialRecordRowMapper.encodeBinary(record.getPublicKey().getBytes()));
             ps.setLong(5, record.getSignatureCount());
             ps.setTimestamp(6, CredentialRecordRowMapper.toTimestamp(record.getCreated()));
             ps.setTimestamp(7, CredentialRecordRowMapper.toTimestamp(record.getLastUsed()));
@@ -95,9 +93,7 @@ public class JdbcPasskeyCredentialRepository extends AbstractPasskeyCredentialRe
     private int updateCredentialRecord(CredentialRecord record) {
         return this.jdbcOperations.update(UPDATE_SQL, ps -> {
             ps.setString(1, JauthUserEntityRepository.userHandle(record.getUserEntityUserId()));
-            ps.setString(
-                    2,
-                    CredentialRecordRowMapper.encodeBinary(record.getPublicKey().getBytes()));
+            ps.setString(2, CredentialRecordRowMapper.encodeBinary(record.getPublicKey().getBytes()));
             ps.setLong(3, record.getSignatureCount());
             ps.setTimestamp(4, CredentialRecordRowMapper.toTimestamp(record.getLastUsed()));
             setCommonColumns(ps, record, 5);
@@ -106,13 +102,10 @@ public class JdbcPasskeyCredentialRepository extends AbstractPasskeyCredentialRe
     }
 
     /** label/credential_type/布尔三列/transports/attestation 两列：插入（从 8）与更新（从 5）共用的一段绑定。 */
-    private static void setCommonColumns(PreparedStatement ps, CredentialRecord record, int startIndex)
-            throws SQLException {
+    private static void setCommonColumns(PreparedStatement ps, CredentialRecord record, int startIndex) throws SQLException {
         int index = startIndex;
         ps.setString(index++, record.getLabel());
-        String credentialType = record.getCredentialType() == null
-                ? null
-                : record.getCredentialType().getValue();
+        String credentialType = record.getCredentialType() == null ? null : record.getCredentialType().getValue();
         ps.setString(index++, credentialType);
         ps.setBoolean(index++, record.isBackupEligible());
         ps.setBoolean(index++, record.isBackupState());
