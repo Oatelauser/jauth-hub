@@ -763,6 +763,9 @@ public class JauthHubAutoConfiguration {
                     .disableDefaultRegistrationPage(true));
         }
 
+        // 守卫注释（用户红线）：这里绝不设 defaultSuccessUrl——表单有此口子而 passkey 的 webAuthn DSL
+        // 没有，单边配置即两种登录方式落点分叉。两方式的默认落点恒为 /，去向统一由部署方在 / 上的
+        // 落点路由接管（app 为 RootController，属性 jauth-hub.app.home-path）
         http.formLogin(form -> form.loginPage(LOGIN_PATH).permitAll());
 
         ContentNegotiationStrategy contentNegotiationStrategy = http.getSharedObject(ContentNegotiationStrategy.class);
