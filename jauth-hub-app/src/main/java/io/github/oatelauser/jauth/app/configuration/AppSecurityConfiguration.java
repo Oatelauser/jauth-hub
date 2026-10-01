@@ -54,7 +54,8 @@ public class AppSecurityConfiguration {
                         .permitAll()
                         .requestMatchers("/actuator/**")
                         .authenticated()
-                        .requestMatchers("/selfservice/**", "/api/**")
+                        // "/" 仅做看板重定向（RootController），认领放认证组：未认证 → 登录 → 保存请求回跳闭环
+                        .requestMatchers("/", "/selfservice/**", "/api/**")
                         .authenticated()
                         // B12 用户管理页/档案页：仅需认证——SUPER_ADMIN 细门在 @RequiresRole 注解层（08 票路线）
                         .requestMatchers("/admin/**", "/profile")
