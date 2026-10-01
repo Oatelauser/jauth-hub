@@ -65,8 +65,8 @@ class ProtocolPagesTest {
     @BeforeEach
     void setUp() {
         MessageSource messageSource = messageSource();
-        educated = buildMockMvc(EducationalFlag.ON, messageSource);
-        plain = buildMockMvc(() -> false, messageSource);
+        educated = buildMockMvc(EducationalFlag.ON, PasskeyFlag.OFF, messageSource);
+        plain = buildMockMvc(() -> false, PasskeyFlag.OFF, messageSource);
     }
 
     @Test
@@ -93,6 +93,33 @@ class ProtocolPagesTest {
         educated.perform(get("/login").queryParam("error", ""))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("用户名或密码错误")));
+    }
+
+    @Test
+    @DisplayName("passkey 默认关：登录页零可见变化——无按钮无脚本无 passkey 词条（SPEC §5 默认关）")
+    void loginWithPasskeyDisabledRendersNoPasskeyEntry() throws Exception {
+        // B12 教训：断言中文文案必须钉 locale（FixedLocaleResolver 已钉 zh），且确认消息源不被回退污染
+        educated.perform(get("/login"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("使用通行密钥登录"))))
+                .andExpect(content().string(not(containsString("id=\"passkey-login\""))))
+                .andExpect(content().string(not(containsString("/webauthn/authenticate/options"))))
+                .andExpect(content().string(not(containsString("/login/webauthn"))));
+    }
+
+    @Test
+    @DisplayName("passkey 开启：按钮/内联脚本/教学段渲染，zh 文案齐备")
+    void loginWithPasskeyEnabledRendersButtonAndInlineScript() throws Exception {
+        MockMvc passkey = buildMockMvc(EducationalFlag.ON, () -> true, messageSource());
+        // Thymeleaf javascript 内联把 @{...} 的 '/' 转义为 '\/'（运行时等价），断言按转义后字面量
+        passkey.perform(get("/login"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"passkey-login\"")))
+                .andExpect(content().string(containsString("使用通行密钥登录")))
+                .andExpect(content().string(containsString("\\/webauthn\\/authenticate\\/options")))
+                .andExpect(content().string(containsString("\\/login\\/webauthn")))
+                .andExpect(content().string(containsString("通行密钥验证未通过")))
+                .andExpect(content().string(containsString("私钥永不出设备")));
     }
 
     @Test
@@ -158,7 +185,7 @@ class ProtocolPagesTest {
                 .andExpect(content().string(not(containsString("发生了什么"))));
     }
 
-    private MockMvc buildMockMvc(EducationalFlag flag, MessageSource messageSource) {
+    private MockMvc buildMockMvc(EducationalFlag flag, PasskeyFlag passkey, MessageSource messageSource) {
         ClassLoaderTemplateResolver resolver = new ClassLoaderTemplateResolver();
         resolver.setPrefix(TEMPLATE_PREFIX);
         resolver.setSuffix(".html");
@@ -175,7 +202,7 @@ class ProtocolPagesTest {
         viewResolver.setForceContentType(true);
 
         return MockMvcBuilders.standaloneSetup(
-                        new LoginController(flag),
+                        new LoginController(flag, passkey),
                         new ConsentController(
                                 mockClients(),
                                 new InMemoryScopeCatalog(),

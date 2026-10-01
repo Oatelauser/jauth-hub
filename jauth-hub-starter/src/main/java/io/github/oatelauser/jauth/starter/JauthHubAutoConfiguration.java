@@ -59,6 +59,7 @@ import io.github.oatelauser.jauth.core.web.LocalIntrospectionJwtDecoder;
 import io.github.oatelauser.jauth.core.web.LoginController;
 import io.github.oatelauser.jauth.core.web.LoginLockoutFilter;
 import io.github.oatelauser.jauth.core.web.MeController;
+import io.github.oatelauser.jauth.core.web.PasskeyFlag;
 import io.github.oatelauser.jauth.core.web.PlatformTokenResolver;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.net.URI;
@@ -425,6 +426,12 @@ public class JauthHubAutoConfiguration {
         return properties::isEducational;
     }
 
+    /** passkey 可见性开关（v1.2 C2）：属性绑定（SPEC §5 默认关），core 登录页与 selfservice 看板导航消费。 */
+    @Bean
+    PasskeyFlag jauthPasskeyFlag(JauthHubProperties properties) {
+        return properties.getPasskey()::isEnabled;
+    }
+
     /** scope 目录：内存实现内置三枚 OIDC 标准 scope，宿主可注册自有 scope（目录 = 代码 + i18n，不建表）。 */
     @Bean
     @ConditionalOnMissingBean(ScopeCatalog.class)
@@ -433,8 +440,8 @@ public class JauthHubAutoConfiguration {
     }
 
     @Bean
-    LoginController jauthLoginController(EducationalFlag educational) {
-        return new LoginController(educational);
+    LoginController jauthLoginController(EducationalFlag educational, PasskeyFlag passkey) {
+        return new LoginController(educational, passkey);
     }
 
     @Bean

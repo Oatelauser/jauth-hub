@@ -14,6 +14,7 @@
 |---|---|
 | 🐙 **GitHub 式体验** | 授权确认页可勾选 scope、已授权应用看板一键撤销、PAT 个人访问令牌、`/me` 平台接口——用过的都说熟 |
 | 🏢 **v1.1 平台层** | 组织自助创建、应用安装两步制审批（org OWNER 封顶 scope ceiling）、发行范围=请求∩consent∩ceiling 运行时取交、`orgs` claim 富化（id/name/role）、我的应用注册（个人 + org）、用户管理与自助改密 |
+| 🔑 **v1.2 Passkey** | WebAuthn 通行密钥：登录页免密按钮 + 自助管理页（注册/删除），私钥不出设备；默认关，一个开关开启 |
 | 🔀 **双模式，一套代码** | **独立部署**：起一个服务，所有项目接入它；**内嵌**：引一个 starter，认证能力长在你自己的服务里（宿主只欠一个 `UserDetailsService`） |
 | 🔐 **安全内核先行** | 令牌落库只有 SHA-256 哈希（数据库泄露≠令牌泄露）、刷新令牌轮转 + **重放整族熔断**、强制 PKCE、签名密钥 90 天自动轮转 |
 | 🎓 **天生教学** | 自带 `/demo` 教学区：对着**真实端点**完整走一遍授权码 + PKCE，每一步的 HTTP 请求/响应实时可见——前端同学看一遍就懂 OAuth 在干什么 |
@@ -26,7 +27,7 @@
 ```
 jauth-hub-core                    协议与领域实现（存储/令牌/密钥/页面/SPI，零家族依赖）
 jauth-hub-starter                 接管式自动配置（memory|jdbc 条件装配，引依赖即生效）
-jauth-hub-selfservice             用户自助页（已授权看板、PAT、我的组织、我的应用、安装审批）
+jauth-hub-selfservice             用户自助页（已授权看板、PAT、通行密钥、我的组织、我的应用、安装审批）
 jauth-hub-resource-server-starter 资源服务器接入（内省校验 + 30s 缓存 + scope→权限映射）
 jauth-hub-app                     独立部署壳（自带用户库 + /demo 教学区）
 examples/embedded-demo            内嵌接入示例工程
@@ -112,7 +113,7 @@ jauth-hub.rs:
 
 | 操作 | 路径 | 说明 |
 |---|---|---|
-| 🔑 登录 | `/login` | 用户名/密码（Passkey 规划中 v1.2） |
+| 🔑 登录 | `/login` | 用户名/密码；开启 passkey 后另有"使用通行密钥登录"按钮（设备生物识别免密，私钥不出设备） |
 | 👤 档案与改密 | `/profile` | 改显示名、自助改密（旧密码校验带防爆破锁） |
 | ✅ 授权确认 | 授权跳转后的 consent 页 | 逐条勾选 scope，发的令牌只含你准许的权限；org 应用会标出所属组织 |
 | 📋 已授权应用 | `/selfservice/apps` | 查看谁拿了你的授权，一键**解除授权** |
@@ -120,6 +121,7 @@ jauth-hub.rs:
 | ✉️ 安装审批 | `/selfservice/orgs/{orgId}/installations` | OWNER 审批成员的应用安装请求：批准时勾选 ceiling ⊆ 请求范围、拒绝、撤销 |
 | 🧩 我的应用 | `/selfservice/my-apps` | 注册个人 OAuth 应用（client_id/secret、redirect 白名单），org 应用在 `/selfservice/orgs/{orgId}/apps` |
 | 🔖 个人访问令牌 | `/selfservice/pat` | 勾选 scope + 有效期（30/90/365 天）生成长期令牌，**明文只显示一次** |
+| 🔐 通行密钥 | `/selfservice/passkey` | 注册/管理 passkey（命名、删除即失效）；默认关，开启方式见下方配置表 |
 
 > **org 应用发行范围** = 请求 scope ∩ 用户 consent ∩ org ceiling，运行时取交——三方任何一个收窄，令牌立即跟着收窄。
 
@@ -171,6 +173,7 @@ OIDC 发现端点：<http://localhost:8080/.well-known/openid-configuration> （
 | `jauth-hub.rate-limit.limit-per-hour` | `5000` | 按用户合并限流 |
 | `jauth-hub.rate-limit.login-max-failures` | `5` | 连错锁 15 分钟 |
 | `jauth-hub.cors.allowed-origins` | 空 | SPA 浏览器直连 token 端点时配 |
+| `jauth-hub.passkey.enabled` | `false` | Passkey 登录与管理页开关；`rp-id`/`allowed-origins` 缺省由 `issuer` 推导（host 即 rp-id、origin 即完整 URL），不可解析时启动 fail-fast |
 
 **默认策略**（每客户端可覆盖）：access 2h · refresh 30d 用后即轮转（重放→整族熔断）· PAT 90d · 授权码 5min+强制 PKCE · 密钥 90d 轮转+14d 重叠。⚠️ 框架防线：公开客户端不发 refresh token。
 

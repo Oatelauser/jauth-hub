@@ -10,6 +10,7 @@ import io.github.oatelauser.jauth.core.response.ResponseRenderer;
 import io.github.oatelauser.jauth.core.scope.ScopeCatalog;
 import io.github.oatelauser.jauth.core.user.UserRepository;
 import io.github.oatelauser.jauth.core.web.EducationalFlag;
+import io.github.oatelauser.jauth.core.web.PasskeyFlag;
 import io.github.oatelauser.jauth.selfservice.pat.JdbcPatService;
 import io.github.oatelauser.jauth.selfservice.pat.PatService;
 import io.github.oatelauser.jauth.selfservice.web.AuthorizedAppService;
@@ -21,6 +22,7 @@ import io.github.oatelauser.jauth.selfservice.web.MyOrgsController;
 import io.github.oatelauser.jauth.selfservice.web.OrgAppsController;
 import io.github.oatelauser.jauth.selfservice.web.OrgInstallationsController;
 import io.github.oatelauser.jauth.selfservice.web.OwnedAppService;
+import io.github.oatelauser.jauth.selfservice.web.PasskeyController;
 import io.github.oatelauser.jauth.selfservice.web.PatController;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -40,6 +42,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.security.web.webauthn.management.UserCredentialRepository;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.servlet.ViewResolver;
 import org.thymeleaf.spring6.SpringTemplateEngine;
@@ -115,14 +118,31 @@ public class JauthSelfServiceAutoConfiguration {
                 ObjectProvider<OAuth2AuthorizationConsentService> consentService,
                 RegisteredClientRepository clientRepository,
                 EducationalFlag educational,
+                ObjectProvider<PasskeyFlag> passkey,
                 ResponseRenderer responseRenderer) {
+            // PasskeyFlag 由 starter 供给；宿主自带 bean 集而缺它时降级 OFF（看板不渲染 passkey 入口），
+            // 与本配置"个别 bean 缺席渲染提示态"的边角容忍一致
             return new AuthorizedAppsController(
                     appService.getIfAvailable(),
                     authorizationService,
                     consentService,
                     clientRepository,
                     educational,
+                    passkey.getIfAvailable(() -> PasskeyFlag.OFF),
                     responseRenderer);
+        }
+
+        /**
+         * 通行密钥管理页（v1.2 C2）：凭据仓储 bean 仅 passkey 开启时由 starter 装配，缺席渲染"未启用"提示
+         * （与 PAT 的 memory 门控同构，页面不 500）。
+         */
+        @Bean
+        @ConditionalOnMissingBean
+        PasskeyController jauthPasskeyController(
+                ObjectProvider<UserCredentialRepository> credentials,
+                UserRepository userRepository,
+                EducationalFlag educational) {
+            return new PasskeyController(credentials, userRepository, educational);
         }
 
         /** 我的应用页（B10）：memory 模式也可用（与 PAT/看板不同），服务 bean 由两段存储配置按模式供给。 */
@@ -200,7 +220,7 @@ public class JauthSelfServiceAutoConfiguration {
 
         /**
          * selfservice 视图解析器：自带引擎 + 双解析器链（本模块命名空间优先，core 命名空间兜底供 fragments/layout
-         * 解析），消息源自持 basename 并挂 parent。viewNames 白名单钉死只认领本模块七个视图名
+         * 解析），消息源自持 basename 并挂 parent。viewNames 白名单钉死只认领本模块八个视图名
          * （thymeleaf-spring6 的 ThymeleafViewResolver 无 checkExistence），其余视图穿透宿主/Boot 默认解析器；
          * core 三页仍走共享引擎，两套视图名不相交。
          */
@@ -224,6 +244,7 @@ public class JauthSelfServiceAutoConfiguration {
             viewResolver.setViewNames(new String[] {
                 PatController.VIEW_PAT,
                 AuthorizedAppsController.VIEW_APPS,
+                PasskeyController.VIEW_PASSKEY,
                 MyAppsController.VIEW_MY_APPS,
                 MyAppsController.VIEW_MY_APP_NEW,
                 MyOrgsController.VIEW_MY_ORGS,

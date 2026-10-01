@@ -12,6 +12,7 @@ import io.github.oatelauser.jauth.core.response.JauthException;
 import io.github.oatelauser.jauth.core.token.JdbcTokenFamilyService;
 import io.github.oatelauser.jauth.core.util.UuidV7;
 import io.github.oatelauser.jauth.core.web.EducationalFlag;
+import io.github.oatelauser.jauth.core.web.PasskeyFlag;
 import io.github.oatelauser.jauth.selfservice.support.IntegrationTestSupport;
 import io.github.oatelauser.jauth.selfservice.support.Providers;
 import java.time.Instant;
@@ -134,6 +135,7 @@ class AuthorizedAppServiceTest {
                 Providers.fixed(this.consentService),
                 mock(RegisteredClientRepository.class),
                 EducationalFlag.ON,
+                PasskeyFlag.OFF,
                 new DefaultResponseRenderer());
     }
 

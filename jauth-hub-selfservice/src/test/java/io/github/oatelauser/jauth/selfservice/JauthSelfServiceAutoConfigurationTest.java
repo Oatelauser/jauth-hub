@@ -23,6 +23,7 @@ import io.github.oatelauser.jauth.selfservice.web.MyOrgsController;
 import io.github.oatelauser.jauth.selfservice.web.OrgAppsController;
 import io.github.oatelauser.jauth.selfservice.web.OrgInstallationsController;
 import io.github.oatelauser.jauth.selfservice.web.OwnedAppService;
+import io.github.oatelauser.jauth.selfservice.web.PasskeyController;
 import io.github.oatelauser.jauth.selfservice.web.PatController;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -81,6 +82,7 @@ class JauthSelfServiceAutoConfigurationTest {
                     assertThat(context).hasSingleBean(JdbcOwnedAppService.class);
                     assertThat(context).hasSingleBean(PatController.class);
                     assertThat(context).hasSingleBean(AuthorizedAppsController.class);
+                    assertThat(context).hasSingleBean(PasskeyController.class);
                     assertThat(context).hasSingleBean(MyAppsController.class);
                     // B11 org 三页：领域 bean 缺席（本 runner 无 starter 域件）也不拦控制器注册，页面提示态
                     assertThat(context).hasSingleBean(MyOrgsController.class);
@@ -103,6 +105,7 @@ class JauthSelfServiceAutoConfigurationTest {
                     assertThat(context).hasSingleBean(InMemoryOwnedAppService.class);
                     assertThat(context).hasSingleBean(PatController.class);
                     assertThat(context).hasSingleBean(AuthorizedAppsController.class);
+                    assertThat(context).hasSingleBean(PasskeyController.class);
                     assertThat(context).hasSingleBean(MyAppsController.class);
                     assertThat(context).hasSingleBean(MyOrgsController.class);
                     assertThat(context).hasSingleBean(OrgInstallationsController.class);

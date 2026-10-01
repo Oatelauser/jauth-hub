@@ -22,6 +22,11 @@
         <p th:text="#{jauth.apps.teach}">看板教学说明</p>
       </details>
 
+      <!--/* 通行密钥导航入口（v1.2 C2）：passkey 开启才渲染——默认关看板零可见变化 */-->
+      <p class="hint" th:if="${passkeyEnabled}">
+        <a th:href="@{/selfservice/passkey}" th:text="#{jauth.apps.passkey-link}">通行密钥</a>
+      </p>
+
       <div class="alert" th:if="${!appsSupported}" th:text="#{jauth.apps.unsupported}">当前存储模式不支持</div>
 
       <th:block th:if="${appsSupported}">

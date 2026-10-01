@@ -16,6 +16,7 @@ import io.github.oatelauser.jauth.core.scope.InMemoryScopeCatalog;
 import io.github.oatelauser.jauth.core.user.JauthUser;
 import io.github.oatelauser.jauth.core.user.UserRepository;
 import io.github.oatelauser.jauth.core.web.EducationalFlag;
+import io.github.oatelauser.jauth.core.web.PasskeyFlag;
 import io.github.oatelauser.jauth.selfservice.pat.InMemoryPatService;
 import io.github.oatelauser.jauth.selfservice.pat.PatTokens;
 import io.github.oatelauser.jauth.selfservice.support.Providers;
@@ -199,6 +200,7 @@ class SelfServiceJsonApiTest {
                                 org.springframework.security.oauth2.server.authorization.client
                                         .RegisteredClientRepository.class),
                         EducationalFlag.ON,
+                        PasskeyFlag.OFF,
                         new DefaultResponseRenderer()))
                 .setControllerAdvice(jauthAdvice())
                 .build();

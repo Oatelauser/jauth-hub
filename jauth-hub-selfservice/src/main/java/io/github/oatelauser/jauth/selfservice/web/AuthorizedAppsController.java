@@ -4,6 +4,7 @@ import io.github.oatelauser.jauth.core.response.JauthErrorCode;
 import io.github.oatelauser.jauth.core.response.JauthException;
 import io.github.oatelauser.jauth.core.response.ResponseRenderer;
 import io.github.oatelauser.jauth.core.web.EducationalFlag;
+import io.github.oatelauser.jauth.core.web.PasskeyFlag;
 import java.security.Principal;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -56,6 +57,8 @@ public class AuthorizedAppsController {
 
     private final EducationalFlag educational;
 
+    private final PasskeyFlag passkey;
+
     private final ResponseRenderer responseRenderer;
 
     public AuthorizedAppsController(
@@ -64,12 +67,14 @@ public class AuthorizedAppsController {
             ObjectProvider<OAuth2AuthorizationConsentService> consentService,
             RegisteredClientRepository clientRepository,
             EducationalFlag educational,
+            PasskeyFlag passkey,
             ResponseRenderer responseRenderer) {
         this.appService = appService;
         this.authorizationService = authorizationService;
         this.consentService = consentService;
         this.clientRepository = clientRepository;
         this.educational = educational;
+        this.passkey = passkey;
         this.responseRenderer = responseRenderer;
     }
 
@@ -84,6 +89,7 @@ public class AuthorizedAppsController {
     public String page(@Nullable Principal principal, Model model) {
         model.addAttribute("educational", this.educational.enabled());
         model.addAttribute("appsSupported", this.appService != null);
+        model.addAttribute("passkeyEnabled", this.passkey.enabled());
         if (this.appService == null || principal == null) {
             return VIEW_APPS;
         }

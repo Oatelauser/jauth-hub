@@ -14,6 +14,7 @@ English | [中文](README.md)
 |---|---|
 | 🐙 **GitHub-grade UX** | Scope checkboxes on the consent page, an authorized-apps dashboard with one-click revoke, personal access tokens, a `/me` platform endpoint — familiar to anyone who has wired up a GitHub App |
 | 🏢 **v1.1 platform layer** | Self-service organizations, two-step app-installation approval with OWNER-set scope ceilings, issued scopes = requested ∩ consented ∩ ceiling (intersected at runtime), an enriched `orgs` claim (id/name/role), app registration for personal and org apps, user management and self-service password change |
+| 🔑 **v1.2 Passkey** | WebAuthn passkeys: a passwordless button on the login page plus a self-service management page (register/delete); the private key never leaves the device — off by default, one switch to enable |
 | 🔀 **Dual mode, one codebase** | **Standalone**: run one service and point every project at it. **Embedded**: drop in a starter and auth grows inside your own service (the host only supplies a `UserDetailsService`) |
 | 🔐 **Security-first core** | Only SHA-256 hashes of tokens ever hit the database (a DB leak ≠ a token leak), refresh token rotation with **whole-family revocation on replay**, mandatory PKCE, signing keys auto-rotated every 90 days |
 | 🎓 **Built to teach** | The bundled `/demo` walkthrough drives a real authorization-code + PKCE flow against real endpoints, showing every HTTP request/response live — frontend engineers get OAuth in one sitting |
@@ -26,7 +27,7 @@ English | [中文](README.md)
 ```
 jauth-hub-core                    Protocol + domain implementation (storage/tokens/keys/pages/SPI, zero family deps)
 jauth-hub-starter                Takeover-style auto-configuration (memory|jdbc conditional wiring; add the dep and it works)
-jauth-hub-selfservice            User self-service pages (authorized apps, PAT, my orgs, my apps, installation approval)
+jauth-hub-selfservice            User self-service pages (authorized apps, PAT, passkeys, my orgs, my apps, installation approval)
 jauth-hub-resource-server-starter Resource-server integration (introspection + 30s cache + scope→authority mapping)
 jauth-hub-app                    Standalone deployment shell (own user store + /demo teaching zone)
 examples/embedded-demo           Embedded-integration example project
@@ -112,7 +113,7 @@ A complete runnable example lives in `examples/embedded-demo`.
 
 | Action | Where | Notes |
 |---|---|---|
-| 🔑 Sign in | `/login` | Username/password (Passkey planned for v1.2) |
+| 🔑 Sign in | `/login` | Username/password; with passkeys enabled there is also a "Sign in with a passkey" button (device biometrics, private key never leaves the device) |
 | 👤 Profile & password | `/profile` | Change display name; self-service password change (old-password check is brute-force aware) |
 | ✅ Consent | The consent page after the auth redirect | Check scopes individually — issued tokens carry only what you allowed; org apps show their organization |
 | 📋 Authorized apps | `/selfservice/apps` | See who holds your authorizations; **revoke** in one click |
@@ -120,6 +121,7 @@ A complete runnable example lives in `examples/embedded-demo`.
 | ✉️ Installation approval | `/selfservice/orgs/{orgId}/installations` | OWNERs rule on members' app-installation requests: approve with a ceiling ⊆ requested scopes, reject, or revoke |
 | 🧩 My apps | `/selfservice/my-apps` | Register personal OAuth apps (client_id/secret, redirect allowlist); org apps live at `/selfservice/orgs/{orgId}/apps` |
 | 🔖 Personal access tokens | `/selfservice/pat` | Pick scopes + lifetime (30/90/365 days); the plaintext is **shown exactly once** |
+| 🔐 Passkeys | `/selfservice/passkey` | Register and manage passkeys (name them, delete to revoke); off by default, see the configuration table |
 
 > **Issued scopes for org apps** = requested ∩ user consent ∩ org ceiling, intersected at runtime — narrow any of the three and the token narrows with it.
 
@@ -172,6 +174,7 @@ OIDC discovery endpoint: <http://localhost:8080/.well-known/openid-configuration
 | `jauth-hub.rate-limit.limit-per-hour` | `5000` | Per-user merged rate limiting |
 | `jauth-hub.rate-limit.login-max-failures` | `5` | 5 misses lock the account for 15 minutes |
 | `jauth-hub.cors.allowed-origins` | empty | Set when an SPA hits the token endpoint directly from the browser |
+| `jauth-hub.passkey.enabled` | `false` | Passkey sign-in and management toggle; `rp-id`/`allowed-origins` default to values derived from `issuer` (host as rp-id, full URL as origin); startup fails fast when not derivable |
 
 **Default policies** (overridable per client): access 2h · refresh 30d, rotate on use (replay → whole family revoked) · PAT 90d · authorization code 5min + mandatory PKCE · keys rotate every 90d with a 14d overlap. ⚠️ Framework guardrail: public clients never receive refresh tokens.
 

@@ -34,3 +34,13 @@ management:
 
 jauth-hub:
   storage: jdbc
+  # ── Passkey（v1.2，默认关：整块不开启即零端点零 UI）────────────────────────────
+  # 开启后：登录页出现"使用通行密钥登录"按钮，/selfservice/passkey 管理页可用（看板页有导航入口）。
+  # rp-id / allowed-origins 不配时从 jauth-hub.issuer 推导（issuer 的 host 即 rp-id、
+  # scheme://host[:port] 即 origin）——本地 local 档 issuer 是 http://localhost:8080，可直开；
+  # 生产 issuer 不可解析时启动 fail-fast（WebAuthn 的 RP 身份猜错 = 运行期全量认证失败）。
+  # passkey:
+  #   enabled: true
+  #   rp-id: auth.example.com            # 缺省 = issuer host
+  #   rp-name: jauth-hub                 # 缺省 = jauth-hub
+  #   allowed-origins: [https://auth.example.com]   # 缺省 = issuer origin

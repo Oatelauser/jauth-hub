@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<!--/* 通行密钥管理页（v1.2 C2）：教学块 + 注册表单（label + 浏览器原生 ceremony）+ 凭据列表；注册/删除走框架端点（原生 JS 带 CSRF） */-->
+<html lang="zh" xmlns:th="https://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('jauth.passkey.title')}">
+  <title>通行密钥</title>
+</head>
+<body>
+  <!--/* 自助页补充样式（ss- 前缀自成命名空间，与 PAT/看板页同构）：core 单文件 CSS 属 core 模块不可改 */-->
+  <style>
+    .ss-wide { max-width: 760px; }
+    .ss-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .ss-table th, .ss-table td { border-bottom: 1px solid #dfe3ef; padding: 8px 10px; text-align: left; }
+    .ss-table th { color: #5a607a; font-weight: 600; }
+    .ss-mono { font-family: ui-monospace, Consolas, monospace; }
+    .card h2 { margin: 20px 0 12px; font-size: 17px; }
+  </style>
+  <div class="page">
+    <main class="card ss-wide">
+      <p class="brand" th:text="#{jauth.brand}">jauth-hub</p>
+      <h1 th:text="#{jauth.passkey.title}">通行密钥</h1>
+      <details class="teach" th:if="${educational}">
+        <summary th:text="#{jauth.teach.what-happened}">发生了什么</summary>
+        <p th:text="#{jauth.passkey.teach}">通行密钥教学说明</p>
+      </details>
+
+      <div class="alert" th:if="${!passkeyEnabled}" th:text="#{jauth.passkey.unsupported}">通行密钥未启用</div>
+
+      <th:block th:if="${passkeyEnabled}">
+        <meta name="_csrf" th:if="${_csrf != null}" th:content="${_csrf.token}" />
+        <meta name="_csrf_header" th:if="${_csrf != null}" th:content="${_csrf.headerName}" />
+
+        <div class="alert" id="passkey-error" hidden="hidden" role="alert" th:text="#{jauth.passkey.error}">注册未完成，请重试</div>
+
+        <h2 th:text="#{jauth.passkey.create-title}">添加通行密钥</h2>
+        <form class="form" id="passkey-form">
+          <label class="field">
+            <span th:text="#{jauth.passkey.label}">名称</span>
+            <input type="text" name="label" maxlength="100" required="required"
+                   th:placeholder="#{jauth.passkey.label-placeholder}" />
+          </label>
+          <button class="btn primary" type="submit" th:text="#{jauth.passkey.create-submit}">添加</button>
+        </form>
+
+        <h2 th:text="#{jauth.passkey.list-title}">我的通行密钥</h2>
+        <p class="hint" th:if="${#lists.isEmpty(credentials)}" th:text="#{jauth.passkey.empty}">还没有通行密钥</p>
+        <table class="ss-table" th:if="${!#lists.isEmpty(credentials)}">
+          <thead>
+            <tr>
+              <th th:text="#{jauth.passkey.col-label}">名称</th>
+              <th th:text="#{jauth.passkey.col-credential-id}">凭据 ID</th>
+              <th th:text="#{jauth.passkey.col-created}">添加时间</th>
+              <th th:text="#{jauth.passkey.col-last-used}">最近使用</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr th:each="credential : ${credentials}">
+              <td class="scope-name" th:text="${credential.label == null} ? #{jauth.passkey.unnamed} : ${credential.label}">我的手机</td>
+              <td class="ss-mono" th:text="${credential.credentialIdShort}">AbCdEfGhIjKl…</td>
+              <td th:text="${#temporals.format(credential.createdAt, 'yyyy-MM-dd HH:mm')}">2026-10-01 10:00</td>
+              <td th:text="${credential.lastUsedAt == null} ? '—' : ${#temporals.format(credential.lastUsedAt, 'yyyy-MM-dd HH:mm')}">—</td>
+              <td>
+                <button class="btn ss-passkey-delete" type="button"
+                        th:attr="data-delete-url=@{'/webauthn/register/' + ${credential.credentialId}}"
+                        th:text="#{jauth.passkey.delete}">删除</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </th:block>
+    </main>
+  </div>
+  <script th:if="${passkeyEnabled}" th:inline="javascript">
+    (function () {
+      var csrfMeta = document.querySelector('meta[name="_csrf"]');
+      var csrfHeaderMeta = document.querySelector('meta[name="_csrf_header"]');
+      function postHeaders() {
+        var headers = { 'Content-Type': 'application/json' };
+        if (csrfMeta && csrfHeaderMeta) { headers[csrfHeaderMeta.content] = csrfMeta.content; }
+        return headers;
+      }
+      /* base64url（无 padding，对齐 SS7 Bytes 序列化）↔ ArrayBuffer：WebAuthn 二进制字段的 JSON 线格式 */
+      function toArrayBuffer(value) {
+        var binary = window.atob(value.replace(/-/g, '+').replace(/_/g, '/'));
+        var bytes = new Uint8Array(binary.length);
+        for (var i = 0; i < binary.length; i++) { bytes[i] = binary.charCodeAt(i); }
+        return bytes.buffer;
+      }
+      function toBase64Url(buffer) {
+        var bytes = new Uint8Array(buffer);
+        var binary = '';
+        for (var i = 0; i < bytes.length; i++) { binary += String.fromCharCode(bytes[i]); }
+        return window.btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      }
+      var errorBox = document.getElementById('passkey-error');
+      function showError() { errorBox.hidden = false; }
+      /* 选项端点把 challenge/user 存进 session，POST /webauthn/register 时按 session 配对核验 */
+      function requestCreationOptions() {
+        return fetch(/*[[ @{/webauthn/register/options} ]]*/ '/webauthn/register/options',
+            { method: 'POST', headers: postHeaders(), credentials: 'same-origin' })
+          .then(function (response) {
+            if (!response.ok) { throw new Error('options ' + response.status); }
+            return response.json();
+          });
+      }
+      function createWithAuthenticator(options) {
+        var publicKey = {
+          challenge: toArrayBuffer(options.challenge),
+          rp: options.rp,
+          user: { name: options.user.name, displayName: options.user.displayName, id: toArrayBuffer(options.user.id) },
+          pubKeyCredParams: options.pubKeyCredParams,
+          timeout: options.timeout,
+          excludeCredentials: (options.excludeCredentials || []).map(function (descriptor) {
+            return { type: descriptor.type, id: toArrayBuffer(descriptor.id) };
+          }),
+          authenticatorSelection: options.authenticatorSelection,
+          attestation: options.attestation
+        };
+        return navigator.credentials.create({ publicKey: publicKey });
+      }
+      function postRegistration(credential, label) {
+        var body = {
+          publicKey: {
+            credential: {
+              id: credential.id,
+              rawId: toBase64Url(credential.rawId),
+              type: credential.type,
+              response: {
+                attestationObject: toBase64Url(credential.response.attestationObject),
+                clientDataJSON: toBase64Url(credential.response.clientDataJSON),
+                transports: credential.response.getTransports ? credential.response.getTransports() : []
+              },
+              clientExtensionResults: {},
+              authenticatorAttachment: credential.authenticatorAttachment
+            },
+            label: label
+          }
+        };
+        return fetch(/*[[ @{/webauthn/register} ]]*/ '/webauthn/register',
+            { method: 'POST', headers: postHeaders(), credentials: 'same-origin', body: JSON.stringify(body) })
+          .then(function (response) {
+            if (!response.ok) { throw new Error('register ' + response.status); }
+            return response.json();
+          });
+      }
+      document.getElementById('passkey-form').addEventListener('submit', function (event) {
+        event.preventDefault();
+        errorBox.hidden = true;
+        if (!window.PublicKeyCredential) { showError(); return; }
+        var label = event.target.querySelector('input[name="label"]').value.trim();
+        requestCreationOptions()
+          .then(createWithAuthenticator)
+          .then(function (credential) { return postRegistration(credential, label); })
+          .then(function () { window.location.reload(); })
+          .catch(showError);
+      });
+      Array.prototype.forEach.call(document.querySelectorAll('.ss-passkey-delete'), function (button) {
+        button.addEventListener('click', function () {
+          if (!window.confirm(/*[[#{jauth.passkey.delete-confirm}]]*/ '确定删除该通行密钥吗？')) { return; }
+          var headers = {};
+          if (csrfMeta && csrfHeaderMeta) { headers[csrfHeaderMeta.content] = csrfMeta.content; }
+          fetch(button.getAttribute('data-delete-url'),
+              { method: 'DELETE', headers: headers, credentials: 'same-origin' })
+            .then(function (response) {
+              // 框架删除端点：204 成功、403 非本人凭据（ownership 由框架把关）
+              if (response.status === 204) { button.closest('tr').remove(); return; }
+              throw new Error('delete ' + response.status);
+            })
+            .catch(showError);
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

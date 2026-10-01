@@ -8,11 +8,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.github.oatelauser.jauth.core.passkey.InMemoryPasskeyCredentialRepository;
+import io.github.oatelauser.jauth.core.passkey.JauthUserEntityRepository;
 import io.github.oatelauser.jauth.core.response.DefaultResponseRenderer;
 import io.github.oatelauser.jauth.core.scope.InMemoryScopeCatalog;
 import io.github.oatelauser.jauth.core.user.JauthUser;
 import io.github.oatelauser.jauth.core.user.UserRepository;
 import io.github.oatelauser.jauth.core.web.EducationalFlag;
+import io.github.oatelauser.jauth.core.web.PasskeyFlag;
 import io.github.oatelauser.jauth.selfservice.pat.InMemoryPatService;
 import io.github.oatelauser.jauth.selfservice.pat.PatRecord;
 import io.github.oatelauser.jauth.selfservice.pat.PatService;
@@ -23,9 +26,11 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,6 +39,11 @@ import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.security.web.webauthn.api.Bytes;
+import org.springframework.security.web.webauthn.api.CredentialRecord;
+import org.springframework.security.web.webauthn.api.ImmutableCredentialRecord;
+import org.springframework.security.web.webauthn.api.ImmutablePublicKeyCose;
+import org.springframework.security.web.webauthn.management.UserCredentialRepository;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.servlet.i18n.FixedLocaleResolver;
@@ -168,6 +178,84 @@ class SelfServicePagesTest {
                 .andExpect(content().string(not(containsString("data-revoke-url"))));
     }
 
+    @Test
+    @DisplayName("通行密钥页：注册表单（label 必填）/凭据列表（label、ID 缩略、删除端点接线、时间列）/教学块/zh 文案")
+    void passkeyPageRendersFormListAndDeleteWiring() throws Exception {
+        byte[] credentialId = new byte[16];
+        for (int i = 0; i < credentialId.length; i++) {
+            credentialId[i] = (byte) i;
+        }
+        String expectedId = new Bytes(credentialId).toBase64UrlString();
+        InMemoryPasskeyCredentialRepository credentials = new InMemoryPasskeyCredentialRepository(event -> {});
+        credentials.save(credentialRecord("我的手机", credentialId));
+
+        passkeyPage(EducationalFlag.ON, credentials)
+                .perform(get("/selfservice/passkey").principal(() -> ALICE))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML))
+                .andExpect(content().string(containsString("通行密钥")))
+                .andExpect(content().string(containsString("name=\"label\"")))
+                .andExpect(content().string(containsString("required=\"required\"")))
+                .andExpect(content().string(containsString("添加通行密钥")))
+                .andExpect(content().string(containsString("我的手机")))
+                .andExpect(content().string(containsString(expectedId.substring(0, 12) + "…")))
+                // 删除走框架 DELETE 端点：credentialId 原样作路径段（base64url URL 安全）
+                .andExpect(
+                        content().string(containsString("data-delete-url=\"/webauthn/register/" + expectedId + "\"")))
+                .andExpect(content().string(containsString(expectedLocalTime())))
+                .andExpect(content().string(containsString("发生了什么")))
+                .andExpect(content().string(containsString("私钥")))
+                // Thymeleaf javascript 内联把 @{...} 的 '/' 转义为 '\/'（运行时等价），断言按转义后字面量
+                .andExpect(content().string(containsString("\\/webauthn\\/register\\/options")));
+    }
+
+    @Test
+    @DisplayName("通行密钥页未启用（凭据仓储缺席 = jauth-hub.passkey.enabled=false）：渲染未启用提示，表单/列表/脚本不渲染")
+    void passkeyPageDisabledRendersNoticeInsteadOfForm() throws Exception {
+        passkeyPage(EducationalFlag.ON, null)
+                .perform(get("/selfservice/passkey").principal(() -> ALICE))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("通行密钥未启用")))
+                .andExpect(content().string(not(containsString("name=\"label\""))))
+                .andExpect(content().string(not(containsString("/webauthn/register"))));
+    }
+
+    @Test
+    @DisplayName("看板导航：passkey 开启渲染通行密钥入口，默认关零可见（B12：locale 已钉 zh，断言中文词条）")
+    void appsPageNavEntryFollowsPasskeyFlag() throws Exception {
+        appsPage(EducationalFlag.ON, mockAppsService(), () -> true)
+                .perform(get("/selfservice/apps").principal(() -> ALICE))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("href=\"/selfservice/passkey\"")))
+                .andExpect(content().string(containsString("通行密钥")));
+        appsPage(EducationalFlag.ON, mockAppsService(), PasskeyFlag.OFF)
+                .perform(get("/selfservice/apps").principal(() -> ALICE))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("/selfservice/passkey"))));
+    }
+
+    private MockMvc passkeyPage(EducationalFlag educational, @Nullable UserCredentialRepository credentials) {
+        PasskeyController controller = new PasskeyController(Providers.fixed(credentials), this.users, educational);
+        return buildMockMvc(null, null, controller);
+    }
+
+    /** 合成凭据行（user handle = alice 的 jauth 用户 id，走 JauthUserEntityRepository 编解码单点）。 */
+    private static CredentialRecord credentialRecord(String label, byte[] credentialId) {
+        return ImmutableCredentialRecord.builder()
+                .credentialId(new Bytes(credentialId))
+                .userEntityUserId(JauthUserEntityRepository.userHandle("user-alice"))
+                .publicKey(new ImmutablePublicKeyCose(new byte[] {0x01, 0x02, 0x03}))
+                .signatureCount(0)
+                .uvInitialized(true)
+                .backupEligible(false)
+                .backupState(false)
+                .transports(Set.of())
+                .created(T0)
+                .lastUsed(T0)
+                .label(label)
+                .build();
+    }
+
     private MockMvc patPage(EducationalFlag educational, PatService service, Clock viewClock) {
         PatController controller = new PatController(
                 service,
@@ -177,10 +265,14 @@ class SelfServicePagesTest {
                 educational,
                 new DefaultResponseRenderer(),
                 viewClock);
-        return buildMockMvc(controller, null);
+        return buildMockMvc(controller, null, null);
     }
 
     private MockMvc appsPage(EducationalFlag educational, AuthorizedAppService appService) {
+        return appsPage(educational, appService, PasskeyFlag.OFF);
+    }
+
+    private MockMvc appsPage(EducationalFlag educational, AuthorizedAppService appService, PasskeyFlag passkey) {
         AuthorizedAppsController controller = new AuthorizedAppsController(
                 appService,
                 Providers.fixed(mock(
@@ -190,12 +282,14 @@ class SelfServicePagesTest {
                                 .class)),
                 mockClients(),
                 educational,
+                passkey,
                 new DefaultResponseRenderer());
-        return buildMockMvc(null, controller);
+        return buildMockMvc(null, controller, null);
     }
 
     /** 手装 Thymeleaf：双解析器（selfservice 命名空间优先，core 兜底供 fragments/layout），双 basename 消息源。 */
-    private MockMvc buildMockMvc(PatController patController, AuthorizedAppsController appsController) {
+    private MockMvc buildMockMvc(
+            PatController patController, AuthorizedAppsController appsController, PasskeyController passkeyController) {
         SpringTemplateEngine engine = new SpringTemplateEngine();
         engine.setTemplateResolver(templateResolver(SELF_SERVICE_TEMPLATES));
         engine.addTemplateResolver(templateResolver(CORE_TEMPLATES));
@@ -206,8 +300,17 @@ class SelfServicePagesTest {
         viewResolver.setContentType("text/html;charset=UTF-8");
         viewResolver.setForceContentType(true);
 
-        Object[] controllers = patController != null ? new Object[] {patController} : new Object[] {appsController};
-        return MockMvcBuilders.standaloneSetup(controllers)
+        List<Object> controllers = new ArrayList<>();
+        if (patController != null) {
+            controllers.add(patController);
+        }
+        if (appsController != null) {
+            controllers.add(appsController);
+        }
+        if (passkeyController != null) {
+            controllers.add(passkeyController);
+        }
+        return MockMvcBuilders.standaloneSetup(controllers.toArray())
                 .setViewResolvers(viewResolver)
                 .setLocaleResolver(new FixedLocaleResolver(Locale.SIMPLIFIED_CHINESE))
                 .addFilters((request, response, chain) -> {

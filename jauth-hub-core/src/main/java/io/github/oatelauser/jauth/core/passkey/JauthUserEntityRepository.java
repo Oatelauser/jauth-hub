@@ -68,12 +68,12 @@ public class JauthUserEntityRepository implements PublicKeyCredentialUserEntityR
                 .build();
     }
 
-    /** 句柄 ↔ 用户 id 的唯一编解码点（UTF-8）。 */
-    static String userHandle(Bytes id) {
+    /** 句柄 ↔ 用户 id 的唯一编解码点（UTF-8）；C2 起 selfservice 凭据列表与审计桥共用，故公开。 */
+    public static String userHandle(Bytes id) {
         return new String(id.getBytes(), StandardCharsets.UTF_8);
     }
 
-    static Bytes userHandle(String userId) {
+    public static Bytes userHandle(String userId) {
         return new Bytes(userId.getBytes(StandardCharsets.UTF_8));
     }
 }
