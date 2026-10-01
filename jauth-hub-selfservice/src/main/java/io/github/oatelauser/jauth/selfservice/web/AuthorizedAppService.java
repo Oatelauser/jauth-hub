@@ -55,7 +55,11 @@ public class AuthorizedAppService {
             scopesByClient
                     .computeIfAbsent(row.registeredClientId(), key -> new LinkedHashSet<>())
                     .addAll(row.scopes());
-            latestByClient.merge(row.registeredClientId(), row.latestIssuedAt(), AuthorizedAppService::latest);
+            // 全 NULL 签发时间是框架合法状态（授权码已消费/过期后三列被清空），HashMap.merge 不吃 null
+            // value——跳过即可，视图层对缺时行以"—"渲染，排序 nullsLast 已容
+            if (row.latestIssuedAt() != null) {
+                latestByClient.merge(row.registeredClientId(), row.latestIssuedAt(), AuthorizedAppService::latest);
+            }
         }
         List<AuthorizedApp> apps = new ArrayList<>(scopesByClient.size());
         for (Map.Entry<String, Set<String>> entry : scopesByClient.entrySet()) {
