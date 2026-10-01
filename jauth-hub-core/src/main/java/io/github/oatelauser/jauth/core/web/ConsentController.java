@@ -153,13 +153,23 @@ public class ConsentController {
         List<ScopeItem> items = new ArrayList<>(scopes.size());
         for (String name : scopes) {
             boolean grantable = ceiling == null || ceiling.contains(name);
-            ScopeDefinition definition = scopeCatalog.find(name).orElse(null);
-            String description =
-                    definition != null ? messageSource.getMessage(definition.i18nKey(), null, name, locale) : name;
-            items.add(new ScopeItem(name, description, grantable, grantable));
+            items.add(new ScopeItem(name, description(name, locale), grantable, grantable));
         }
         items.sort(Comparator.comparing(ScopeItem::name));
         return items;
+    }
+
+    /**
+     * 描述三级兜底序（v1.2 C4 ③）：i18n key 命中 > 注解 desc（fallbackDesc，{@code @RequiresScope} 流入）>
+     * 裸名。目录外 scope 仍如实展示裸名（渲染层不拒，判定归框架与勾选守门面）。
+     */
+    private String description(String name, Locale locale) {
+        ScopeDefinition definition = scopeCatalog.find(name).orElse(null);
+        if (definition == null) {
+            return name;
+        }
+        String fallback = definition.fallbackDesc() != null ? definition.fallbackDesc() : name;
+        return messageSource.getMessage(definition.i18nKey(), null, fallback, locale);
     }
 
     /**

@@ -39,6 +39,7 @@ import io.github.oatelauser.jauth.core.response.JauthResponseAdvice;
 import io.github.oatelauser.jauth.core.response.ResponseRenderer;
 import io.github.oatelauser.jauth.core.scope.InMemoryScopeCatalog;
 import io.github.oatelauser.jauth.core.scope.ScopeCatalog;
+import io.github.oatelauser.jauth.core.scope.ScopeDefinition;
 import io.github.oatelauser.jauth.core.token.ClaimsContributor;
 import io.github.oatelauser.jauth.core.token.DefaultClaimsContributor;
 import io.github.oatelauser.jauth.core.token.InMemoryTokenFamilyService;
@@ -62,6 +63,8 @@ import io.github.oatelauser.jauth.core.web.LoginLockoutFilter;
 import io.github.oatelauser.jauth.core.web.MeController;
 import io.github.oatelauser.jauth.core.web.PasskeyFlag;
 import io.github.oatelauser.jauth.core.web.PlatformTokenResolver;
+import io.github.oatelauser.jauth.core.web.RequiresScope;
+import io.github.oatelauser.jauth.core.web.RequiresScopeInterceptor;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.net.URI;
 import java.security.KeyPair;
@@ -81,7 +84,10 @@ import java.util.UUID;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -141,8 +147,10 @@ import org.springframework.web.accept.HeaderContentNegotiationStrategy;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import org.thymeleaf.spring6.templateresolver.SpringResourceTemplateResolver;
 import org.thymeleaf.templatemode.TemplateMode;
 
@@ -177,6 +185,8 @@ import org.thymeleaf.templatemode.TemplateMode;
         })
 @EnableConfigurationProperties({JauthHubProperties.class, MessageSourceProperties.class})
 public class JauthHubAutoConfiguration {
+
+    private static final Logger log = LoggerFactory.getLogger(JauthHubAutoConfiguration.class);
 
     /** 协议链上自认领的页面路径（登录页 = formLogin 落点）。 */
     static final String LOGIN_PATH = "/login";
@@ -462,6 +472,49 @@ public class JauthHubAutoConfiguration {
     @ConditionalOnMissingBean(ScopeCatalog.class)
     ScopeCatalog jauthScopeCatalog() {
         return new InMemoryScopeCatalog();
+    }
+
+    /**
+     * {@code @RequiresScope} 自动注册（v1.2 C4 ①）：启动扫同 JVM 全量 HandlerMethod，注解声明的 scope
+     * 幂等进目录（同名 upsert，宿主显式注册仍可覆盖）。SmartInitializingSingleton 在全部单例就位后、
+     * ApplicationRunner（播种等）之前回调——注册先于任何启动消费者完成。经 provider 流式取映射：
+     * 按类型解析会撞 actuator 的 controllerEndpointHandlerMapping（RequestMappingHandlerMapping 子类，
+     * 令 by-type 唯一性破坏），流式遍历全部映射即覆盖宿主 MVC 全域；非 WebMvc 宿主（装配矩阵的裸
+     * runner 面）无映射时为空流，静默无操作而非启动失败。
+     */
+    @Bean
+    SmartInitializingSingleton jauthRequiresScopeRegistrar(
+            ObjectProvider<RequestMappingHandlerMapping> handlerMappings, ScopeCatalog scopeCatalog) {
+        return () -> handlerMappings.stream()
+                .forEach(mapping -> mapping.getHandlerMethods().values().forEach(handlerMethod -> {
+                    RequiresScope requiresScope = handlerMethod.getMethodAnnotation(RequiresScope.class);
+                    if (requiresScope == null) {
+                        return;
+                    }
+                    // desc 空串归一为 null：consent 页兜底序回退裸名，目录内不落""哨兵值
+                    scopeCatalog.register(ScopeDefinition.of(
+                            requiresScope.value(),
+                            requiresScope.sensitive(),
+                            requiresScope.desc().isEmpty() ? null : requiresScope.desc()));
+                    log.info(
+                            "[jauth-hub] @RequiresScope registered scope '{}' (sensitive={})",
+                            requiresScope.value(),
+                            requiresScope.sensitive());
+                }));
+    }
+
+    /**
+     * {@code @RequiresScope} 声明式校验（v1.2 C4 ②）：全局注册（照 jauthStaticResourcesConfigurer 形态）。
+     * 无开关——拦截器对非注解方法只有一次 instanceof 判定，注解不挂即零行为，不改变任何既有请求路径。
+     */
+    @Bean
+    WebMvcConfigurer jauthRequiresScopeInterceptorConfigurer() {
+        return new WebMvcConfigurer() {
+            @Override
+            public void addInterceptors(InterceptorRegistry registry) {
+                registry.addInterceptor(new RequiresScopeInterceptor());
+            }
+        };
     }
 
     @Bean

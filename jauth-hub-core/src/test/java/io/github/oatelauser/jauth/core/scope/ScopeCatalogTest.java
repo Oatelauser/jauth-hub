@@ -2,6 +2,7 @@ package io.github.oatelauser.jauth.core.scope;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -60,6 +61,17 @@ class ScopeCatalogTest {
 
         assertEquals(4, catalog.all().size());
         assertTrue(catalog.find("repo:read").orElseThrow().sensitive());
+    }
+
+    @Test
+    @DisplayName("工厂形态（v1.2 C4）：两参兼容形态落 fallbackDesc=null；三参形态携带 desc，i18nKey 同前缀")
+    void factoryFormsCarryFallbackDesc() {
+        assertNull(ScopeDefinition.of("repo:read", false).fallbackDesc());
+
+        ScopeDefinition withDesc = ScopeDefinition.of("repo:read", false, "读取仓库");
+        assertEquals("读取仓库", withDesc.fallbackDesc());
+        assertFalse(withDesc.sensitive());
+        assertEquals("jauth.scope.repo:read", withDesc.i18nKey());
     }
 
     @Test

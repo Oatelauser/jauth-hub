@@ -13,6 +13,8 @@ import io.github.oatelauser.jauth.core.org.InMemoryInstallationRepository;
 import io.github.oatelauser.jauth.core.org.InMemoryOrgRepository;
 import io.github.oatelauser.jauth.core.org.OrgScopeGate;
 import io.github.oatelauser.jauth.core.scope.InMemoryScopeCatalog;
+import io.github.oatelauser.jauth.core.scope.ScopeCatalog;
+import io.github.oatelauser.jauth.core.scope.ScopeDefinition;
 import io.github.oatelauser.jauth.core.user.InMemoryUserRepository;
 import jakarta.servlet.Filter;
 import java.nio.charset.StandardCharsets;
@@ -156,6 +158,24 @@ class ProtocolPagesTest {
     }
 
     @Test
+    @DisplayName("consent 兜底序（C4 ③）：i18n 未命中时注解 desc 优先，desc 空回退裸名")
+    void consentFallsBackToAnnotationDescBeforeBareName() throws Exception {
+        // 两个自定义 scope 均无 i18n key（jauth.scope.orders:* 不在消息包）——隔离出兜底序判定
+        InMemoryScopeCatalog catalog = new InMemoryScopeCatalog();
+        catalog.register(ScopeDefinition.of("orders:read", false, "读取订单"));
+        catalog.register(ScopeDefinition.of("orders:write", false));
+        MockMvc scoped = buildMockMvc(EducationalFlag.ON, PasskeyFlag.OFF, messageSource(), catalog);
+
+        scoped.perform(get("/oauth2/consent")
+                        .queryParam("client_id", CLIENT_ID)
+                        .queryParam("state", "st-123")
+                        .queryParam("scope", "orders:read orders:write"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("class=\"scope-desc\">读取订单<")))
+                .andExpect(content().string(containsString("class=\"scope-desc\">orders:write<")));
+    }
+
+    @Test
     @DisplayName("设备验证页：用户码输入框提交到自有验证端点（与 settings 同路径 /device/verify）")
     void deviceVerifyRendersCodeInput() throws Exception {
         educated.perform(get("/device/verify"))
@@ -186,6 +206,12 @@ class ProtocolPagesTest {
     }
 
     private MockMvc buildMockMvc(EducationalFlag flag, PasskeyFlag passkey, MessageSource messageSource) {
+        return buildMockMvc(flag, passkey, messageSource, new InMemoryScopeCatalog());
+    }
+
+    /** 目录可注入：consent 兜底序断言（C4 ③）需要预注册带/不带 desc 的自定义 scope。 */
+    private MockMvc buildMockMvc(
+            EducationalFlag flag, PasskeyFlag passkey, MessageSource messageSource, ScopeCatalog scopeCatalog) {
         ClassLoaderTemplateResolver resolver = new ClassLoaderTemplateResolver();
         resolver.setPrefix(TEMPLATE_PREFIX);
         resolver.setSuffix(".html");
@@ -205,7 +231,7 @@ class ProtocolPagesTest {
                         new LoginController(flag, passkey),
                         new ConsentController(
                                 mockClients(),
-                                new InMemoryScopeCatalog(),
+                                scopeCatalog,
                                 messageSource,
                                 flag,
                                 new OrgScopeGate(

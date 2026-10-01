@@ -23,6 +23,8 @@ jauth-hub:
       scopes:
         - openid
         - profile
+        # @RequiresScope("orders:read") 对齐：授权码演练令牌须携带该 scope 才能过 /api/orders 的声明式校验
+        - orders:read
     - client-id: embedded-demo-rs
       client-name: embedded-demo 内省机密客户端
       # 占位 secret（SPEC §4：内省调用方须为机密客户端）；生产写 ENC() 密文
