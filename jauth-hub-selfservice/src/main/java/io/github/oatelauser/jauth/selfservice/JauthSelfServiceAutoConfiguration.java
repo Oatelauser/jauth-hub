@@ -36,6 +36,7 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -260,10 +261,13 @@ public class JauthSelfServiceAutoConfiguration {
          */
         @Bean
         @ConditionalOnMissingBean(name = "jauthSelfServiceViewResolver")
-        ViewResolver jauthSelfServiceViewResolver(ObjectProvider<MessageSource> messageSource) {
+        ViewResolver jauthSelfServiceViewResolver(
+                ObjectProvider<MessageSource> messageSource, ApplicationContext applicationContext) {
             SpringTemplateEngine engine = new SpringTemplateEngine();
-            engine.setTemplateResolver(templateResolver(SELF_SERVICE_TEMPLATES_PREFIX, Ordered.HIGHEST_PRECEDENCE));
-            engine.addTemplateResolver(templateResolver(CORE_TEMPLATES_PREFIX, Ordered.HIGHEST_PRECEDENCE + 1));
+            engine.setTemplateResolver(
+                    templateResolver(SELF_SERVICE_TEMPLATES_PREFIX, Ordered.HIGHEST_PRECEDENCE, applicationContext));
+            engine.addTemplateResolver(
+                    templateResolver(CORE_TEMPLATES_PREFIX, Ordered.HIGHEST_PRECEDENCE + 1, applicationContext));
             ResourceBundleMessageSource localMessages = new ResourceBundleMessageSource();
             localMessages.setBasename(SELF_SERVICE_I18N_BASENAME);
             localMessages.setDefaultEncoding(StandardCharsets.UTF_8.name());
@@ -291,8 +295,15 @@ public class JauthSelfServiceAutoConfiguration {
             return viewResolver;
         }
 
-        private static SpringResourceTemplateResolver templateResolver(String prefix, int order) {
+        /**
+         * 解析器在 @Bean 方法体内构造（非容器 bean，无 Aware 注入），而 Thymeleaf 3.1 起引擎不再向解析器
+         * 传导 ApplicationContext——必须显式传入，否则真渲染期 "Application Context cannot be null"
+         * （v1.2.1 修复：v1.0 起潜伏，standalone 页面测试不真渲染模板故从未暴露）。
+         */
+        private static SpringResourceTemplateResolver templateResolver(
+                String prefix, int order, ApplicationContext applicationContext) {
             SpringResourceTemplateResolver resolver = new SpringResourceTemplateResolver();
+            resolver.setApplicationContext(applicationContext);
             resolver.setPrefix(prefix);
             resolver.setSuffix(".html");
             resolver.setTemplateMode(TemplateMode.HTML);
