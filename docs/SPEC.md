@@ -138,7 +138,7 @@ v2+：webhook、secret scanning、多 Secret 轮转、token exchange（配置可
 - 质量门禁按 [AGENTS.md](../AGENTS.md)：p3c（黄山版）/Spotless/SpotBugs+FindSecBugs/OWASP dep-check，编辑期 hook + 交付前 AI 全量评审
 - 版本策略：里程碑即版本（v1.0→`1.0.0`、v1.1→`1.1.0`、v1.2→`1.2.0`），semver，1.0 起 API 稳定承诺，废弃提前一个 minor
 - 制品：core/starter/selfservice/rs-starter 上 Maven Central（按 [MAVEN_CENTRAL_PUBLISHING.md](MAVEN_CENTRAL_PUBLISHING.md)）；app 不上 Central；v1 无 BOM；Docker 镜像随 [RELEASE_PROCESS.md](RELEASE_PROCESS.md)
-- Passkey 选型：v1.2 开工先验 Spring Security 7 原生 WebAuthn，不足再引 WebAuthn4J
+- Passkey 选型：已验证采纳 **Spring Security 7 原生 `spring-security-webauthn`**（SS BOM 统管 7.1.1，webauthn4j-core 0.31.9 为其传递依赖；2026-10-01，[research/03](../.scratch/jauth-hub/research/03-passkey-selection.md)）
 - actuator：app 暴露 health/info/metrics + 发令牌计数等自定义指标；库侧条件注册 micrometer 绑定
 - 参考 demo（纯参考）：`D:\workspace\Java\test-oauth2`（前后端）。吸收：双链骨架、PKCE 客户端走法、设计语言；不带走：临时密钥/InMemory/CSRF 关/{noop}/JWT access token
 
