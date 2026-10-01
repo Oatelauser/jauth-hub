@@ -4,7 +4,7 @@
 
 English | [中文](README.md)
 
-![Version](https://img.shields.io/badge/version-1.1.0-blue) ![Java](https://img.shields.io/badge/Java-21-orange) ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.x-brightgreen) ![License](https://img.shields.io/badge/License-MIT-yellow) ![CI](https://github.com/Oatelauser/jauth-hub/actions/workflows/ci.yml/badge.svg)
+![Version](https://img.shields.io/badge/version-1.2.0-blue) ![Java](https://img.shields.io/badge/Java-21-orange) ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.x-brightgreen) ![License](https://img.shields.io/badge/License-MIT-yellow) ![CI](https://github.com/Oatelauser/jauth-hub/actions/workflows/ci.yml/badge.svg)
 
 ---
 
@@ -20,7 +20,7 @@ English | [中文](README.md)
 | 🎓 **Built to teach** | The bundled `/demo` walkthrough drives a real authorization-code + PKCE flow against real endpoints, showing every HTTP request/response live — frontend engineers get OAuth in one sitting |
 | 🧩 **Family ecosystem** | Plays out of the box with the [spring-plus](https://central.sonatype.com/search?q=io.github.oatelauser) family (unified responses / declarative authorization / config encryption), yet works fully standalone |
 | 🗄️ **Zero-ceremony start** | Defaults to an H2 file database (clone and run), switches to PostgreSQL with one line of config; SQL is written for both dialects |
-| 🧪 **Quality gates** | 341 tests + Alibaba p3c rules + Spotless + SpotBugs/FindSecBugs + full end-to-end flow tests, all enforced green in CI |
+| 🧪 **Quality gates** | 396 tests + Alibaba p3c rules + Spotless + SpotBugs/FindSecBugs + full end-to-end flow tests, all enforced green in CI |
 
 ## 📦 Modules
 
@@ -54,7 +54,7 @@ mvn verify   # build + full test suite + quality gates
 
 ```bash
 mvn -pl jauth-hub-app -am package -DskipTests
-java -jar jauth-hub-app/target/jauth-hub-app-1.1.0.jar
+java -jar jauth-hub-app/target/jauth-hub-app-1.2.0.jar
 ```
 
 Open <http://localhost:8080/demo> — the teaching zone walks you through the full **login → consent → token exchange → introspection → API call** loop, with live HTTP details at every step.
@@ -77,7 +77,7 @@ jauth-hub:
 <dependency>
     <groupId>io.github.oatelauser</groupId>
     <artifactId>jauth-hub-starter</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.0</version>
 </dependency>
 ```
 
@@ -94,7 +94,7 @@ UserDetailsService userDetailsService() {
 <dependency>
     <groupId>io.github.oatelauser</groupId>
     <artifactId>jauth-hub-resource-server-starter</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.0</version>
 </dependency>
 ```
 
@@ -183,8 +183,8 @@ OIDC discovery endpoint: <http://localhost:8080/.well-known/openid-configuration
 
 ## 🗺️ Roadmap
 
-- **v1.1 (platform layer, this release)**: organizations, app-installation approval with scope ceilings, app/user management pages ✅
-- **v1.2 (hardening)**: Passkey passwordless sign-in, sudo mode for sensitive operations
+- **v1.1 (platform layer)**: organizations, app-installation approval with scope ceilings, app/user management pages ✅
+- **v1.2 (hardening, this release)**: Passkey passwordless sign-in, sudo mode for sensitive operations, @RequiresScope declarative scope checks ✅
 - **v2+**: webhook events, secret scanning, email flows, ...
 
 ## 📚 More docs
