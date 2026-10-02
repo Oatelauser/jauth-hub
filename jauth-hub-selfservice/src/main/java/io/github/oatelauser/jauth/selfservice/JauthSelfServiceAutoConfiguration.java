@@ -33,6 +33,7 @@ import io.github.oatelauser.jauth.selfservice.web.PatController;
 import io.github.oatelauser.jauth.selfservice.web.SensitiveScopeSudoInterceptor;
 import io.github.oatelauser.jauth.selfservice.web.SudoController;
 import io.github.oatelauser.jauth.selfservice.web.SudoInterceptor;
+import io.github.oatelauser.jauth.selfservice.web.SudoStateController;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import javax.sql.DataSource;
@@ -168,6 +169,22 @@ public class JauthSelfServiceAutoConfiguration {
         SudoController jauthSudoController(
                 ObjectProvider<SudoGate> sudoGate, ObjectProvider<PasskeyFlag> passkey, EducationalFlag educational) {
             return new SudoController(sudoGate, passkey.getIfAvailable(() -> PasskeyFlag.OFF), educational);
+        }
+
+        /**
+         * sudo 页 JSON 状态面（v1.4 B1）：门控与依赖形态照 jauthSudoController——SudoGate 缺席（sudo 关）
+         * 即 sudoEnabled=false 的状态体（页面皮渲染"未启用"，headless 皮照 data 分支）；认证归部署方
+         * default 链（同 SSR 页，starter 协议链不认领 /api/sudo）。
+         */
+        @Bean
+        @ConditionalOnMissingBean
+        SudoStateController jauthSudoStateController(
+                ObjectProvider<SudoGate> sudoGate,
+                ObjectProvider<PasskeyFlag> passkey,
+                EducationalFlag educational,
+                ResponseRenderer responseRenderer) {
+            return new SudoStateController(
+                    sudoGate, passkey.getIfAvailable(() -> PasskeyFlag.OFF), educational, responseRenderer);
         }
 
         /**

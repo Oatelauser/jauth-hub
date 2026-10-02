@@ -103,6 +103,12 @@ class JauthMemoryModeIntegrationTest {
                 .as("consent 页")
                 .isTrue();
         assertThat(chain.matches(request("GET", "/device/verify"))).as("设备验证页").isTrue();
+        assertThat(chain.matches(request("GET", "/api/consent")))
+                .as("consent 状态面")
+                .isTrue();
+        assertThat(chain.matches(request("GET", "/api/device/verify")))
+                .as("设备验证状态面")
+                .isTrue();
         assertThat(chain.matches(request("GET", "/css/jauth.css")))
                 .as("core CSS")
                 .isTrue();

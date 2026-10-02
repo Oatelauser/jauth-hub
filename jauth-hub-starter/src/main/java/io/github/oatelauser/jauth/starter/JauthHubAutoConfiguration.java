@@ -57,7 +57,10 @@ import io.github.oatelauser.jauth.core.user.SudoGate;
 import io.github.oatelauser.jauth.core.user.UserRepository;
 import io.github.oatelauser.jauth.core.web.AccessTokenPlatformTokenResolver;
 import io.github.oatelauser.jauth.core.web.ConsentController;
+import io.github.oatelauser.jauth.core.web.ConsentPageAssembler;
+import io.github.oatelauser.jauth.core.web.ConsentStateController;
 import io.github.oatelauser.jauth.core.web.DeviceVerifyController;
+import io.github.oatelauser.jauth.core.web.DeviceVerifyStateController;
 import io.github.oatelauser.jauth.core.web.EducationalFlag;
 import io.github.oatelauser.jauth.core.web.LocalIntrospectionJwtDecoder;
 import io.github.oatelauser.jauth.core.web.LoginController;
@@ -173,7 +176,8 @@ import org.thymeleaf.templatemode.TemplateMode;
  * </ul>
  *
  * <p><b>宿主链共存四规则之三（禁止违反）</b>：本配置只产出一条精确匹配的协议链（securityMatcher =
- * 框架协议端点 ∪ /login、/oauth2/consent、/device/verify、core 静态 css），<b>绝不写 anyRequest
+ * 框架协议端点 ∪ /login、/oauth2/consent、/device/verify、两页 JSON 状态面 /api/consent 与
+ * /api/device/verify、core 静态 css），<b>绝不写 anyRequest
  * 兜底</b>——嵌入模式的 default 链是宿主自己的事；jauth 链若吞下未认领请求，宿主接口会被静默纳入 jauth
  * 的认证语义，属结构性越权。
  *
@@ -198,6 +202,12 @@ public class JauthHubAutoConfiguration {
 
     /** 设备验证页：AuthorizationServerSettings.deviceVerificationEndpoint 落点（verification_uri 即此）。 */
     static final String DEVICE_VERIFY_PATH = "/device/verify";
+
+    /** consent 页 JSON 状态面（v1.4 B1，授权规则镜像 SSR 同名页）。 */
+    static final String API_CONSENT_PATH = "/api/consent";
+
+    /** 设备验证页 JSON 状态面（v1.4 B1，授权规则镜像 SSR 同名页）。 */
+    static final String API_DEVICE_VERIFY_PATH = "/api/device/verify";
 
     /** 平台 API /me（SPEC §4 端点三分；链 matcher 认领 + 控制器自担 Bearer 认证）。 */
     static final String ME_PATH = "/me";
@@ -524,8 +534,12 @@ public class JauthHubAutoConfiguration {
         return new LoginController(educational, passkey);
     }
 
+    /**
+     * consent 页状态装配器（v1.4 B1）：SSR 皮与 JSON 状态面共用的装配单点（org 三态、已授权徽标、org 会话
+     * 暂存副作用），独立成 bean 供两控制器同源委托。
+     */
     @Bean
-    ConsentController jauthConsentController(
+    ConsentPageAssembler jauthConsentPageAssembler(
             RegisteredClientRepository clientRepository,
             ScopeCatalog scopeCatalog,
             MessageSource messageSource,
@@ -533,7 +547,7 @@ public class JauthHubAutoConfiguration {
             OrgScopeGate orgScopeGate,
             ClientOwnerResolver clientOwnerResolver,
             OAuth2AuthorizationConsentService consentService) {
-        return new ConsentController(
+        return new ConsentPageAssembler(
                 clientRepository,
                 scopeCatalog,
                 messageSource,
@@ -544,8 +558,27 @@ public class JauthHubAutoConfiguration {
     }
 
     @Bean
+    ConsentController jauthConsentController(ConsentPageAssembler assembler) {
+        return new ConsentController(assembler);
+    }
+
+    /** consent 页 JSON 状态面（v1.4 B1）：GET /api/consent，链认领与授权规则镜像 SSR 同名页。 */
+    @Bean
+    ConsentStateController jauthConsentStateController(
+            ConsentPageAssembler assembler, ResponseRenderer responseRenderer) {
+        return new ConsentStateController(assembler, responseRenderer);
+    }
+
+    @Bean
     DeviceVerifyController jauthDeviceVerifyController(EducationalFlag educational) {
         return new DeviceVerifyController(educational);
+    }
+
+    /** 设备验证页 JSON 状态面（v1.4 B1）：GET /api/device/verify，链认领与授权规则镜像 SSR 同名页。 */
+    @Bean
+    DeviceVerifyStateController jauthDeviceVerifyStateController(
+            EducationalFlag educational, ResponseRenderer responseRenderer) {
+        return new DeviceVerifyStateController(educational, responseRenderer);
     }
 
     /**
@@ -684,8 +717,9 @@ public class JauthHubAutoConfiguration {
     // ------------------------------------------------------------------ 协议链（SPEC §2 四规则）
 
     /**
-     * jauth 协议链：唯一产出的安全链，精认知领框架协议端点 ∪ 自有四路径，序位可配（默认 100，委托
-     * OrderedSecurityFilterChain 实现）。链内授权规则逐路径显式声明（login/css 放行、协议端点与两页面需
+     * jauth 协议链：唯一产出的安全链，精认知领框架协议端点 ∪ 自有路径（登录/consent/设备验证三 SSR 页、
+     * consent 与设备验证两 JSON 状态面、/me、core css），序位可配（默认 100，委托
+     * OrderedSecurityFilterChain 实现）。链内授权规则逐路径显式声明（login/css 放行、协议端点与上述页面需
      * 认证），<b>无 anyRequest 兜底</b>（类注释第三规则）。非浏览器客户端（Accept 非 text/html）401 而非
      * 重定向登录页（协议端点的正确姿势）。CORS 仅在来源非空时并入。
      */
@@ -727,6 +761,8 @@ public class JauthHubAutoConfiguration {
                 PathPatternRequestMatcher.withDefaults().matcher(LOGIN_PATH),
                 PathPatternRequestMatcher.withDefaults().matcher(CONSENT_PAGE_PATH),
                 PathPatternRequestMatcher.withDefaults().matcher(DEVICE_VERIFY_PATH),
+                PathPatternRequestMatcher.withDefaults().matcher(API_CONSENT_PATH),
+                PathPatternRequestMatcher.withDefaults().matcher(API_DEVICE_VERIFY_PATH),
                 PathPatternRequestMatcher.withDefaults().matcher(ME_PATH),
                 PathPatternRequestMatcher.withDefaults().matcher(CSS_PATTERN)));
         if (properties.getPasskey().isEnabled()) {
@@ -753,6 +789,9 @@ public class JauthHubAutoConfiguration {
                 .requestMatchers(LOGIN_PATH, CSS_PATTERN, ME_PATH)
                 .permitAll()
                 .requestMatchers(CONSENT_PAGE_PATH, DEVICE_VERIFY_PATH)
+                .authenticated()
+                // 两 JSON 状态面授权规则镜像 SSR 同名页（v1.4 B1：headless 皮与 SSR 皮同认证口径）
+                .requestMatchers(API_CONSENT_PATH, API_DEVICE_VERIFY_PATH)
                 .authenticated());
 
         // Passkey 端点授权与 DSL（SPEC §5 v1.2：默认关 = 端点不认领不装配；开时仍逐路径显式，无 anyRequest 兜底）

@@ -62,8 +62,11 @@ public class SudoController {
         return VIEW_SUDO;
     }
 
-    /** 本站路径判定："/" 开头排除 "//"（协议相对 = 外站）；其余一律看板。 */
-    private static String safeReturnTo(@Nullable String returnTo) {
+    /**
+     * 本站路径判定："/" 开头排除 "//"（协议相对 = 外站）；其余一律看板。
+     * package-private 供同包 JSON 状态面（{@link SudoStateController}）复用——消毒口径单点。
+     */
+    static String safeReturnTo(@Nullable String returnTo) {
         if (returnTo == null || !returnTo.startsWith("/") || returnTo.startsWith("//")) {
             return FALLBACK_RETURN_TO;
         }

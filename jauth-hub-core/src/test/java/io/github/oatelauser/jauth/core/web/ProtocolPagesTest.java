@@ -229,7 +229,7 @@ class ProtocolPagesTest {
 
         return MockMvcBuilders.standaloneSetup(
                         new LoginController(flag, passkey),
-                        new ConsentController(
+                        new ConsentController(new ConsentPageAssembler(
                                 mockClients(),
                                 scopeCatalog,
                                 messageSource,
@@ -240,7 +240,7 @@ class ProtocolPagesTest {
                                         new InMemoryInstallationRepository()),
                                 new InMemoryClientOwnerResolver(),
                                 new org.springframework.security.oauth2.server.authorization
-                                        .InMemoryOAuth2AuthorizationConsentService()),
+                                        .InMemoryOAuth2AuthorizationConsentService())),
                         new DeviceVerifyController(flag))
                 .setViewResolvers(viewResolver)
                 .setLocaleResolver(new FixedLocaleResolver(Locale.SIMPLIFIED_CHINESE))
