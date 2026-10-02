@@ -25,6 +25,7 @@ import io.github.oatelauser.jauth.selfservice.web.MyAppsController;
 import io.github.oatelauser.jauth.selfservice.web.MyOrgsController;
 import io.github.oatelauser.jauth.selfservice.web.OrgAppsController;
 import io.github.oatelauser.jauth.selfservice.web.OrgInstallationsController;
+import io.github.oatelauser.jauth.selfservice.web.OrgMembersController;
 import io.github.oatelauser.jauth.selfservice.web.OwnedAppService;
 import io.github.oatelauser.jauth.selfservice.web.PasskeyController;
 import io.github.oatelauser.jauth.selfservice.web.PatController;
@@ -242,6 +243,17 @@ public class JauthSelfServiceAutoConfiguration {
         }
 
         /** org 应用页（B11）：注册/列表面，OWNER 门在控制器入口。 */
+        /** org 成员管理页（v1.3 D3，OWNER 面）：领域 bean 经 ObjectProvider 可缺省，缺席渲染提示态。 */
+        @Bean
+        @ConditionalOnMissingBean
+        OrgMembersController jauthOrgMembersController(
+                ObjectProvider<OrgService> orgService,
+                UserRepository userRepository,
+                EducationalFlag educational,
+                ResponseRenderer responseRenderer) {
+            return new OrgMembersController(orgService.getIfAvailable(), userRepository, educational, responseRenderer);
+        }
+
         @Bean
         @ConditionalOnMissingBean
         OrgAppsController jauthOrgAppsController(
@@ -297,7 +309,8 @@ public class JauthSelfServiceAutoConfiguration {
                 MyAppsController.VIEW_MY_APP_NEW,
                 MyOrgsController.VIEW_MY_ORGS,
                 OrgInstallationsController.VIEW_ORG_INSTALLATIONS,
-                OrgAppsController.VIEW_ORG_APPS
+                OrgAppsController.VIEW_ORG_APPS,
+                OrgMembersController.VIEW_ORG_MEMBERS
             });
             viewResolver.setContentType("text/html;charset=UTF-8");
             viewResolver.setForceContentType(true);

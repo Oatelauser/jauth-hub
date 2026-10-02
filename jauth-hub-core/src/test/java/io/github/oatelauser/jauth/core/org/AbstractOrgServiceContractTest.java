@@ -132,6 +132,55 @@ abstract class AbstractOrgServiceContractTest {
                 .containsExactlyInAnyOrder(tuple("acme", OrgRole.OWNER), tuple("globex", OrgRole.MEMBER));
     }
 
+    @Test
+    void memberManagementLifecycleHonorsOwnerGateAndSelfGuard() {
+        Org org = fixture().orgService().create("member-org", OWNER_ID);
+
+        // 门：非 OWNER 一律 A0508（org 不存在同译，不泄露存在性）
+        assertThatThrownBy(() -> fixture().orgService().listMembers(org.id(), OUTSIDER_ID))
+                .isInstanceOf(JauthException.class);
+
+        // 添加：恒 MEMBER；重复添加 A0516；审计 member.added
+        OrgMember added = fixture().orgService().addMember(org.id(), OWNER_ID, MEMBER_ID);
+        assertThat(added.role()).isEqualTo(OrgRole.MEMBER);
+        assertThatThrownBy(() -> fixture().orgService().addMember(org.id(), OWNER_ID, MEMBER_ID))
+                .isInstanceOf(JauthException.class);
+        assertThat(eventsOfType(AuditEventType.MEMBER_ADDED)).hasSize(1);
+
+        // 列表：OWNER（创建者）+ 新成员
+        assertThat(fixture().orgService().listMembers(org.id(), OWNER_ID))
+                .extracting(OrgMember::userId, OrgMember::role)
+                .containsExactlyInAnyOrder(tuple(OWNER_ID, OrgRole.OWNER), tuple(MEMBER_ID, OrgRole.MEMBER));
+
+        // 自操作护栏 A0518：OWNER 不可移除/降级自己（最后一个 OWNER 结构性锁死）
+        assertThatThrownBy(() -> fixture().orgService().removeMember(org.id(), OWNER_ID, OWNER_ID))
+                .isInstanceOf(JauthException.class);
+        assertThatThrownBy(() -> fixture().orgService().changeMemberRole(org.id(), OWNER_ID, OWNER_ID, OrgRole.MEMBER))
+                .isInstanceOf(JauthException.class);
+
+        // 角色翻转 MEMBER→OWNER→MEMBER 与审计 member.role_changed
+        assertThat(fixture()
+                        .orgService()
+                        .changeMemberRole(org.id(), OWNER_ID, MEMBER_ID, OrgRole.OWNER)
+                        .role())
+                .isEqualTo(OrgRole.OWNER);
+        assertThat(fixture()
+                        .orgService()
+                        .changeMemberRole(org.id(), OWNER_ID, MEMBER_ID, OrgRole.MEMBER)
+                        .role())
+                .isEqualTo(OrgRole.MEMBER);
+        assertThat(eventsOfType(AuditEventType.MEMBER_ROLE_CHANGED)).hasSize(2);
+
+        // 移除：非成员目标 A0517；成功后列表收缩、审计 member.removed
+        assertThatThrownBy(() -> fixture().orgService().removeMember(org.id(), OWNER_ID, OUTSIDER_ID))
+                .isInstanceOf(JauthException.class);
+        fixture().orgService().removeMember(org.id(), OWNER_ID, MEMBER_ID);
+        assertThat(fixture().orgService().listMembers(org.id(), OWNER_ID))
+                .extracting(OrgMember::userId)
+                .containsExactly(OWNER_ID);
+        assertThat(eventsOfType(AuditEventType.MEMBER_REMOVED)).hasSize(1);
+    }
+
     protected final OrgDomainFixture fixture() {
         return this.fixture;
     }

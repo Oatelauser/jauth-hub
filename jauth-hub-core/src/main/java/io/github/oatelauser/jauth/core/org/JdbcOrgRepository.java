@@ -96,6 +96,32 @@ public class JdbcOrgRepository implements OrgRepository {
         return this.jdbcOperations.query(FIND_MEMBERSHIPS_SQL, MEMBERSHIP_ROW_MAPPER, userId);
     }
 
+    @Override
+    public List<OrgMember> findMembersByOrg(String orgId) {
+        Assert.hasText(orgId, "orgId cannot be empty");
+        return this.jdbcOperations.query(
+                "SELECT org_id, user_id, role, created_at FROM jauth_org_member WHERE org_id = ?"
+                        + " ORDER BY created_at, user_id",
+                MEMBER_ROW_MAPPER,
+                orgId);
+    }
+
+    @Override
+    public void deleteMember(String orgId, String userId) {
+        Assert.hasText(orgId, "orgId cannot be empty");
+        Assert.hasText(userId, "userId cannot be empty");
+        this.jdbcOperations.update("DELETE FROM jauth_org_member WHERE org_id = ? AND user_id = ?", orgId, userId);
+    }
+
+    @Override
+    public void updateMemberRole(String orgId, String userId, OrgRole role) {
+        Assert.hasText(orgId, "orgId cannot be empty");
+        Assert.hasText(userId, "userId cannot be empty");
+        Assert.notNull(role, "role cannot be null");
+        this.jdbcOperations.update(
+                "UPDATE jauth_org_member SET role = ? WHERE org_id = ? AND user_id = ?", role.name(), orgId, userId);
+    }
+
     private <T> @Nullable T queryOne(String sql, RowMapper<T> rowMapper, Object... arguments) {
         List<T> result = this.jdbcOperations.query(sql, rowMapper, arguments);
         return result.isEmpty() ? null : result.get(0);

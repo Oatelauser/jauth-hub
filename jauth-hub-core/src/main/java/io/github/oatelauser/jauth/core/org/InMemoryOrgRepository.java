@@ -72,6 +72,32 @@ public class InMemoryOrgRepository implements OrgRepository {
                 .toList();
     }
 
+    @Override
+    public List<OrgMember> findMembersByOrg(String orgId) {
+        Assert.hasText(orgId, "orgId cannot be empty");
+        return this.membersByKey.values().stream()
+                .filter(member -> member.orgId().equals(orgId))
+                .toList();
+    }
+
+    @Override
+    public void deleteMember(String orgId, String userId) {
+        Assert.hasText(orgId, "orgId cannot be empty");
+        Assert.hasText(userId, "userId cannot be empty");
+        this.membersByKey.remove(memberKey(orgId, userId));
+    }
+
+    @Override
+    public void updateMemberRole(String orgId, String userId, OrgRole role) {
+        Assert.hasText(orgId, "orgId cannot be empty");
+        Assert.hasText(userId, "userId cannot be empty");
+        Assert.notNull(role, "role cannot be null");
+        OrgMember existing = this.membersByKey.get(memberKey(orgId, userId));
+        if (existing != null) {
+            this.membersByKey.put(memberKey(orgId, userId), new OrgMember(orgId, userId, role, existing.createdAt()));
+        }
+    }
+
     private static String memberKey(String orgId, String userId) {
         return orgId + "|" + userId;
     }

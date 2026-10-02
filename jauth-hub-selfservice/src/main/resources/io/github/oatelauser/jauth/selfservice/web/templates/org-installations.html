@@ -26,7 +26,8 @@
       <p class="brand" th:text="#{jauth.brand}">jauth-hub</p>
       <h1>
         <span th:text="#{jauth.orginst.title}">安装审批</span>
-        <span class="ss-badge" th:text="${org.name}">acme</span>
+        <!--/* org 徽标入守卫（v1.3 D3，D0 记账 #7）：守卫外 null 取属性即 C0101，提示永不可达 */-->
+        <span class="ss-badge" th:if="${installationsSupported}" th:text="${org.name}">acme</span>
       </h1>
       <details class="teach" th:if="${educational}">
         <summary th:text="#{jauth.teach.what-happened}">发生了什么</summary>

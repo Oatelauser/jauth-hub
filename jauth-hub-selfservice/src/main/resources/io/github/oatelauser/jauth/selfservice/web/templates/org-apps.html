@@ -29,7 +29,9 @@
       <p class="brand" th:text="#{jauth.brand}">jauth-hub</p>
       <h1>
         <span th:text="#{jauth.orgapps.title}">组织应用</span>
-        <span class="ss-badge" th:text="${org.name}">acme</span>
+        <!--/* org 徽标入守卫（v1.3 D3，D0 记账 #7）：宿主未装域 bean 时控制器早退不设 org，
+            守卫外的 null 取属性即 C0101，「当前装配不支持」提示反而永不可达 */-->
+        <span class="ss-badge" th:if="${orgAppsSupported}" th:text="${org.name}">acme</span>
       </h1>
       <details class="teach" th:if="${educational}">
         <summary th:text="#{jauth.teach.what-happened}">发生了什么</summary>

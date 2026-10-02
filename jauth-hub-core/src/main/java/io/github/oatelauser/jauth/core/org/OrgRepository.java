@@ -63,4 +63,29 @@ public interface OrgRepository {
      * @return 归属条目列表（无归属为空列表）
      */
     List<OrgMembership> findMembershipsByUser(String userId);
+
+    /**
+     * 查 org 的全部成员行（v1.3 D3 成员管理面；排序由实现定，展示层不依赖顺序语义）。
+     *
+     * @param orgId org id
+     * @return 成员行列表（无成员为空列表）
+     */
+    List<OrgMember> findMembersByOrg(String orgId);
+
+    /**
+     * 删除单个成员关系（v1.3 D3 移除成员；不存在为无害空操作，幂等语义由服务层判定）。
+     *
+     * @param orgId org id
+     * @param userId 用户 id
+     */
+    void deleteMember(String orgId, String userId);
+
+    /**
+     * 更新成员角色（v1.3 D3）：saveMember 是纯 INSERT，角色变更走本方法（存在性由服务层先判）。
+     *
+     * @param orgId org id
+     * @param userId 用户 id
+     * @param role 新角色
+     */
+    void updateMemberRole(String orgId, String userId, OrgRole role);
 }

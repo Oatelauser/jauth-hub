@@ -26,6 +26,10 @@ public class OrgScopeGate {
 
     private final InstallationRepository installationRepository;
 
+    /**
+     * EI_EXPOSE_REP2 定向豁免：仓储/服务是容器单例门面（Spring 注入通行形态，构造后无可变面暴露）。
+     */
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(value = "EI_EXPOSE_REP2")
     public OrgScopeGate(
             UserRepository userRepository, OrgRepository orgRepository, InstallationRepository installationRepository) {
         this.userRepository = userRepository;

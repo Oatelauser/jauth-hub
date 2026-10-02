@@ -82,6 +82,10 @@ public class OrgInstallationsController {
 
     private final ResponseRenderer responseRenderer;
 
+    /**
+     * EI_EXPOSE_REP2 定向豁免：服务/仓储是容器单例门面（Spring 注入通行形态，构造后无可变面暴露）。
+     */
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(value = "EI_EXPOSE_REP2")
     public OrgInstallationsController(
             @Nullable OrgService orgService,
             @Nullable InstallationService installationService,

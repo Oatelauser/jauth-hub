@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<!--/* org 成员管理页(v1.3 D3,仅 OWNER):成员行(用户名/角色/加入时间)+ 添加表单;移除/角色翻转走页内 JS */-->
+<html lang="zh" xmlns:th="https://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('jauth.orgmembers.title')}">
+  <title>成员管理</title>
+</head>
+<body>
+  <style>
+    .ss-wide { max-width: 760px; }
+    .ss-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .ss-table th, .ss-table td { border-bottom: 1px solid #dfe3ef; padding: 8px 10px; text-align: left; }
+    .ss-table th { color: #5a607a; font-weight: 600; }
+    .ss-mono { font-family: ui-monospace, Consolas, monospace; font-size: 13px; word-break: break-all; }
+    .ss-badge { display: inline-block; border-radius: 6px; padding: 1px 8px; font-size: 12px;
+                background: #eef2fd; color: #3352a4; }
+    .ss-badge.owner { background: #fdeef1; color: #b02a37; }
+    .ss-actions button { margin-right: 6px; padding: 3px 10px; font-size: 13px; cursor: pointer; }
+    .ss-actions button.danger { color: #b02a37; }
+    .field input { border: 1px solid #dfe3ef; border-radius: 8px; padding: 10px 12px; font-size: 15px; }
+    .card h2 { margin: 20px 0 12px; font-size: 17px; }
+  </style>
+  <meta name="_csrf" th:if="${_csrf != null}" th:content="${_csrf.token}" />
+  <meta name="_csrf_header" th:if="${_csrf != null}" th:content="${_csrf.headerName}" />
+  <div class="page">
+    <main class="card ss-wide">
+      <p class="brand" th:text="#{jauth.brand}">jauth-hub</p>
+      <h1 th:text="#{jauth.orgmembers.title}">成员管理</h1>
+      <details class="teach" th:if="${educational}">
+        <summary th:text="#{jauth.teach.what-happened}">发生了什么</summary>
+        <p th:text="#{jauth.orgmembers.teach}">成员管理教学说明</p>
+      </details>
+
+      <div class="alert" th:if="${!membersSupported}" th:text="#{jauth.orgmembers.unsupported}">当前装配不支持</div>
+
+      <th:block th:if="${membersSupported}">
+        <table class="ss-table" th:if="${!#lists.isEmpty(members)}">
+          <thead>
+            <tr>
+              <th th:text="#{jauth.orgmembers.col-username}">用户名</th>
+              <th th:text="#{jauth.orgmembers.col-role}">角色</th>
+              <th th:text="#{jauth.orgmembers.col-joined}">加入时间</th>
+              <th th:text="#{jauth.orgmembers.col-actions}">管理</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr th:each="member : ${members}" th:attr="data-user-id=${member.userId}">
+              <td class="scope-name" th:text="${member.username}">alice</td>
+              <td>
+                <span class="ss-badge" th:classappend="${member.role == 'OWNER'} ? owner"
+                      th:text="${member.role}">OWNER</span>
+              </td>
+              <td th:text="${#temporals.format(member.createdAt, 'yyyy-MM-dd HH:mm')}">2026-10-02 10:00</td>
+              <td class="ss-actions">
+                <button type="button" class="role" th:text="#{jauth.orgmembers.toggle-role}">切换角色</button>
+                <button type="button" class="danger remove" th:text="#{jauth.orgmembers.remove}">移除</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <form class="form" id="member-form">
+          <h2 th:text="#{jauth.orgmembers.add-title}">添加成员</h2>
+          <label class="field">
+            <span th:text="#{jauth.orgmembers.field-username}">用户名</span>
+            <input type="text" name="username" maxlength="50" required="required" />
+            <span class="hint" th:text="#{jauth.orgmembers.add-hint}">输入用户池内的用户名</span>
+          </label>
+          <p><button type="submit" class="btn primary" th:text="#{jauth.orgmembers.add}">添加</button></p>
+        </form>
+      </th:block>
+    </main>
+  </div>
+  <!--/* 管理动作:移除/角色翻转(销毁性,A0515 = sudo 过期跳验证页);添加走表单。零外链零依赖 */-->
+  <script th:inline="javascript">
+    (function () {
+      var csrfMeta = document.querySelector('meta[name="_csrf"]');
+      var csrfHeaderMeta = document.querySelector('meta[name="_csrf_header"]');
+      var orgId = /*[[${orgId}]]*/ 'org';
+      function call(method, url, body) {
+        var headers = { 'Accept': 'application/json' };
+        if (csrfMeta && csrfHeaderMeta) { headers[csrfHeaderMeta.content] = csrfMeta.content; }
+        return fetch(url, {
+          method: method,
+          headers: headers,
+          credentials: 'same-origin',
+          body: body ? JSON.stringify(body) : undefined
+        }).then(function (response) {
+          return response.json().then(function (payload) { return { ok: response.ok, payload: payload }; });
+        });
+      }
+      function handle(result) {
+        if (result.ok) { window.location.reload(); return; }
+        if (result.payload && result.payload.code === 'A0515') {
+          window.location.href = '/selfservice/sudo?returnTo=' + encodeURIComponent(window.location.pathname);
+          return;
+        }
+        window.alert((result.payload && result.payload.message) || '操作失败');
+      }
+      document.querySelectorAll('tr[data-user-id]').forEach(function (row) {
+        var userId = row.getAttribute('data-user-id');
+        row.querySelector('button.remove').addEventListener('click', function () {
+          if (!window.confirm('确认移除该成员？其本组织内的授权与安装不受影响。')) { return; }
+          call('DELETE', '/selfservice/orgs/' + orgId + '/members/' + userId).then(handle);
+        });
+        row.querySelector('button.role').addEventListener('click', function () {
+          if (!window.confirm('确认切换该成员角色（OWNER↔MEMBER）？')) { return; }
+          call('POST', '/selfservice/orgs/' + orgId + '/members/' + userId + '/role').then(handle);
+        });
+      });
+      var form = document.getElementById('member-form');
+      if (form) {
+        form.addEventListener('submit', function (event) {
+          event.preventDefault();
+          call('POST', '/selfservice/orgs/' + orgId + '/members', {
+            username: form.querySelector('input[name="username"]').value.trim()
+          }).then(handle);
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

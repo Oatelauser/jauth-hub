@@ -152,6 +152,21 @@ class OrgPagesRenderingIntegrationTest {
     }
 
     @Test
+    @DisplayName("成员管理页（v1.3 D3）：OWNER 视角真渲染成员行与管理入口")
+    void membersPageRendersOwnedRows() throws Exception {
+        Org org = seedOrg("D0-成员管理部");
+        MvcResult result = this.mockMvc
+                .perform(get("/selfservice/orgs/" + org.id() + "/members")
+                        .locale(Locale.SIMPLIFIED_CHINESE)
+                        .with(user(SUPERADMIN_USERNAME).roles("SUPER_ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML))
+                .andExpect(content().string(not(containsString("C0101"))))
+                .andReturn();
+        assertThat(bodyOf(result)).contains("成员管理").contains("添加成员").contains(SUPERADMIN_USERNAME);
+    }
+
+    @Test
     @DisplayName("负路径：不存在的 orgId 先撞 OWNER 门——200 JSON 语义码 A0508（家族惯例，非 403/404）")
     void nonexistentOrgFailsOwnerGateWithA0508() throws Exception {
         this.mockMvc

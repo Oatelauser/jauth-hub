@@ -64,7 +64,16 @@ public enum AuditEventType {
      * 应用删除（v1.3 D2：级联撤销其全部授权/consent/安装并烧断族谱；detail 记 client id 与级联计数；
      * secret 轮转不打本事件——非生命周期销毁，明文回显一次性完成）。
      */
-    CLIENT_DELETED("client.deleted");
+    CLIENT_DELETED("client.deleted"),
+
+    /** org 成员添加（OWNER 直接添加，输入用户名；v1.3 D3，OrgService 路径）。 */
+    MEMBER_ADDED("member.added"),
+
+    /** org 成员移除（OWNER；v1.3 D3，OrgService 路径）。 */
+    MEMBER_REMOVED("member.removed"),
+
+    /** org 成员角色变更（OWNER↔MEMBER；v1.3 D3，OrgService 路径）。 */
+    MEMBER_ROLE_CHANGED("member.role_changed");
 
     private final String wireName;
 

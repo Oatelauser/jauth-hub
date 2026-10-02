@@ -64,6 +64,8 @@
                      th:text="#{jauth.myorgs.link-installations}">安装审批</a>
                   <a th:href="@{/selfservice/orgs/{orgId}/apps(orgId=${membership.orgId})}"
                      th:text="#{jauth.myorgs.link-apps}">组织应用</a>
+                  <a th:href="@{/selfservice/orgs/{orgId}/members(orgId=${membership.orgId})}"
+                     th:text="#{jauth.myorgs.link-members}">成员管理</a>
                 </th:block>
               </td>
             </tr>
