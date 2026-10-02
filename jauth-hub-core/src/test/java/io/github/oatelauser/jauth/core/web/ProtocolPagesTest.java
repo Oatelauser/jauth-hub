@@ -228,20 +228,22 @@ class ProtocolPagesTest {
         viewResolver.setForceContentType(true);
 
         return MockMvcBuilders.standaloneSetup(
-                        new LoginController(flag, passkey),
-                        new ConsentController(new ConsentPageAssembler(
-                                mockClients(),
-                                scopeCatalog,
-                                messageSource,
-                                flag,
-                                new OrgScopeGate(
-                                        new InMemoryUserRepository(),
-                                        new InMemoryOrgRepository(),
-                                        new InMemoryInstallationRepository()),
-                                new InMemoryClientOwnerResolver(),
-                                new org.springframework.security.oauth2.server.authorization
-                                        .InMemoryOAuth2AuthorizationConsentService())),
-                        new DeviceVerifyController(flag))
+                        new LoginController(flag, passkey, TrustSkinFlag.SSR),
+                        new ConsentController(
+                                new ConsentPageAssembler(
+                                        mockClients(),
+                                        scopeCatalog,
+                                        messageSource,
+                                        flag,
+                                        new OrgScopeGate(
+                                                new InMemoryUserRepository(),
+                                                new InMemoryOrgRepository(),
+                                                new InMemoryInstallationRepository()),
+                                        new InMemoryClientOwnerResolver(),
+                                        new org.springframework.security.oauth2.server.authorization
+                                                .InMemoryOAuth2AuthorizationConsentService()),
+                                TrustSkinFlag.SSR),
+                        new DeviceVerifyController(flag, TrustSkinFlag.SSR))
                 .setViewResolvers(viewResolver)
                 .setLocaleResolver(new FixedLocaleResolver(Locale.SIMPLIFIED_CHINESE))
                 .addFilters(UTF8_RESPONSE_FILTER, new CsrfFilter(new HttpSessionCsrfTokenRepository()))

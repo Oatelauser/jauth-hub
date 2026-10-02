@@ -249,14 +249,16 @@ class ConsentOrgContextPageTest {
         viewResolver.setContentType("text/html;charset=UTF-8");
         viewResolver.setForceContentType(true);
 
-        return MockMvcBuilders.standaloneSetup(new ConsentController(new ConsentPageAssembler(
-                        clients(),
-                        new InMemoryScopeCatalog(),
-                        messageSource(),
-                        () -> false,
-                        new OrgScopeGate(this.userRepository, this.orgRepository, this.installationRepository),
-                        this.ownerResolver,
-                        this.consentService)))
+        return MockMvcBuilders.standaloneSetup(new ConsentController(
+                        new ConsentPageAssembler(
+                                clients(),
+                                new InMemoryScopeCatalog(),
+                                messageSource(),
+                                () -> false,
+                                new OrgScopeGate(this.userRepository, this.orgRepository, this.installationRepository),
+                                this.ownerResolver,
+                                this.consentService),
+                        TrustSkinFlag.SSR))
                 .setViewResolvers(viewResolver)
                 .setLocaleResolver(new FixedLocaleResolver(Locale.SIMPLIFIED_CHINESE))
                 .addFilters(UTF8_RESPONSE_FILTER, new CsrfFilter(new HttpSessionCsrfTokenRepository()))

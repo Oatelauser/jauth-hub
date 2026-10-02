@@ -49,6 +49,10 @@ public class AppSecurityConfiguration {
         http.authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/demo/**", "/error")
                         .permitAll()
+                        // /front/**（v1.4 B4）是登录前皮肤：jauth-hub-front 的 SPA 产物，登录页本尊就在其中，
+                        // 必须匿名可达（照 /login 的 permitAll 先例）；静态装配见 AppWebConfiguration
+                        .requestMatchers("/front/**")
+                        .permitAll()
                         // actuator（SPEC §8）：health/info 公开（探活/元信息），metrics 需认证
                         .requestMatchers("/actuator/health", "/actuator/info")
                         .permitAll()

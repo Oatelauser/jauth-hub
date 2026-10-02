@@ -72,6 +72,7 @@ import io.github.oatelauser.jauth.core.web.PasskeyFlag;
 import io.github.oatelauser.jauth.core.web.PlatformTokenResolver;
 import io.github.oatelauser.jauth.core.web.RequiresScope;
 import io.github.oatelauser.jauth.core.web.RequiresScopeInterceptor;
+import io.github.oatelauser.jauth.core.web.TrustSkinFlag;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.net.URI;
 import java.security.KeyPair;
@@ -490,6 +491,16 @@ public class JauthHubAutoConfiguration {
         return properties.getPasskey()::isEnabled;
     }
 
+    /**
+     * 信任面皮肤开关（v1.4 B4）：属性绑定（默认 ssr = SSR 皮永远默认，SPEC §1/issues 10 宪法），四页 SSR
+     * 控制器消费（core 三页直注，selfservice sudo 页经 ObjectProvider 降级 SSR）。front 皮肤的静态装配
+     * （/front/** 资源 + 深链回退）是 app/宿主部署层职责，不在本协议链认领范围。
+     */
+    @Bean
+    TrustSkinFlag jauthTrustSkinFlag(JauthHubProperties properties) {
+        return () -> properties.getTrustSkin() == JauthHubProperties.TrustSkin.FRONT;
+    }
+
     /** scope 目录：内存实现内置三枚 OIDC 标准 scope，宿主可注册自有 scope（目录 = 代码 + i18n，不建表）。 */
     @Bean
     @ConditionalOnMissingBean(ScopeCatalog.class)
@@ -541,8 +552,8 @@ public class JauthHubAutoConfiguration {
     }
 
     @Bean
-    LoginController jauthLoginController(EducationalFlag educational, PasskeyFlag passkey) {
-        return new LoginController(educational, passkey);
+    LoginController jauthLoginController(EducationalFlag educational, PasskeyFlag passkey, TrustSkinFlag trustSkin) {
+        return new LoginController(educational, passkey, trustSkin);
     }
 
     /**
@@ -616,8 +627,8 @@ public class JauthHubAutoConfiguration {
     }
 
     @Bean
-    ConsentController jauthConsentController(ConsentPageAssembler assembler) {
-        return new ConsentController(assembler);
+    ConsentController jauthConsentController(ConsentPageAssembler assembler, TrustSkinFlag trustSkin) {
+        return new ConsentController(assembler, trustSkin);
     }
 
     /** consent 页 JSON 状态面（v1.4 B1）：GET /api/consent，链认领与授权规则镜像 SSR 同名页。 */
@@ -628,8 +639,8 @@ public class JauthHubAutoConfiguration {
     }
 
     @Bean
-    DeviceVerifyController jauthDeviceVerifyController(EducationalFlag educational) {
-        return new DeviceVerifyController(educational);
+    DeviceVerifyController jauthDeviceVerifyController(EducationalFlag educational, TrustSkinFlag trustSkin) {
+        return new DeviceVerifyController(educational, trustSkin);
     }
 
     /** 设备验证页 JSON 状态面（v1.4 B1）：GET /api/device/verify，链认领与授权规则镜像 SSR 同名页。 */

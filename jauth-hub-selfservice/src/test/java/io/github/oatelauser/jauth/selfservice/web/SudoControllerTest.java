@@ -6,6 +6,7 @@ import io.github.oatelauser.jauth.core.user.InMemoryUserRepository;
 import io.github.oatelauser.jauth.core.user.SudoGate;
 import io.github.oatelauser.jauth.core.web.EducationalFlag;
 import io.github.oatelauser.jauth.core.web.PasskeyFlag;
+import io.github.oatelauser.jauth.core.web.TrustSkinFlag;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Map;
@@ -13,6 +14,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.ui.Model;
 import org.springframework.validation.support.BindingAwareModelMap;
 
@@ -21,6 +23,8 @@ import org.springframework.validation.support.BindingAwareModelMap;
  * sudo/passkey 任一缺席渲染"未启用"提示态（模型位驱动，不 500）。直调控制器不走 MockMvc——
  * standalone 场景无视图解析器，视图名渲染会循环派发（UrlFilenameView 语义），模型断言已覆盖本页职责。
  *
+ * <p>皮肤守卫（v1.4 B4）：front 开 → "redirect:/front/sudo"（查询串原样），SSR 缺省走视图渲染。
+ *
  * @author oatelauser
  */
 class SudoControllerTest {
@@ -28,7 +32,7 @@ class SudoControllerTest {
     @Test
     @DisplayName("returnTo 本站路径透传，外站/协议相对/空回退看板")
     void returnToSanitized() {
-        SudoController controller = controller(true);
+        SudoController controller = controller(true, TrustSkinFlag.SSR);
 
         assertThat(page(controller, "/profile")).containsEntry("returnTo", "/profile");
 
@@ -41,24 +45,37 @@ class SudoControllerTest {
     @Test
     @DisplayName("SudoGate 缺席（sudo 关）渲染未启用提示态；双开时 sudoEnabled=true")
     void disabledStateRendersHint() {
-        assertThat(page(controller(false), "/profile"))
+        assertThat(page(controller(false, TrustSkinFlag.SSR), "/profile"))
                 .containsEntry("sudoEnabled", false)
                 .containsEntry("returnTo", "/profile");
-        assertThat(page(controller(true), "/profile")).containsEntry("sudoEnabled", true);
+        assertThat(page(controller(true, TrustSkinFlag.SSR), "/profile")).containsEntry("sudoEnabled", true);
+    }
+
+    @Test
+    @DisplayName("trust-skin=front：302 到 /front/sudo 且 returnTo 查询串原样保留；无查询串不加尾缀 ?")
+    void frontSkinRedirectsToSpaRouteWithQueryPreserved() {
+        SudoController controller = controller(true, () -> true);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setQueryString("returnTo=/selfservice/pat");
+        assertThat(controller.page("/selfservice/pat", new BindingAwareModelMap(), request))
+                .isEqualTo("redirect:/front/sudo?returnTo=/selfservice/pat");
+
+        assertThat(controller.page(null, new BindingAwareModelMap(), new MockHttpServletRequest()))
+                .isEqualTo("redirect:/front/sudo");
     }
 
     private static Map<String, Object> page(SudoController controller, @Nullable String returnTo) {
         Model model = new BindingAwareModelMap();
-        String view = controller.page(returnTo, model);
+        String view = controller.page(returnTo, model, new MockHttpServletRequest());
         assertThat(view).isEqualTo(SudoController.VIEW_SUDO);
         return model.asMap();
     }
 
-    private static SudoController controller(boolean sudoEnabled) {
+    private static SudoController controller(boolean sudoEnabled, TrustSkinFlag trustSkin) {
         SudoGate gate = sudoEnabled
                 ? new SudoGate(new InMemoryUserRepository(), Duration.ofMinutes(15), Clock.systemUTC())
                 : null;
-        return new SudoController(provider(gate), (PasskeyFlag) () -> true, (EducationalFlag) () -> true);
+        return new SudoController(provider(gate), (PasskeyFlag) () -> true, (EducationalFlag) () -> true, trustSkin);
     }
 
     /** 按在场性返回固定 gate 的最小 ObjectProvider（控制器只读 getIfAvailable）。 */

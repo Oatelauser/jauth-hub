@@ -105,4 +105,62 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <!-- v1.4 B4 front 皮肤装配（默认关）：把 jauth-hub-front 构建产物拷进 app 的
+         classpath:/static/front/（AppWebConfiguration 以 /front/** 出网 + history 深链回退）。
+         enforcer 先行 fail-fast——resources-plugin 对缺失源目录静默跳过（实测），不拦即静默出无皮制品。
+         须从仓库根目录执行（${maven.multiModuleProjectDirectory} 随调用目录变化）。两插件版本均随
+         Boot parent BOM 管，非新增依赖。 -->
+    <profile>
+      <id>front-skin</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-enforcer-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>front-dist-must-exist</id>
+                <goals>
+                  <goal>enforce</goal>
+                </goals>
+                <configuration>
+                  <rules>
+                    <requireFilesExist>
+                      <files>
+                        <file>${maven.multiModuleProjectDirectory}/jauth-hub-front/dist/index.html</file>
+                      </files>
+                      <message>front-skin profile requires jauth-hub-front/dist: run "npm ci &amp;&amp; npm run build" in jauth-hub-front/ first</message>
+                    </requireFilesExist>
+                  </rules>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-resources-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>copy-front-dist</id>
+                <phase>generate-resources</phase>
+                <goals>
+                  <goal>copy-resources</goal>
+                </goals>
+                <configuration>
+                  <outputDirectory>${project.build.outputDirectory}/static/front</outputDirectory>
+                  <resources>
+                    <resource>
+                      <directory>${maven.multiModuleProjectDirectory}/jauth-hub-front/dist</directory>
+                    </resource>
+                  </resources>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>

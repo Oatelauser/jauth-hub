@@ -19,3 +19,24 @@ jobs:
           cache: maven
       - name: Verify (tests + Spotless/p3c/SpotBugs gates + PG Testcontainers)
         run: mvn -B verify
+
+  front:
+    # B3 分离前端（jauth-hub-front，Maven reactor 外）：与 verify 并行——普通 Java CI 不被 node
+    # 阻塞；dist 是否上传 artifact 不做（YAGNI，发布携带 front 皮肤的方式见 RELEASE_PROCESS 阶段 4）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: jauth-hub-front
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: jauth-hub-front/package-lock.json
+      - name: Install deps (npm ci)
+        run: npm ci
+      - name: Test (vitest)
+        run: npm run test
+      - name: Build (vite)
+        run: npm run build

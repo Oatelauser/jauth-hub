@@ -268,7 +268,7 @@ class ConsentStateControllerTest {
                 this.ownerResolver,
                 this.consentService);
         return MockMvcBuilders.standaloneSetup(
-                        new ConsentController(assembler),
+                        new ConsentController(assembler, TrustSkinFlag.SSR),
                         new ConsentStateController(assembler, new DefaultResponseRenderer()),
                         new DeviceVerifyStateController(() -> true, new DefaultResponseRenderer()))
                 .addFilters(new CsrfFilter(new HttpSessionCsrfTokenRepository()))

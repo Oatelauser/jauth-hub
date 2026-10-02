@@ -16,6 +16,7 @@
 | 🏢 **v1.1 平台层** | 组织自助创建、应用安装两步制审批（org OWNER 封顶 scope ceiling）、发行范围=请求∩consent∩ceiling 运行时取交、`orgs` claim 富化（id/name/role）、我的应用注册（个人 + org）、用户管理与自助改密 |
 | 🔑 **v1.2 Passkey** | WebAuthn 通行密钥：登录页免密按钮 + 自助管理页（注册/删除），私钥不出设备；默认关，一个开关开启 |
 | 🧹 **v1.3 滑账清剿** | 账号安全闭环：改密/停用即全量失效令牌与会话（fail-secure）、应用全生命周期（轮转/编辑/删除级联）、org 成员管理（OWNER 面）、敏感 scope 自动联动 sudo、创建面节流、审计词表补全 |
+| 🧑‍💻 **v1.4 headless 皮** | 信任面四页 JSON API（`/api/login` GET+POST、`/api/consent`、`/api/device/verify`、`/api/sudo`）+ `jauth-hub-front`（Vue 3 + Vite 分离前端），`jauth-hub.trust-skin=front` 一键切换、同域名 `/front/**` 部署；SSR 永远默认 |
 | 🔀 **双模式，一套代码** | **独立部署**：起一个服务，所有项目接入它；**内嵌**：引一个 starter，认证能力长在你自己的服务里（宿主只欠一个 `UserDetailsService`） |
 | 🔐 **安全内核先行** | 令牌落库只有 SHA-256 哈希（数据库泄露≠令牌泄露）、刷新令牌轮转 + **重放整族熔断**、强制 PKCE、签名密钥 90 天自动轮转 |
 | 🎓 **天生教学** | 自带 `/demo` 教学区：对着**真实端点**完整走一遍授权码 + PKCE，每一步的 HTTP 请求/响应实时可见——前端同学看一遍就懂 OAuth 在干什么 |
@@ -31,6 +32,7 @@ jauth-hub-starter                 接管式自动配置（memory|jdbc 条件装�
 jauth-hub-selfservice             用户自助页（已授权看板、PAT、通行密钥、我的组织、我的应用、安装审批）
 jauth-hub-resource-server-starter 资源服务器接入（内省校验 + 30s 缓存 + scope→权限映射）
 jauth-hub-app                     独立部署壳（自带用户库 + /demo 教学区）
+jauth-hub-front                   分离前端工程（Vue 3 + Vite，不在 Maven reactor；信任面四页备选皮）
 examples/embedded-demo            内嵌接入示例工程
 ```
 
@@ -108,6 +110,27 @@ jauth-hub.rs:
 
 完整可跑示例见 `examples/embedded-demo`。
 
+### ③ 分离前端皮肤（jauth-hub-front，v1.4 headless）
+
+信任面四页（登录/consent/设备验证/sudo）有 JSON API 面，供任意前端消费；根目录 `jauth-hub-front/`（Vue 3 + Vite，Maven reactor 外）是官方分离前端示范：
+
+| JSON API | 方法 | 对应页面 |
+|---|---|---|
+| `/api/login` | GET 状态 + POST 认证桥（回 redirectUrl） | 登录 |
+| `/api/consent` | GET 装配状态（scope 项/org 三态/已授徽标） | 授权确认 |
+| `/api/device/verify` | GET 状态 | 设备验证 |
+| `/api/sudo` | GET 状态 | sudo 强验证 |
+
+部署（同域名，SSR 永远默认，front 只是备选皮）：
+
+```bash
+cd jauth-hub-front && npm ci && npm run build     # 产出 dist/
+cd .. && mvn -Pfront-skin -pl jauth-hub-app -am package   # dist 拷进制品 classpath:/static/front/
+java -jar jauth-hub-app/target/jauth-hub-app-1.3.0.jar --jauth-hub.trust-skin=front
+```
+
+`jauth-hub.trust-skin=front` 后四页 GET 一律 302 到 `/front/<路由>`（查询串原样转发），静态资源经 `/front/**` 出网并带 history 深链回退。本地免打包联调（在 `jauth-hub-app/` 目录启动）：`--spring.web.resources.static-locations=file:../jauth-hub-front/dist`（注意该属性整体替换默认静态位，需保 `/demo` 资源时追加 `,classpath:/static/`）。
+
 ## 📖 用户操作手册
 
 ### 👤 终端用户
@@ -170,6 +193,7 @@ OIDC 发现端点：<http://localhost:8080/.well-known/openid-configuration> （
 | 配置 | 默认 | 说明 |
 |---|---|---|
 | `jauth-hub.storage` | `memory`（app 固定 `jdbc`） | 内存=轻量 demo；jdbc=生产 |
+| `jauth-hub.trust-skin` | `ssr` | `front` = 信任面四页 GET 302 到 `/front/<路由>`（SPA 皮，查询串原样转发）；SSR 永远默认，front 为备选皮部署形态 |
 | `jauth-hub.issuer` | `http://localhost:8080` | 发行方地址 |
 | `jauth-hub.educational` | `true` | 教学块开关（生产可关） |
 | `jauth-hub.rate-limit.limit-per-hour` | `5000` | 按用户合并限流 |

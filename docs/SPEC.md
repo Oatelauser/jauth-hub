@@ -17,7 +17,7 @@
 | 家族件 | spring-plus **1.1.0**（web/security/boot 三件套），仅 app 模块必选 | [08](../.scratch/jauth-hub/issues/08-grilling-spring-plus-integration.md) |
 | 数据库 | H2（PostgreSQL 兼容模式）+ PostgreSQL **双兼容 SQL**，不承诺 MySQL；memory\|jdbc 双实现条件注册（`jauth-hub.storage`） | [03](../.scratch/jauth-hub/issues/03-grilling-dual-mode-architecture.md) |
 | 会话 | Spring Session：JDBC 默认（零新增基建）、Redis 可选（引依赖即切） | [04](../.scratch/jauth-hub/issues/04-grilling-v1-scope.md) |
-| 前端 | **双皮**（[10](../.scratch/jauth-hub/issues/10-frontend-form.md)）：默认 = Thymeleaf SSR + 手写单文件 CSS（无框架）；v1.4 增 headless 皮 = 信任面四页 JSON API + 根目录 `jauth-hub-front`（Vue 3 + Vite，产物随制品、认证中心同域名）。信任面页面永远是 jauth-hub 自家的；自助面可换可缺；接入方前端形态无关。教学三层保留但不绑架架构；**运行时零外链永守**（框架须打包进制品）。UI 中文 + i18n 资源结构（messages_en 骨架） | [05](../.scratch/jauth-hub/issues/05-grilling-learning-frontend.md) · [10](../.scratch/jauth-hub/issues/10-frontend-form.md) |
+| 前端 | **双皮**（[10](../.scratch/jauth-hub/issues/10-frontend-form.md)）：默认 = Thymeleaf SSR + 手写单文件 CSS（无框架）；v1.4 已落地 headless 皮 = 信任面四页 JSON API + 根目录 `jauth-hub-front`（Vue 3 + Vite，产物随制品、认证中心同域名 `/front/**`，`jauth-hub.trust-skin=front` 经 302 路由切换，SSR 永远默认）。信任面页面永远是 jauth-hub 自家的；自助面可换可缺；接入方前端形态无关。教学三层保留但不绑架架构；**运行时零外链永守**（框架须打包进制品）。UI 中文 + i18n 资源结构（messages_en 骨架） | [05](../.scratch/jauth-hub/issues/05-grilling-learning-frontend.md) · [10](../.scratch/jauth-hub/issues/10-frontend-form.md) |
 | 运行时 | v1 仅 JVM；代码守 AOT 友好习惯；**GraalVM 原生二进制不做**（2026-10-02 用户拍板除名，原 v1.x 实验目标取消） | [10](../.scratch/jauth-hub/issues/10-frontend-form.md) |
 | 协议 | 强制 PKCE；implicit/password 不存在；client_credentials 与 DPoP 框架能力在、**默认关**（配置可开不宣传） | [06](../.scratch/jauth-hub/issues/06-final-tech-details.md) |
 | License | **MIT** | [06](../.scratch/jauth-hub/issues/06-final-tech-details.md) |
@@ -39,6 +39,9 @@ jauth-hub-app                         独立部署壳：自持用户库、用户
                                       spring-plus 三件套全必选
 jauth-hub-resource-server-starter     资源服务器薄封装：预接线 introspection（缓存 30s）+ scope→权限映射
 examples/                             内嵌接入示例工程（宿主嵌 starter + OAuth 保护自家接口演示）
+jauth-hub-front/                      v1.4 分离前端工程（Vue 3 + Vite，不在 Maven reactor）：信任面四页的
+                                      自家备选皮，构建产物部署于同域名 /front/**（app 的 front-skin
+                                      profile 拷包 + /front/** 资源装配与深链回退）
 ```
 
 关键机制（[03](../.scratch/jauth-hub/issues/03-grilling-dual-mode-architecture.md)）：
@@ -105,7 +108,7 @@ public interface ResponseRenderer {
 | **v1.1 平台层** | org 归属 + 安装审批 + 权限封顶（org 角色模型） |
 | **v1.2 强化层** | Passkey（开关，默认关）、sudo mode（开关，依赖 Passkey） |
 | **v1.3 滑账清剿**（1.3.0，2026-10-02 完成） | 老账 ①–⑧全清（⑤ 经查证由 B9 架构性覆盖）+ v1.2 新账 2/3/6 收口 + D0 真渲染测试网；批次 T0+D0–D6；随批拍板：GraalVM 除名、OWASP 继续豁免、credentialId 限流转 v2+、Maven Central 随 1.3.0 发布 |
-| **v1.4 headless 皮** | 信任面四页（登录/consent/设备/sudo）JSON API 化 + 根目录 `jauth-hub-front`（Vue 3 + Vite 分离前端，产物随制品、同域名）——[10](../.scratch/jauth-hub/issues/10-frontend-form.md) |
+| **v1.4 headless 皮**（进行中，完成翻转归 B5） | 信任面四页（登录/consent/设备/sudo）JSON API 化 + 根目录 `jauth-hub-front`（Vue 3 + Vite 分离前端，产物随制品、同域名）——[10](../.scratch/jauth-hub/issues/10-frontend-form.md)；B1（consent/device/sudo 状态面）–B4（同域名装配：trust-skin 旗标 302 路由 + /front/** 静态与深链回退 + CI front job）已落地 |
 | 横切 | 按用户合并限流 + X-RateLimit-*、授权看板 + 一键 Revoke + RP-initiated logout + 基础审计、UserDetails→claims 映射 |
 
 v2+：webhook、secret scanning、多 Secret 轮转、token exchange（配置可开）、redirect 通配 per-URI、back-channel logout（等框架 issue #18296）、fine-grained PAT、邮箱流（注册验证/找回密码）、passkey 登录限流 credentialId 维度（2026-10-02 拍板自 v1.3 转入）。出局：phantom token、请求头降权、"严格无 OIDC"模式。附决：存量用户不导入。

@@ -16,6 +16,7 @@ English | [中文](README.md)
 | 🏢 **v1.1 platform layer** | Self-service organizations, two-step app-installation approval with OWNER-set scope ceilings, issued scopes = requested ∩ consented ∩ ceiling (intersected at runtime), an enriched `orgs` claim (id/name/role), app registration for personal and org apps, user management and self-service password change |
 | 🔑 **v1.2 Passkey** | WebAuthn passkeys: a passwordless button on the login page plus a self-service management page (register/delete); the private key never leaves the device — off by default, one switch to enable |
 | 🧹 **v1.3 hardening sweep** | Account-security closed loop: password change / disable revokes every token and session (fail-secure); full app lifecycle (secret rotation / edit / delete-with-cascade); org member management (OWNER surface); sensitive scopes auto-imply sudo; creation throttling; audit vocabulary completion |
+| 🧑‍💻 **v1.4 headless skin** | Trust-surface JSON APIs (`/api/login` GET+POST, `/api/consent`, `/api/device/verify`, `/api/sudo`) + `jauth-hub-front` (Vue 3 + Vite separated frontend); one switch — `jauth-hub.trust-skin=front` — flips the four pages to a same-domain `/front/**` SPA; SSR remains the default |
 | 🔀 **Dual mode, one codebase** | **Standalone**: run one service and point every project at it. **Embedded**: drop in a starter and auth grows inside your own service (the host only supplies a `UserDetailsService`) |
 | 🔐 **Security-first core** | Only SHA-256 hashes of tokens ever hit the database (a DB leak ≠ a token leak), refresh token rotation with **whole-family revocation on replay**, mandatory PKCE, signing keys auto-rotated every 90 days |
 | 🎓 **Built to teach** | The bundled `/demo` walkthrough drives a real authorization-code + PKCE flow against real endpoints, showing every HTTP request/response live — frontend engineers get OAuth in one sitting |
@@ -31,6 +32,7 @@ jauth-hub-starter                Takeover-style auto-configuration (memory|jdbc 
 jauth-hub-selfservice            User self-service pages (authorized apps, PAT, passkeys, my orgs, my apps, installation approval)
 jauth-hub-resource-server-starter Resource-server integration (introspection + 30s cache + scope→authority mapping)
 jauth-hub-app                    Standalone deployment shell (own user store + /demo teaching zone)
+jauth-hub-front                  Separated frontend project (Vue 3 + Vite, outside the Maven reactor; optional skin for the trust-surface pages)
 examples/embedded-demo           Embedded-integration example project
 ```
 
@@ -108,6 +110,27 @@ jauth-hub.rs:
 
 A complete runnable example lives in `examples/embedded-demo`.
 
+### ③ Separated frontend skin (jauth-hub-front, v1.4 headless)
+
+The four trust-surface pages (login / consent / device verification / sudo) expose JSON APIs any frontend can consume; the root-level `jauth-hub-front/` (Vue 3 + Vite, outside the Maven reactor) is the official separated-frontend reference:
+
+| JSON API | Method | Page |
+|---|---|---|
+| `/api/login` | GET state + POST auth bridge (returns redirectUrl) | Login |
+| `/api/consent` | GET assembled state (scope items / org tri-state / granted badges) | Consent |
+| `/api/device/verify` | GET state | Device verification |
+| `/api/sudo` | GET state | sudo re-verification |
+
+Deployment (same domain; SSR remains the default, front is an optional skin):
+
+```bash
+cd jauth-hub-front && npm ci && npm run build     # produces dist/
+cd .. && mvn -Pfront-skin -pl jauth-hub-app -am package   # copies dist into the jar at classpath:/static/front/
+java -jar jauth-hub-app/target/jauth-hub-app-1.3.0.jar --jauth-hub.trust-skin=front
+```
+
+With `jauth-hub.trust-skin=front`, the four page GETs 302 to `/front/<route>` (query string forwarded verbatim); static assets are served under `/front/**` with history deep-link fallback. Local no-repackage iteration (start from `jauth-hub-app/`): `--spring.web.resources.static-locations=file:../jauth-hub-front/dist` (note the property replaces the default static locations entirely — append `,classpath:/static/` to keep the `/demo` assets).
+
 ## 📖 User guide
 
 ### 👤 End users
@@ -171,6 +194,7 @@ OIDC discovery endpoint: <http://localhost:8080/.well-known/openid-configuration
 | Property | Default | Notes |
 |---|---|---|
 | `jauth-hub.storage` | `memory` (app pins `jdbc`) | In-memory = light demo; jdbc = production |
+| `jauth-hub.trust-skin` | `ssr` | `front` = the four trust-surface page GETs 302 to `/front/<route>` (SPA skin, query string forwarded verbatim); SSR remains the default, front is an optional deployment skin |
 | `jauth-hub.issuer` | `http://localhost:8080` | Issuer address |
 | `jauth-hub.educational` | `true` | Teaching blocks toggle (turn off in production) |
 | `jauth-hub.rate-limit.limit-per-hour` | `5000` | Per-user merged rate limiting |

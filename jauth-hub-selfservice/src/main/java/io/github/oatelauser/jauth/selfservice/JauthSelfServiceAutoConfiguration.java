@@ -16,6 +16,7 @@ import io.github.oatelauser.jauth.core.user.SudoGate;
 import io.github.oatelauser.jauth.core.user.UserRepository;
 import io.github.oatelauser.jauth.core.web.EducationalFlag;
 import io.github.oatelauser.jauth.core.web.PasskeyFlag;
+import io.github.oatelauser.jauth.core.web.TrustSkinFlag;
 import io.github.oatelauser.jauth.selfservice.pat.JdbcPatService;
 import io.github.oatelauser.jauth.selfservice.pat.PatService;
 import io.github.oatelauser.jauth.selfservice.web.AuthorizedAppService;
@@ -162,13 +163,21 @@ public class JauthSelfServiceAutoConfiguration {
 
         /**
          * sudo 验证页（v1.2 C3）：SudoGate 经 ObjectProvider 持有——缺席（sudo 关）即页面渲染"未启用"
-         * 提示态（照 PasskeyController 门控形态）；PasskeyFlag 宿主缺它时降级 OFF 同看板先例。
+         * 提示态（照 PasskeyController 门控形态）；PasskeyFlag 宿主缺它时降级 OFF 同看板先例；
+         * TrustSkinFlag（v1.4 B4）同款降级 SSR（皮肤旗标由 starter 供给，缺它即 SSR 皮永远默认）。
          */
         @Bean
         @ConditionalOnMissingBean
         SudoController jauthSudoController(
-                ObjectProvider<SudoGate> sudoGate, ObjectProvider<PasskeyFlag> passkey, EducationalFlag educational) {
-            return new SudoController(sudoGate, passkey.getIfAvailable(() -> PasskeyFlag.OFF), educational);
+                ObjectProvider<SudoGate> sudoGate,
+                ObjectProvider<PasskeyFlag> passkey,
+                EducationalFlag educational,
+                ObjectProvider<TrustSkinFlag> trustSkin) {
+            return new SudoController(
+                    sudoGate,
+                    passkey.getIfAvailable(() -> PasskeyFlag.OFF),
+                    educational,
+                    trustSkin.getIfAvailable(() -> TrustSkinFlag.SSR));
         }
 
         /**
