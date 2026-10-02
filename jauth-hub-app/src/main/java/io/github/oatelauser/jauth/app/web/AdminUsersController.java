@@ -1,5 +1,6 @@
 package io.github.oatelauser.jauth.app.web;
 
+import io.github.oatelauser.jauth.app.user.AccountSecurityService;
 import io.github.oatelauser.jauth.core.response.JauthErrorCode;
 import io.github.oatelauser.jauth.core.response.JauthException;
 import io.github.oatelauser.jauth.core.response.ResponseRenderer;
@@ -67,15 +68,19 @@ public class AdminUsersController {
 
     private final ResponseRenderer responseRenderer;
 
+    private final AccountSecurityService accountSecurityService;
+
     public AdminUsersController(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
             EducationalFlag educational,
-            ResponseRenderer responseRenderer) {
+            ResponseRenderer responseRenderer,
+            AccountSecurityService accountSecurityService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.educational = educational;
         this.responseRenderer = responseRenderer;
+        this.accountSecurityService = accountSecurityService;
     }
 
     /**
@@ -159,12 +164,15 @@ public class AdminUsersController {
 
     /**
      * 停用/启用 JSON：ACTIVE↔DISABLED 翻换，不可作用于自己（A0513）；停用即时挡登录
-     * （AppUserDetailsService 的 status→enabled 接线）。
+     * （AppUserDetailsService 的 status→enabled 接线）并触发全量清剿——授权/会话/PAT 全失效
+     * （v1.3 D1：账号死则凭据全死；启用方向不清剿）。
+     * 敏感操作（v1.3 D1 用户拍板）：{@code @RequiresSudo}——sudo 开启时强认证过期即 A0515。
      *
      * @param id 目标用户 id
      * @param admin 操作者
      * @return SPI 渲染的成功体（data.status 为翻转后的新状态）
      */
+    @RequiresSudo
     @RequiresRole(role = RequiresRole.ROLE_SUPER_ADMIN)
     @PostMapping(
             value = "/api/admin/users/{id}/status",
@@ -176,6 +184,10 @@ public class AdminUsersController {
         String newStatus =
                 JauthUser.STATUS_ACTIVE.equals(target.status()) ? JauthUser.STATUS_DISABLED : JauthUser.STATUS_ACTIVE;
         this.userRepository.updateStatus(target.id(), newStatus);
+        if (JauthUser.STATUS_DISABLED.equals(newStatus)) {
+            this.accountSecurityService.onUserDisabled(
+                    target.username(), target.id(), requireActingAdmin(admin).id());
+        }
         Map<String, Object> data = new LinkedHashMap<>(4);
         data.put("id", target.id());
         data.put("username", target.username());
@@ -184,11 +196,13 @@ public class AdminUsersController {
     }
 
     /**
-     * 重置密码 JSON：新密码由管理员在请求中给定（≥8 位），更新后响应只回摘要不回显明文。
+     * 重置密码 JSON：新密码由管理员在请求中给定（≥8 位），更新后响应只回摘要不回显明文；目标用户的
+     * 授权/令牌与全部会话随重置全量清剿（v1.3 D1，fail-secure：口令已按失窃处理），PAT 保留。
      * 敏感操作（v1.2 C3）：{@code @RequiresSudo}——sudo 开启时强认证过期即 A0515，页面跳 /selfservice/sudo。
      *
      * @param id 目标用户 id
      * @param request 重置请求
+     * @param admin 操作者（清剿审计的行为主体）
      * @return SPI 渲染的成功体（data 仅含 id/username）
      */
     @RequiresSudo
@@ -198,13 +212,16 @@ public class AdminUsersController {
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
-    public Object resetPassword(@PathVariable String id, @RequestBody PasswordRequest request) {
+    public Object resetPassword(
+            @PathVariable String id, @RequestBody PasswordRequest request, @Principal UserDetails admin) {
         JauthUser target = this.userRepository.findById(id);
         if (target == null) {
             throw new JauthException(JauthErrorCode.B0502);
         }
         String password = requireValidNewPassword(request.password());
         this.userRepository.updatePasswordHash(target.id(), this.passwordEncoder.encode(password));
+        this.accountSecurityService.onCredentialsChanged(
+                target.username(), target.id(), requireActingAdmin(admin).id(), null);
         Map<String, Object> data = new LinkedHashMap<>(4);
         data.put("id", target.id());
         data.put("username", target.username());
@@ -217,15 +234,19 @@ public class AdminUsersController {
         if (target == null) {
             throw new JauthException(JauthErrorCode.B0502);
         }
-        JauthUser actingAdmin = this.userRepository.findByUsername(admin.getUsername());
-        if (actingAdmin == null) {
-            // SUPER_ADMIN 角色只能来自 jauth_user 池（AppUserDetailsService 映射），落空属装配边角
-            throw new JauthException(JauthErrorCode.B0502);
-        }
-        if (target.id().equals(actingAdmin.id())) {
+        if (target.id().equals(requireActingAdmin(admin).id())) {
             throw new JauthException(AppErrorCode.A0513);
         }
         return target;
+    }
+
+    /** 操作者解析（SUPER_ADMIN 角色只能来自 jauth_user 池，AppUserDetailsService 映射；落空属装配边角）。 */
+    private JauthUser requireActingAdmin(UserDetails admin) {
+        JauthUser actingAdmin = this.userRepository.findByUsername(admin.getUsername());
+        if (actingAdmin == null) {
+            throw new JauthException(JauthErrorCode.B0502);
+        }
+        return actingAdmin;
     }
 
     /** 用户名校验：trim 后非空（A0501）、不超列宽（A0502），返回规整值。 */

@@ -85,6 +85,23 @@ abstract class AbstractPatServiceContractTest {
     }
 
     @Test
+    void revokeAllForUserRevokesOnlyTargetsActivePats() {
+        PatService.PatIssuance keptOther = service().create(OTHER_USER_ID, "他池", SCOPES, Duration.ofDays(90));
+        PatService.PatIssuance active = service().create(USER_ID, "批量存活", SCOPES, Duration.ofDays(90));
+        PatService.PatIssuance alreadyRevoked = service().create(USER_ID, "批量已吊销", SCOPES, Duration.ofDays(90));
+        service().revoke(USER_ID, alreadyRevoked.record().id());
+
+        int revoked = service().revokeAllForUser(USER_ID);
+
+        assertThat(revoked).isEqualTo(1); // 已吊销行不重复计
+        assertThat(service().listActive(USER_ID)).isEmpty();
+        assertThat(service().listActive(OTHER_USER_ID))
+                .extracting(PatRecord::id)
+                .containsExactly(keptOther.record().id()); // 他人不受牵连
+        assertThat(active.record().id()).isNotNull();
+    }
+
+    @Test
     void revokingAnotherUsersPatFailsAndKeepsItActive() {
         PatService.PatIssuance issuance = service().create(USER_ID, "他人令牌", SCOPES, Duration.ofDays(90));
 

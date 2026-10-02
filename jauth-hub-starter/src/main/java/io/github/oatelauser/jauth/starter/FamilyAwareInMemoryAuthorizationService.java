@@ -54,6 +54,8 @@ final class FamilyAwareInMemoryAuthorizationService implements OAuth2Authorizati
         authorizationIdsByFamily
                 .computeIfAbsent(familyKey(authorization), key -> ConcurrentHashMap.newKeySet())
                 .add(authorization.getId());
+        // 按主体授权索引（v1.3 D1）：清剿走族谱服务枚举（陈旧项 findById 落空跳过），本类自有索引仍只服务 RTR 单族烧断
+        tokenFamilyService.recordAuthorizationId(authorization.getPrincipalName(), authorization.getId());
         recordRefreshTokenFamily(authorization);
     }
 
@@ -65,6 +67,7 @@ final class FamilyAwareInMemoryAuthorizationService implements OAuth2Authorizati
         if (ids != null) {
             ids.remove(authorization.getId());
         }
+        tokenFamilyService.discardAuthorizationId(authorization.getPrincipalName(), authorization.getId());
     }
 
     @Override

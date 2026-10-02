@@ -63,6 +63,44 @@ class InMemoryTokenFamilyServiceTest {
                 .isEqualTo(InMemoryTokenFamilyService.STATUS_ACTIVE);
     }
 
+    @Test
+    @DisplayName("授权 id 索引：record 记、discard 撤、burnAllByPrincipal 清（D1 清剿枚举面）")
+    void authorizationIdIndexTracksRecordAndDiscard() {
+        service.recordAuthorizationId("alice", "auth-1");
+        service.recordAuthorizationId("alice", "auth-2");
+        service.recordAuthorizationId("alice", "auth-1"); // 幂等
+        service.recordAuthorizationId("bob", "auth-3");
+
+        assertThat(service.authorizationIdsByPrincipal("alice")).containsExactlyInAnyOrder("auth-1", "auth-2");
+        assertThat(service.authorizationIdsByPrincipal("bob")).containsExactly("auth-3");
+        assertThat(service.authorizationIdsByPrincipal("carol")).isEmpty();
+
+        service.discardAuthorizationId("alice", "auth-1");
+        service.discardAuthorizationId("alice", "never-seen"); // 缺席无害
+
+        assertThat(service.authorizationIdsByPrincipal("alice")).containsExactly("auth-2");
+    }
+
+    @Test
+    @DisplayName("按主体烧断：该主体全部族 BURNED 且清索引，他人族不受扰")
+    void burnAllByPrincipalBurnsEveryFamilyAndClearsIndex() {
+        service.recordRefreshToken("alice", "client-1", hash("r1"));
+        service.recordRefreshToken("alice", "client-2", hash("r2"));
+        service.recordRefreshToken("bob", "client-1", hash("r3"));
+        service.recordAuthorizationId("alice", "auth-1");
+
+        int burned = service.burnAllByPrincipal("alice");
+
+        assertThat(burned).isEqualTo(2);
+        assertThat(service.findByRefreshTokenHash(hash("r1")).orElseThrow().status())
+                .isEqualTo(InMemoryTokenFamilyService.STATUS_BURNED);
+        assertThat(service.findByRefreshTokenHash(hash("r2")).orElseThrow().status())
+                .isEqualTo(InMemoryTokenFamilyService.STATUS_BURNED);
+        assertThat(service.findByRefreshTokenHash(hash("r3")).orElseThrow().status())
+                .isEqualTo(InMemoryTokenFamilyService.STATUS_ACTIVE);
+        assertThat(service.authorizationIdsByPrincipal("alice")).isEmpty();
+    }
+
     private static String hash(String token) {
         return TokenHash.sha256Hex(token);
     }

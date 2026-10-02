@@ -10,6 +10,7 @@ import java.util.Optional;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.util.Assert;
 
 /**
  * 刷新令牌族谱存储（表 jauth_token_family，V5 行模型：一轮转一行）。
@@ -122,6 +123,22 @@ public class JdbcTokenFamilyService {
                 Timestamp.from(Instant.now()),
                 principalName,
                 registeredClientId);
+    }
+
+    /**
+     * 烧断该主体的全部族谱行（v1.3 D1，按主体全量清剿；内存版镜像方法额外清授权 id 索引——JDBC 授权行
+     * 由清剿方 SQL 直删，无需枚举）。已 BURNED 行无条件重标（幂等，与 {@link #burnFamily} 同语义）。
+     *
+     * @param principalName 主体名
+     * @return 标记行数
+     */
+    public int burnAllByPrincipal(String principalName) {
+        Assert.hasText(principalName, "principalName cannot be empty");
+        return jdbcOperations.update(
+                "UPDATE jauth_token_family SET status = ?, updated_at = ? WHERE principal_name = ?",
+                STATUS_BURNED,
+                Timestamp.from(Instant.now()),
+                principalName);
     }
 
     /** 下一代号：族内（含 BURNED 历史）最大 generation + 1，从 1 起。 并发双实例可能同代号——探测/烧族只依赖哈希与族键，代号仅作可读性排序，不参与判定。 */

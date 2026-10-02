@@ -82,6 +82,21 @@ public class InMemoryPatService implements PatService {
         this.recordsById.put(patId, revoked(record));
     }
 
+    @Override
+    public synchronized int revokeAllForUser(String userId) {
+        Assert.hasText(userId, "userId cannot be empty");
+        // 停用清剿路径（v1.3 D1）：无行是正常态不抛——与单吊销的 B0502 语义不同（JDBC 版同注）
+        int revokedCount = 0;
+        for (Map.Entry<String, PatRecord> entry : this.recordsById.entrySet()) {
+            PatRecord record = entry.getValue();
+            if (record.userId().equals(userId) && record.status() == PatStatus.ACTIVE) {
+                entry.setValue(revoked(record));
+                revokedCount++;
+            }
+        }
+        return revokedCount;
+    }
+
     private static PatRecord revoked(PatRecord record) {
         return new PatRecord(
                 record.id(),

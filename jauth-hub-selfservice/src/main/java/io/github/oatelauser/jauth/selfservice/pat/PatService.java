@@ -53,6 +53,15 @@ public interface PatService {
     void revoke(String userId, String patId);
 
     /**
+     * 吊销用户名下全部未吊销的 PAT（v1.3 D1 停用清剿：账号死则其 PAT 全死）。
+     * 改密不清 PAT——PAT 独立于口令签发（GitHub 同款语义），仅账号失活时整体收回。
+     *
+     * @param userId 用户 id
+     * @return 标记 REVOKED 的行数
+     */
+    int revokeAllForUser(String userId);
+
+    /**
      * 创建结果：记录 + 明文令牌。
      *
      * <p>明文唯一出现点——消费方即写进创建响应，不做任何留存。

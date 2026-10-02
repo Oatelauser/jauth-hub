@@ -14,6 +14,8 @@ import io.github.oatelauser.jauth.core.authorization.AuditingOAuth2Authorization
 import io.github.oatelauser.jauth.core.authorization.AuditingOAuth2AuthorizationService;
 import io.github.oatelauser.jauth.core.authorization.CeilingAwareOAuth2AuthorizationService;
 import io.github.oatelauser.jauth.core.authorization.JauthJdbcOAuth2AuthorizationService;
+import io.github.oatelauser.jauth.core.authorization.JdbcPrincipalAuthorizationRevoker;
+import io.github.oatelauser.jauth.core.authorization.PrincipalAuthorizationRevoker;
 import io.github.oatelauser.jauth.core.client.ClientOwnerResolver;
 import io.github.oatelauser.jauth.core.client.ClientSeedProperties;
 import io.github.oatelauser.jauth.core.client.ClientSeeder;
@@ -955,6 +957,14 @@ public class JauthHubAutoConfiguration {
                     meterRegistry.getIfAvailable());
         }
 
+        /** 授权清剿（memory，v1.3 D1）：经族谱服务的授权 id 索引枚举，remove 走装饰链逐条打 token.revoked。 */
+        @Bean
+        @ConditionalOnMissingBean(PrincipalAuthorizationRevoker.class)
+        PrincipalAuthorizationRevoker jauthPrincipalAuthorizationRevoker(
+                OAuth2AuthorizationService authorizationService, InMemoryTokenFamilyService tokenFamilyService) {
+            return new InMemoryPrincipalAuthorizationRevoker(authorizationService, tokenFamilyService);
+        }
+
         /** consent 服务 = 审计装饰（memory 实现）：consent.accepted 事件在 save 路径（装饰类注释）。 */
         @Bean
         @ConditionalOnMissingBean(OAuth2AuthorizationConsentService.class)
@@ -1114,6 +1124,14 @@ public class JauthHubAutoConfiguration {
                             patSupport),
                     auditPublisher,
                     meterRegistry.getIfAvailable());
+        }
+
+        /** 授权清剿（jdbc，v1.3 D1）：SQL 直删该主体全部授权行 + 整主体烧族（先删后烧，接口顺序约束）。 */
+        @Bean
+        @ConditionalOnMissingBean(PrincipalAuthorizationRevoker.class)
+        PrincipalAuthorizationRevoker jauthPrincipalAuthorizationRevoker(
+                DataSource dataSource, JdbcTokenFamilyService tokenFamilyService) {
+            return new JdbcPrincipalAuthorizationRevoker(new JdbcTemplate(dataSource), tokenFamilyService);
         }
 
         /** consent 服务 = 审计装饰（JDBC 实现）。 */

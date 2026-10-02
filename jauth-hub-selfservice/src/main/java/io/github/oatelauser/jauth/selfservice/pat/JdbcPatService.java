@@ -117,6 +117,17 @@ public class JdbcPatService implements PatService {
         }
     }
 
+    @Override
+    public int revokeAllForUser(String userId) {
+        Assert.hasText(userId, "userId cannot be empty");
+        // 停用清剿路径：无行（本就全吊销/无 PAT）是正常态，不抛——与单吊销的"记录不可再吊销"语义不同
+        return this.jdbcOperations.update(
+                "UPDATE jauth_pat SET status = ? WHERE user_id = ? AND status = ?",
+                PatStatus.REVOKED.name(),
+                userId,
+                PatStatus.ACTIVE.name());
+    }
+
     private static String joinScopes(Set<String> scopes) {
         return String.join(" ", scopes);
     }

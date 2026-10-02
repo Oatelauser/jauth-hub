@@ -2,12 +2,20 @@ package io.github.oatelauser.jauth.app.configuration;
 
 import io.github.oatelauser.jauth.app.bootstrap.SuperAdminProperties;
 import io.github.oatelauser.jauth.app.bootstrap.SuperAdminSeeder;
+import io.github.oatelauser.jauth.app.user.AccountSecurityService;
 import io.github.oatelauser.jauth.app.user.AppUserDetailsService;
+import io.github.oatelauser.jauth.app.user.UserSessionInvalidator;
+import io.github.oatelauser.jauth.core.audit.AuditEventPublisher;
+import io.github.oatelauser.jauth.core.authorization.PrincipalAuthorizationRevoker;
 import io.github.oatelauser.jauth.core.user.UserRepository;
+import io.github.oatelauser.jauth.selfservice.pat.PatService;
+import javax.sql.DataSource;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -42,5 +50,21 @@ public class AppConfiguration {
     ApplicationRunner superAdminSeederRunner(
             SuperAdminProperties properties, UserRepository userRepository, PasswordEncoder passwordEncoder) {
         return args -> new SuperAdminSeeder(properties, userRepository, passwordEncoder).seed();
+    }
+
+    /** 会话全量失效（v1.3 D1）：直删 spring_session（Boot 4.1 会话仓库默认非索引，类注释）。 */
+    @Bean
+    UserSessionInvalidator userSessionInvalidator(DataSource dataSource) {
+        return new UserSessionInvalidator(new JdbcTemplate(dataSource));
+    }
+
+    /** 账号状态变更清剿编排（v1.3 D1）：PAT 走 ObjectProvider——memory 模式 PAT 禁用无 bean。 */
+    @Bean
+    AccountSecurityService accountSecurityService(
+            PrincipalAuthorizationRevoker authorizationRevoker,
+            UserSessionInvalidator sessionInvalidator,
+            ObjectProvider<PatService> patServices,
+            AuditEventPublisher auditPublisher) {
+        return new AccountSecurityService(authorizationRevoker, sessionInvalidator, patServices, auditPublisher);
     }
 }

@@ -24,7 +24,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 /**
  * sudo 门端到端集成测试（v1.2 C3）：passkey+sudo 双开的自有 H2 档——角色变更在未强认证时被拦
  * （A0515，页面 JS 的跳转分支按此码触发）；{@code strong_auth_at} 打点后（TTL 内）放行。
- * 建号端点不在敏感面（决议：只 gate 改密×2 + 角色变更），本测试顺带回归该边界。
+ * 建号端点不在敏感面（决议：改密×2 + 角色变更，v1.3 D1 用户拍板追加固态开关），本测试顺带回归该边界。
  *
  * @author oatelauser
  */
@@ -76,6 +76,35 @@ class SudoGatingIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("00000"));
         assertThat(this.userRepository.findById(targetId).role()).isEqualTo(JauthUser.ROLE_SUPERADMIN);
+    }
+
+    @Test
+    @DisplayName("停用/启用：未强认证 → A0515；打点后放行（v1.3 D1 用户拍板纳入敏感面）")
+    void statusToggleGatedUntilStrongAuthStamped() throws Exception {
+        // 同类前序方法可能已给超管打点（共享上下文）：先打一张远过期的时间戳钉死"未强认证"起点
+        this.userRepository.updateStrongAuthAt(adminId(), Instant.now().minusSeconds(86_400));
+        String targetId = createTargetUser("sudo-status-target");
+
+        // 未打点：拦 A0515
+        this.mockMvc
+                .perform(post("/api/admin/users/{id}/status", targetId)
+                        .with(admin())
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(jsonPath("$.code").value("A0515"));
+
+        // 打点后（TTL 内）放行，且停用语义生效
+        this.userRepository.updateStrongAuthAt(adminId(), Instant.now());
+        this.mockMvc
+                .perform(post("/api/admin/users/{id}/status", targetId)
+                        .with(admin())
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("00000"))
+                .andExpect(jsonPath("$.data.status").value(JauthUser.STATUS_DISABLED));
     }
 
     private String createTargetUser(String username) throws Exception {
