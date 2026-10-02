@@ -62,7 +62,9 @@ import io.github.oatelauser.jauth.core.web.ConsentStateController;
 import io.github.oatelauser.jauth.core.web.DeviceVerifyController;
 import io.github.oatelauser.jauth.core.web.DeviceVerifyStateController;
 import io.github.oatelauser.jauth.core.web.EducationalFlag;
+import io.github.oatelauser.jauth.core.web.JsonLoginService;
 import io.github.oatelauser.jauth.core.web.LocalIntrospectionJwtDecoder;
+import io.github.oatelauser.jauth.core.web.LoginApiController;
 import io.github.oatelauser.jauth.core.web.LoginController;
 import io.github.oatelauser.jauth.core.web.LoginLockoutFilter;
 import io.github.oatelauser.jauth.core.web.MeController;
@@ -103,6 +105,7 @@ import org.springframework.boot.autoconfigure.context.MessageSourceProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration;
 import org.springframework.boot.security.oauth2.server.authorization.autoconfigure.servlet.OAuth2AuthorizationServerAutoConfiguration;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.MessageSource;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.context.annotation.Bean;
@@ -111,10 +114,15 @@ import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.core.Ordered;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.DefaultAuthenticationEventPublisher;
+import org.springframework.security.authentication.ProviderManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.OAuth2Token;
@@ -176,8 +184,8 @@ import org.thymeleaf.templatemode.TemplateMode;
  * </ul>
  *
  * <p><b>宿主链共存四规则之三（禁止违反）</b>：本配置只产出一条精确匹配的协议链（securityMatcher =
- * 框架协议端点 ∪ /login、/oauth2/consent、/device/verify、两页 JSON 状态面 /api/consent 与
- * /api/device/verify、core 静态 css），<b>绝不写 anyRequest
+ * 框架协议端点 ∪ /login、/api/login、/oauth2/consent、/device/verify、三页 JSON 状态面 /api/login、
+ * /api/consent 与 /api/device/verify、core 静态 css），<b>绝不写 anyRequest
  * 兜底</b>——嵌入模式的 default 链是宿主自己的事；jauth 链若吞下未认领请求，宿主接口会被静默纳入 jauth
  * 的认证语义，属结构性越权。
  *
@@ -196,6 +204,9 @@ public class JauthHubAutoConfiguration {
 
     /** 协议链上自认领的页面路径（登录页 = formLogin 落点）。 */
     static final String LOGIN_PATH = "/login";
+
+    /** 登录页 JSON 面（v1.4 B2：GET 状态 + POST 认证桥，授权规则镜像 /login 的 permitAll）。 */
+    static final String API_LOGIN_PATH = "/api/login";
 
     /** consent 页（框架 authorizationEndpoint.consentPage 落点，B3 ConsentController）。 */
     static final String CONSENT_PAGE_PATH = "/oauth2/consent";
@@ -535,6 +546,53 @@ public class JauthHubAutoConfiguration {
     }
 
     /**
+     * JSON 登录桥的 {@link AuthenticationManager}（v1.4 B2）：宿主契约件（UserDetailsService +
+     * PasswordEncoder，嵌入契约里宿主提供的那个）组装 DaoAuthenticationProvider 的 ProviderManager，
+     * <b>无 parent</b>——不可经 {@code AuthenticationConfiguration#getAuthenticationManager()} 取全局管理器：
+     * 暴露成 bean 后全局构建器会把它惰性解析为自己的 parent，无人认领的 token 落 parent 即无限自递归
+     * （现场 PatIntrospection/RpLogout 集成测试的 StackOverflow 实证）。事件源照
+     * AuthenticationConfiguration 的同款装配（javap 验证）：上下文感知的
+     * {@code DefaultAuthenticationEventPublisher}，成功/失败事件自动进应用上下文，
+     * {@code SecurityEventAuditBridge}（@EventListener）与表单登录同源接收。宿主已自建管理器时本 bean 让位；
+     * 另条件钉 UserDetailsService 在场——缺席的裸上下文不注册本 bean，否则会触发 Boot
+     * UserDetailsServiceAutoConfiguration 让位，其默认用户面被动消失（现场裸上下文集成测试实证）。
+     */
+    @Bean
+    @ConditionalOnMissingBean(AuthenticationManager.class)
+    @ConditionalOnBean(UserDetailsService.class)
+    AuthenticationManager jauthAuthenticationManager(
+            ApplicationContext applicationContext,
+            UserDetailsService userDetailsService,
+            PasswordEncoder passwordEncoder) {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService);
+        provider.setPasswordEncoder(passwordEncoder);
+        ProviderManager manager = new ProviderManager(provider);
+        manager.setAuthenticationEventPublisher(new DefaultAuthenticationEventPublisher(applicationContext));
+        return manager;
+    }
+
+    /** JSON 登录编舞（v1.4 B2）：锁门 + 认证 + 会话动作，依赖上面的管理器（同条件出现）。 */
+    @Bean
+    @ConditionalOnBean(AuthenticationManager.class)
+    JsonLoginService jauthJsonLoginService(RateLimiter rateLimiter, AuthenticationManager authenticationManager) {
+        return new JsonLoginService(rateLimiter, authenticationManager);
+    }
+
+    /**
+     * 登录页 JSON 面（v1.4 B2）：GET /api/login 状态 + POST /api/login 认证桥，链认领与 permitAll 镜像
+     * /login（管理器缺席的裸上下文不注册，/api/login 由链认领后 404——无用户池即无登录面，形态一致）。
+     */
+    @Bean
+    @ConditionalOnBean(AuthenticationManager.class)
+    LoginApiController jauthLoginApiController(
+            EducationalFlag educational,
+            PasskeyFlag passkey,
+            JsonLoginService jsonLoginService,
+            ResponseRenderer responseRenderer) {
+        return new LoginApiController(educational, passkey, jsonLoginService, responseRenderer);
+    }
+
+    /**
      * consent 页状态装配器（v1.4 B1）：SSR 皮与 JSON 状态面共用的装配单点（org 三态、已授权徽标、org 会话
      * 暂存副作用），独立成 bean 供两控制器同源委托。
      */
@@ -718,7 +776,7 @@ public class JauthHubAutoConfiguration {
 
     /**
      * jauth 协议链：唯一产出的安全链，精认知领框架协议端点 ∪ 自有路径（登录/consent/设备验证三 SSR 页、
-     * consent 与设备验证两 JSON 状态面、/me、core css），序位可配（默认 100，委托
+     * 登录/consent/设备验证三 JSON 面、/me、core css），序位可配（默认 100，委托
      * OrderedSecurityFilterChain 实现）。链内授权规则逐路径显式声明（login/css 放行、协议端点与上述页面需
      * 认证），<b>无 anyRequest 兜底</b>（类注释第三规则）。非浏览器客户端（Accept 非 text/html）401 而非
      * 重定向登录页（协议端点的正确姿势）。CORS 仅在来源非空时并入。
@@ -759,6 +817,7 @@ public class JauthHubAutoConfiguration {
         List<RequestMatcher> claimedMatchers = new ArrayList<>(List.of(
                 endpointsMatcher,
                 PathPatternRequestMatcher.withDefaults().matcher(LOGIN_PATH),
+                PathPatternRequestMatcher.withDefaults().matcher(API_LOGIN_PATH),
                 PathPatternRequestMatcher.withDefaults().matcher(CONSENT_PAGE_PATH),
                 PathPatternRequestMatcher.withDefaults().matcher(DEVICE_VERIFY_PATH),
                 PathPatternRequestMatcher.withDefaults().matcher(API_CONSENT_PATH),
@@ -786,7 +845,8 @@ public class JauthHubAutoConfiguration {
         http.authorizeHttpRequests(authorize -> authorize
                 .requestMatchers(endpointsMatcher)
                 .authenticated()
-                .requestMatchers(LOGIN_PATH, CSS_PATTERN, ME_PATH)
+                // /api/login = 登录前页面状态 + 认证提交（POST 在 CsrfFilter 保护下），镜像 /login 放行
+                .requestMatchers(LOGIN_PATH, API_LOGIN_PATH, CSS_PATTERN, ME_PATH)
                 .permitAll()
                 .requestMatchers(CONSENT_PAGE_PATH, DEVICE_VERIFY_PATH)
                 .authenticated()

@@ -6,7 +6,8 @@ package io.github.oatelauser.jauth.core.response;
  * <p>占段 A05xx（授权/客户端请求错）+ B05xx（认证中心内部错）——spring-plus 家族分段惯例，与家族已占段（如 A0301）不撞车（09 票决议）。
  * 按批增补不预铺：A0501-A0502/B05xx 为基座四枚；selfservice 已占 A0503-A0505（登录主体/存储模式/scope 勾选）、
  * A0509-A0510（B10 应用注册名称/redirect URI 校验）与 A0511（B11 安装审批 ceiling 空勾选）；B8 增 A0506-A0508（org/安装域）；
- * app 已占 A0512-A0514（B12 用户管理：撞名/自操作拒/旧密码错，落 app 自立枚举 AppErrorCode）。
+ * app 已占 A0512-A0514（B12 用户管理：撞名/自操作拒/旧密码错，落 app 自立枚举 AppErrorCode）；
+ * v1.4 B2 增 A0520-A0521（登录 JSON 桥：凭据错同形拒绝/锁定期拒绝）。
  *
  * @author oatelauser
  */
@@ -40,7 +41,13 @@ public enum JauthErrorCode implements ErrorCode {
     A0517("A0517", "该用户不是本组织成员"),
 
     /** org 成员管理：不可作用于自己（移除/降级自锁 = 最后一个 OWNER 的结构性锁死，v1.3 D3）。 */
-    A0518("A0518", "不可对自己执行该操作");
+    A0518("A0518", "不可对自己执行该操作"),
+
+    /** 登录失败（v1.4 B2 JSON 桥）：用户名或口令不匹配、用户不存在、已停用一律同译——与表单登录同形，防用户名枚举。 */
+    A0520("A0520", "用户名或密码错误"),
+
+    /** 登录失败次数过多（v1.4 B2 JSON 桥，SPEC §6 防爆破）：锁定期内不触达口令校验，语义对齐 LoginLockoutFilter 的 login_locked 拒绝形态。 */
+    A0521("A0521", "登录失败次数过多，稍后再试");
 
     private final String code;
 
