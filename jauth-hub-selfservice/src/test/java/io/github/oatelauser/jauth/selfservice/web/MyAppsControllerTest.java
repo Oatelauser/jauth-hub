@@ -68,6 +68,7 @@ class MyAppsControllerTest {
                         .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
                         .build()),
                 new InMemoryClientOwnerResolver(),
+                new io.github.oatelauser.jauth.core.token.InMemoryTokenFamilyService(),
                 new BCryptPasswordEncoder(),
                 new io.github.oatelauser.jauth.core.scope.InMemoryScopeCatalog(),
                 java.time.Clock.fixed(T0, java.time.ZoneOffset.UTC));
@@ -109,8 +110,8 @@ class MyAppsControllerTest {
     @Test
     @DisplayName("服务缺席门控：两页渲染不支持提示（200，不 500），表单不渲染")
     void pagesRenderNoticeWhenServiceMissing() throws Exception {
-        MockMvc missing = MockMvcBuilders.standaloneSetup(
-                        new MyAppsController(null, this.users, EducationalFlag.ON, new DefaultResponseRenderer()))
+        MockMvc missing = MockMvcBuilders.standaloneSetup(new MyAppsController(
+                        null, this.users, EducationalFlag.ON, new DefaultResponseRenderer(), event -> {}))
                 .setViewResolvers(viewResolver())
                 .setLocaleResolver(new FixedLocaleResolver(Locale.SIMPLIFIED_CHINESE))
                 .addFilters((request, response, chain) -> {
@@ -191,8 +192,8 @@ class MyAppsControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"x\",\"redirectUris\":\"https://a.example.com/cb\"}"))
                 .andExpect(jsonPath("$.code").value("A0503"));
-        MockMvc missing = MockMvcBuilders.standaloneSetup(
-                        new MyAppsController(null, this.users, EducationalFlag.ON, new DefaultResponseRenderer()))
+        MockMvc missing = MockMvcBuilders.standaloneSetup(new MyAppsController(
+                        null, this.users, EducationalFlag.ON, new DefaultResponseRenderer(), event -> {}))
                 .setControllerAdvice(jauthAdvice())
                 .build();
         missing.perform(post("/selfservice/my-apps")
@@ -205,7 +206,11 @@ class MyAppsControllerTest {
     /** DOM 面（手装 Thymeleaf 双解析器 + 双 basename，同 SelfServicePagesTest）。 */
     private MockMvc pages() {
         return MockMvcBuilders.standaloneSetup(new MyAppsController(
-                        this.ownedAppService, this.users, EducationalFlag.ON, new DefaultResponseRenderer()))
+                        this.ownedAppService,
+                        this.users,
+                        EducationalFlag.ON,
+                        new DefaultResponseRenderer(),
+                        event -> {}))
                 .setViewResolvers(viewResolver())
                 .setLocaleResolver(new FixedLocaleResolver(Locale.SIMPLIFIED_CHINESE))
                 .addFilters((request, response, chain) -> {
@@ -218,7 +223,11 @@ class MyAppsControllerTest {
     /** JSON 面（advice 手挂：JauthException → SPI 失败体，生产由 starter 装配）。 */
     private MockMvc api() {
         return MockMvcBuilders.standaloneSetup(new MyAppsController(
-                        this.ownedAppService, this.users, EducationalFlag.ON, new DefaultResponseRenderer()))
+                        this.ownedAppService,
+                        this.users,
+                        EducationalFlag.ON,
+                        new DefaultResponseRenderer(),
+                        event -> {}))
                 .setControllerAdvice(jauthAdvice())
                 .build();
     }

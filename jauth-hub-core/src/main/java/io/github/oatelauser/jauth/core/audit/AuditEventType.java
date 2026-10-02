@@ -58,7 +58,13 @@ public enum AuditEventType {
      * 凭据状态变更的全量清剿（v1.3 D1：自助改密/管理员重置/停用；detail 记 reason=password_changed|user_disabled
      * 与 authorizations/sessions/pats 三级计数）。逐令牌撤销仍记 token.revoked（内存装配路径可见）。
      */
-    CREDENTIALS_REVOKED("credentials.revoked");
+    CREDENTIALS_REVOKED("credentials.revoked"),
+
+    /**
+     * 应用删除（v1.3 D2：级联撤销其全部授权/consent/安装并烧断族谱；detail 记 client id 与级联计数；
+     * secret 轮转不打本事件——非生命周期销毁，明文回显一次性完成）。
+     */
+    CLIENT_DELETED("client.deleted");
 
     private final String wireName;
 

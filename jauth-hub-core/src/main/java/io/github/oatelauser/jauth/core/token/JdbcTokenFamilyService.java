@@ -141,6 +141,22 @@ public class JdbcTokenFamilyService {
                 principalName);
     }
 
+    /**
+     * 烧断该 client 的全部族谱行（跨主体，v1.3 D2 应用删除级联；内存版镜像方法）。先于本调用删除该
+     * client 的授权行（级联顺序约束同按主体清剿：中断停在安全态）。
+     *
+     * @param registeredClientId 客户端 id
+     * @return 标记行数
+     */
+    public int burnAllByClient(String registeredClientId) {
+        Assert.hasText(registeredClientId, "registeredClientId cannot be empty");
+        return jdbcOperations.update(
+                "UPDATE jauth_token_family SET status = ?, updated_at = ? WHERE registered_client_id = ?",
+                STATUS_BURNED,
+                Timestamp.from(Instant.now()),
+                registeredClientId);
+    }
+
     /** 下一代号：族内（含 BURNED 历史）最大 generation + 1，从 1 起。 并发双实例可能同代号——探测/烧族只依赖哈希与族键，代号仅作可读性排序，不参与判定。 */
     private int nextGeneration(String principalName, String registeredClientId) {
         Integer max = jdbcOperations.queryForObject(

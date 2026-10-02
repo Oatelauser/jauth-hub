@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.oatelauser.jauth.core.client.ClientOwner;
 import io.github.oatelauser.jauth.core.client.InMemoryClientOwnerResolver;
+import io.github.oatelauser.jauth.core.token.InMemoryTokenFamilyService;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -32,7 +33,18 @@ class InMemoryOwnedAppServiceTest extends AbstractOwnedAppServiceContractTest {
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     private final InMemoryOwnedAppService service = new InMemoryOwnedAppService(
-            this.clientRepository, this.ownerResolver, this.passwordEncoder, scopeCatalog(), fixedClock());
+            this.clientRepository,
+            this.ownerResolver,
+            new InMemoryTokenFamilyService(),
+            this.passwordEncoder,
+            scopeCatalog(),
+            fixedClock());
+
+    @Override
+    protected String currentSecretHash(String appId) {
+        // 内存实现：RegisteredClient 即时对象携带的就是轮转时写入的编码哈希，直接回读
+        return this.clientRepository.findById(appId).getClientSecret();
+    }
 
     @Override
     protected OwnedAppService service() {

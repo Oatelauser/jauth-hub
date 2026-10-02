@@ -1,5 +1,9 @@
 package io.github.oatelauser.jauth.selfservice.web;
 
+import io.github.oatelauser.jauth.core.audit.AuditEvent;
+import io.github.oatelauser.jauth.core.audit.AuditEventPublisher;
+import io.github.oatelauser.jauth.core.audit.AuditEventType;
+import io.github.oatelauser.jauth.core.client.ClientOwner;
 import io.github.oatelauser.jauth.core.org.Org;
 import io.github.oatelauser.jauth.core.org.OrgRepository;
 import io.github.oatelauser.jauth.core.org.OrgService;
@@ -9,6 +13,7 @@ import io.github.oatelauser.jauth.core.response.ResponseRenderer;
 import io.github.oatelauser.jauth.core.user.JauthUser;
 import io.github.oatelauser.jauth.core.user.UserRepository;
 import io.github.oatelauser.jauth.core.web.EducationalFlag;
+import io.github.oatelauser.jauth.core.web.RequiresSudo;
 import java.security.Principal;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -18,6 +23,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -55,19 +61,28 @@ public class OrgAppsController {
 
     private final ResponseRenderer responseRenderer;
 
+    private final AuditEventPublisher auditPublisher;
+
+    /**
+     * EI_EXPOSE_REP2 定向豁免：OwnedAppService 是抽象类（SpotBugs 视可变表示），实为容器单例服务门面
+     * （Spring 注入通行形态，构造后无可变面暴露——与 PatController 存接口不豁免的差异仅在类型形状）。
+     */
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(value = "EI_EXPOSE_REP2")
     public OrgAppsController(
             @Nullable OwnedAppService ownedAppService,
             @Nullable OrgService orgService,
             @Nullable OrgRepository orgRepository,
             UserRepository userRepository,
             EducationalFlag educational,
-            ResponseRenderer responseRenderer) {
+            ResponseRenderer responseRenderer,
+            AuditEventPublisher auditPublisher) {
         this.ownedAppService = ownedAppService;
         this.orgService = orgService;
         this.orgRepository = orgRepository;
         this.userRepository = userRepository;
         this.educational = educational;
         this.responseRenderer = responseRenderer;
+        this.auditPublisher = auditPublisher;
     }
 
     /**
@@ -140,6 +155,125 @@ public class OrgAppsController {
         return this.responseRenderer.renderSuccess(data);
     }
 
+    /**
+     * 轮转 secret JSON（v1.3 D2）：OWNER 门 + ofOrg 归属收紧；旧值即刻失效、不焚令牌；新明文仅此一次。
+     * 敏感操作：{@code @RequiresSudo}（与个人面同门径）。
+     *
+     * @param orgId 归属 org id
+     * @param id 应用 id
+     * @param principal 当前登录主体
+     * @return SPI 渲染的成功体（data.clientSecret 为新明文，仅此一次）
+     */
+    @RequiresSudo
+    @PostMapping(value = "/selfservice/orgs/{orgId}/apps/{id}/secret", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public Object rotateSecret(
+            @PathVariable("orgId") String orgId, @PathVariable String id, @Nullable Principal principal) {
+        requireAppsService();
+        JauthUser user = requireUser(principal);
+        requireOwner(orgId, user);
+        OwnedAppService.Registration registration = this.ownedAppService.rotateSecret(ClientOwner.ofOrg(orgId), id);
+        Map<String, Object> data = appData(registration.app());
+        data.put("clientSecret", registration.plaintextSecret());
+        return this.responseRenderer.renderSuccess(data);
+    }
+
+    /**
+     * 编辑 JSON（v1.3 D2）：改名与 redirect 白名单；非销毁性不挂 sudo（与个人面同分界）。
+     *
+     * @param orgId 归属 org id
+     * @param id 应用 id
+     * @param request 编辑请求
+     * @param principal 当前登录主体
+     * @return SPI 渲染的成功体（data 为更新后的应用摘要）
+     */
+    @PostMapping(
+            value = "/selfservice/orgs/{orgId}/apps/{id}",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public Object update(
+            @PathVariable("orgId") String orgId,
+            @PathVariable String id,
+            @RequestBody UpdateRequest request,
+            @Nullable Principal principal) {
+        requireAppsService();
+        JauthUser user = requireUser(principal);
+        requireOwner(orgId, user);
+        OwnedAppService.OwnedApp app = this.ownedAppService.update(
+                ClientOwner.ofOrg(orgId), id, requireName(request.name()), parseRedirects(request.redirectUris()));
+        return this.responseRenderer.renderSuccess(appData(app));
+    }
+
+    /**
+     * 删除 JSON（v1.3 D2，级联全焚）：OWNER 门 + ofOrg 归属；级联序在服务层。
+     * 敏感操作：{@code @RequiresSudo}。
+     *
+     * @param orgId 归属 org id
+     * @param id 应用 id
+     * @param principal 当前登录主体
+     * @return SPI 渲染的成功体（data.id 为已删应用 id）
+     */
+    @RequiresSudo
+    @DeleteMapping(value = "/selfservice/orgs/{orgId}/apps/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public Object delete(@PathVariable("orgId") String orgId, @PathVariable String id, @Nullable Principal principal) {
+        requireAppsService();
+        JauthUser user = requireUser(principal);
+        requireOwner(orgId, user);
+        this.ownedAppService.delete(ClientOwner.ofOrg(orgId), id);
+        this.auditPublisher.publish(AuditEvent.of(
+                AuditEventType.CLIENT_DELETED,
+                user.id(),
+                "client",
+                id,
+                "owner=org cascade=authorizations,consent,installations,family"));
+        Map<String, Object> data = new LinkedHashMap<>(4);
+        data.put("id", id);
+        return this.responseRenderer.renderSuccess(data);
+    }
+
+    /** 应用摘要 data（注册/轮转/编辑共用形状，与个人面同款）。 */
+    private static Map<String, Object> appData(OwnedAppService.OwnedApp app) {
+        Map<String, Object> data = new LinkedHashMap<>(8);
+        data.put("id", app.id());
+        data.put("name", app.name());
+        data.put("clientId", app.clientId());
+        data.put("confidential", app.confidential());
+        data.put("redirectUris", app.redirectUris());
+        return data;
+    }
+
+    /** 名称校验（A0509，与注册同口径）。 */
+    private static String requireName(@Nullable String raw) {
+        String name = raw == null ? "" : raw.trim();
+        if (name.isEmpty() || name.length() > OwnedAppService.NAME_MAX_LENGTH) {
+            throw new JauthException(SelfServiceErrorCode.A0509);
+        }
+        return name;
+    }
+
+    /** redirect 多行文本校验（A0510，与注册同口径）。 */
+    private static Set<String> parseRedirects(@Nullable String raw) {
+        List<String> redirectUris;
+        try {
+            redirectUris = OwnedAppService.parseRedirectUris(raw);
+        } catch (IllegalArgumentException ex) {
+            throw new JauthException(SelfServiceErrorCode.A0510);
+        }
+        if (redirectUris.isEmpty()) {
+            throw new JauthException(SelfServiceErrorCode.A0510);
+        }
+        return Set.copyOf(redirectUris);
+    }
+
+    private OwnedAppService requireAppsService() {
+        if (this.ownedAppService == null) {
+            throw new JauthException(SelfServiceErrorCode.A0504);
+        }
+        return this.ownedAppService;
+    }
+
     private void requireOwner(String orgId, JauthUser user) {
         if (!this.orgService.isOwner(orgId, user.id())) {
             throw new JauthException(JauthErrorCode.A0508);
@@ -167,4 +301,7 @@ public class OrgAppsController {
 
     /** 注册请求体：redirectUris 为表单多行文本（每行一个精确 URL），解析与校验单源于 {@link OwnedAppService}。 */
     public record RegisterRequest(String name, String redirectUris, Boolean confidential) {}
+
+    /** 编辑请求体（v1.3 D2）：口径同注册的 name/redirectUris 两件。 */
+    public record UpdateRequest(String name, String redirectUris) {}
 }

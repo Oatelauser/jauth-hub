@@ -3,6 +3,8 @@ package io.github.oatelauser.jauth.selfservice.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.oatelauser.jauth.core.client.ClientOwner;
+import io.github.oatelauser.jauth.core.response.JauthException;
 import io.github.oatelauser.jauth.core.scope.InMemoryScopeCatalog;
 import io.github.oatelauser.jauth.core.scope.ScopeCatalog;
 import java.time.Clock;
@@ -41,6 +43,74 @@ abstract class AbstractOwnedAppServiceContractTest {
     protected static final Set<String> REDIRECTS = Set.of("https://app.example.com/callback");
 
     /** 受测服务（构造于固定时钟 T0）。 */
+    @Test
+    void rotateSecretReturnsNewPlaintextOnceAndInvalidatesOldHash() {
+        OwnedAppService.Registration registration = service().register(USER_ID, "轮转契约", REDIRECTS, true);
+        OwnedAppService.Registration rotated = service()
+                .rotateSecret(ClientOwner.ofUser(USER_ID), registration.app().id());
+        assertThat(rotated.plaintextSecret()).isNotBlank().isNotEqualTo(registration.plaintextSecret());
+        // 旧明文对轮转后的存储哈希不再匹配（jdbc 直查哈希列由 app 端到端覆盖，这里经编码器语义断言）
+        assertThat(passwordEncoder()
+                        .matches(
+                                registration.plaintextSecret(),
+                                currentSecretHash(registration.app().id())))
+                .isFalse();
+        assertThat(passwordEncoder()
+                        .matches(
+                                rotated.plaintextSecret(),
+                                currentSecretHash(registration.app().id())))
+                .isTrue();
+        assertThatThrownBy(() -> service()
+                        .rotateSecret(
+                                ClientOwner.ofUser(OTHER_USER_ID),
+                                registration.app().id()))
+                .isInstanceOf(JauthException.class);
+    }
+
+    @Test
+    void rotateSecretRejectedForPublicApp() {
+        OwnedAppService.Registration registration = service().register(USER_ID, "公开勿轮", REDIRECTS, false);
+        assertThatThrownBy(() -> service()
+                        .rotateSecret(
+                                ClientOwner.ofUser(USER_ID), registration.app().id()))
+                .isInstanceOf(JauthException.class);
+    }
+
+    @Test
+    void updateRewritesNameAndRedirectsScopedToOwner() {
+        OwnedAppService.Registration registration = service().register(USER_ID, "旧名", REDIRECTS, true);
+        OwnedAppService.OwnedApp updated = service()
+                .update(
+                        ClientOwner.ofUser(USER_ID),
+                        registration.app().id(),
+                        "新名",
+                        Set.of("https://new.example.com/cb"));
+        assertThat(updated.name()).isEqualTo("新名");
+        assertThat(updated.redirectUris()).containsExactly("https://new.example.com/cb");
+        assertThatThrownBy(() -> service()
+                        .update(
+                                ClientOwner.ofUser(OTHER_USER_ID),
+                                registration.app().id(),
+                                "窃名",
+                                REDIRECTS))
+                .isInstanceOf(JauthException.class);
+    }
+
+    @Test
+    void deleteRemovesFromListAndRejectsForeignOwner() {
+        OwnedAppService.Registration registration = service().register(USER_ID, "待删契约", REDIRECTS, false);
+        assertThatThrownBy(() -> service()
+                        .delete(
+                                ClientOwner.ofUser(OTHER_USER_ID),
+                                registration.app().id()))
+                .isInstanceOf(JauthException.class);
+        service().delete(ClientOwner.ofUser(USER_ID), registration.app().id());
+        assertThat(service().list(USER_ID)).isEmpty();
+    }
+
+    /** 当前存储哈希（jdbc 查列 / memory 经编码器往返由子类实现）。 */
+    protected abstract String currentSecretHash(String appId);
+
     protected abstract OwnedAppService service();
 
     /** 落位后的 client 读取面（断言存储侧形态：secret 编码、设置、grants）。 */

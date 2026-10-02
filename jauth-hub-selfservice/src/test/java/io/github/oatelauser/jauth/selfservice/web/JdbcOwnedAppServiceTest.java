@@ -3,6 +3,7 @@ package io.github.oatelauser.jauth.selfservice.web;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.oatelauser.jauth.core.client.JauthJdbcRegisteredClientRepository;
+import io.github.oatelauser.jauth.core.token.JdbcTokenFamilyService;
 import io.github.oatelauser.jauth.selfservice.support.IntegrationTestSupport;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,19 @@ class JdbcOwnedAppServiceTest extends AbstractOwnedAppServiceContractTest {
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     private final JdbcOwnedAppService service = new JdbcOwnedAppService(
-            this.clientRepository, this.jdbcTemplate, null, this.passwordEncoder, scopeCatalog(), fixedClock());
+            this.clientRepository,
+            this.jdbcTemplate,
+            null,
+            new JdbcTokenFamilyService(this.jdbcTemplate),
+            this.passwordEncoder,
+            scopeCatalog(),
+            fixedClock());
+
+    @Override
+    protected String currentSecretHash(String appId) {
+        return this.jdbcTemplate.queryForObject(
+                "SELECT client_secret FROM oauth2_registered_client WHERE id = ?", String.class, appId);
+    }
 
     @Override
     protected OwnedAppService service() {
@@ -95,6 +108,7 @@ class JdbcOwnedAppServiceTest extends AbstractOwnedAppServiceContractTest {
                 this.clientRepository,
                 this.jdbcTemplate,
                 new TransactionTemplate(new DataSourceTransactionManager(this.jdbcTemplate.getDataSource())),
+                new JdbcTokenFamilyService(this.jdbcTemplate),
                 this.passwordEncoder,
                 scopeCatalog(),
                 fixedClock());

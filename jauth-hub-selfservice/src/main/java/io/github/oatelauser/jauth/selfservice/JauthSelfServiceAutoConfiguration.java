@@ -9,6 +9,8 @@ import io.github.oatelauser.jauth.core.org.OrgRepository;
 import io.github.oatelauser.jauth.core.org.OrgService;
 import io.github.oatelauser.jauth.core.response.ResponseRenderer;
 import io.github.oatelauser.jauth.core.scope.ScopeCatalog;
+import io.github.oatelauser.jauth.core.token.InMemoryTokenFamilyService;
+import io.github.oatelauser.jauth.core.token.JdbcTokenFamilyService;
 import io.github.oatelauser.jauth.core.user.SudoGate;
 import io.github.oatelauser.jauth.core.user.UserRepository;
 import io.github.oatelauser.jauth.core.web.EducationalFlag;
@@ -26,6 +28,7 @@ import io.github.oatelauser.jauth.selfservice.web.OrgInstallationsController;
 import io.github.oatelauser.jauth.selfservice.web.OwnedAppService;
 import io.github.oatelauser.jauth.selfservice.web.PasskeyController;
 import io.github.oatelauser.jauth.selfservice.web.PatController;
+import io.github.oatelauser.jauth.selfservice.web.SensitiveScopeSudoInterceptor;
 import io.github.oatelauser.jauth.selfservice.web.SudoController;
 import io.github.oatelauser.jauth.selfservice.web.SudoInterceptor;
 import java.nio.charset.StandardCharsets;
@@ -176,6 +179,9 @@ public class JauthSelfServiceAutoConfiguration {
                 @Override
                 public void addInterceptors(InterceptorRegistry registry) {
                     registry.addInterceptor(new SudoInterceptor(sudoGate, auditPublisher, userRepository));
+                    // 敏感 scope 联动门(v1.3 D2):与 SudoInterceptor 同场注册(sudo 开),零敏感注解时零行为
+                    registry.addInterceptor(
+                            new SensitiveScopeSudoInterceptor(sudoGate, auditPublisher, userRepository));
                 }
             };
         }
@@ -187,9 +193,10 @@ public class JauthSelfServiceAutoConfiguration {
                 ObjectProvider<OwnedAppService> ownedAppService,
                 UserRepository userRepository,
                 EducationalFlag educational,
-                ResponseRenderer responseRenderer) {
+                ResponseRenderer responseRenderer,
+                AuditEventPublisher auditPublisher) {
             return new MyAppsController(
-                    ownedAppService.getIfAvailable(), userRepository, educational, responseRenderer);
+                    ownedAppService.getIfAvailable(), userRepository, educational, responseRenderer, auditPublisher);
         }
 
         /**
@@ -243,14 +250,16 @@ public class JauthSelfServiceAutoConfiguration {
                 ObjectProvider<OrgRepository> orgRepository,
                 UserRepository userRepository,
                 EducationalFlag educational,
-                ResponseRenderer responseRenderer) {
+                ResponseRenderer responseRenderer,
+                AuditEventPublisher auditPublisher) {
             return new OrgAppsController(
                     ownedAppService.getIfAvailable(),
                     orgService.getIfAvailable(),
                     orgRepository.getIfAvailable(),
                     userRepository,
                     educational,
-                    responseRenderer);
+                    responseRenderer,
+                    auditPublisher);
         }
 
         /**
@@ -344,6 +353,7 @@ public class JauthSelfServiceAutoConfiguration {
                 JauthJdbcRegisteredClientRepository clientRepository,
                 DataSource dataSource,
                 ObjectProvider<TransactionTemplate> transactionTemplate,
+                JdbcTokenFamilyService tokenFamilyService,
                 PasswordEncoder passwordEncoder,
                 ScopeCatalog scopeCatalog,
                 Clock clock) {
@@ -351,6 +361,7 @@ public class JauthSelfServiceAutoConfiguration {
                     clientRepository,
                     new JdbcTemplate(dataSource),
                     transactionTemplate.getIfAvailable(),
+                    tokenFamilyService,
                     passwordEncoder,
                     scopeCatalog,
                     clock);
@@ -371,12 +382,14 @@ public class JauthSelfServiceAutoConfiguration {
         InMemoryOwnedAppService jauthOwnedAppService(
                 RegisteredClientRepository clientRepository,
                 InMemoryClientOwnerResolver ownerResolver,
+                InMemoryTokenFamilyService tokenFamilyService,
                 PasswordEncoder passwordEncoder,
                 ScopeCatalog scopeCatalog,
                 ObjectProvider<Clock> clock) {
             return new InMemoryOwnedAppService(
                     clientRepository,
                     ownerResolver,
+                    tokenFamilyService,
                     passwordEncoder,
                     scopeCatalog,
                     clock.getIfAvailable(Clock::systemUTC));

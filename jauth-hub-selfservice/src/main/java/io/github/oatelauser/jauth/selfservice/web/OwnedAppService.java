@@ -146,6 +146,67 @@ public abstract class OwnedAppService {
     public abstract List<OwnedApp> listOrg(String orgId);
 
     /**
+     * 轮转 secret（v1.3 D2）：服务端生成新高熵 secret，旧值即刻失效；**不焚令牌**（拍板口径——轮转是
+     * 防御性换钥，既有授权的生命周期不受牵连）。明文只在返回值出现一次（register 同款纪律）。
+     * 仅机密应用可轮转（公开应用无 secret）。
+     *
+     * @param owner 归属（所有权随 WHERE/登记表收紧：他人 id 不可轮转）
+     * @param appId 应用 id（oauth2_registered_client.id）
+     * @return 应用视图 + 仅此一次的新明文 secret
+     * @throws io.github.oatelauser.jauth.core.response.JauthException B0502：不存在、非本人或公开应用
+     */
+    public Registration rotateSecret(ClientOwner owner, String appId) {
+        Assert.notNull(owner, "owner cannot be null");
+        Assert.hasText(appId, "appId cannot be empty");
+        String rawSecret = randomUrlSafe(SECRET_ENTROPY_BYTES);
+        OwnedApp app = persistSecretRotation(owner, appId, this.passwordEncoder.encode(rawSecret));
+        return new Registration(app, rawSecret);
+    }
+
+    /**
+     * 编辑应用（v1.3 D2）：改名与改 redirect 白名单（校验口径与注册同源）；secret 与归属不动。
+     *
+     * @param owner 归属（所有权收紧）
+     * @param appId 应用 id
+     * @param name 新应用名（非空，≤100 字符）
+     * @param redirectUris 新回调白名单（非空，口径同注册）
+     * @return 更新后的应用视图
+     * @throws io.github.oatelauser.jauth.core.response.JauthException B0502：不存在或非本人
+     */
+    public OwnedApp update(ClientOwner owner, String appId, String name, Set<String> redirectUris) {
+        Assert.notNull(owner, "owner cannot be null");
+        Assert.hasText(appId, "appId cannot be empty");
+        Assert.hasText(name, "name cannot be empty");
+        Assert.isTrue(name.trim().length() <= NAME_MAX_LENGTH, "name exceeds " + NAME_MAX_LENGTH + " chars");
+        Assert.notEmpty(redirectUris, "redirectUris cannot be empty");
+        redirectUris.forEach(OwnedAppService::requireValidRedirectUri);
+        return persistUpdate(owner, appId, name.trim(), Set.copyOf(redirectUris));
+    }
+
+    /**
+     * 删除应用（v1.3 D2，级联全焚拍板）：该 client 的全部授权行、consent、安装行随删，族谱按 client
+     * 跨主体烧断（顺序：先删授权后烧族，中断停安全态）。审计事件由控制器面发布（CLIENT_DELETED）。
+     *
+     * @param owner 归属（所有权收紧）
+     * @param appId 应用 id
+     * @throws io.github.oatelauser.jauth.core.response.JauthException B0502：不存在或非本人
+     */
+    public void delete(ClientOwner owner, String appId) {
+        Assert.notNull(owner, "owner cannot be null");
+        Assert.hasText(appId, "appId cannot be empty");
+        persistDelete(owner, appId);
+    }
+
+    /** 轮转落位：写新 secret 哈希并回读视图（miss/公开应用 → B0502）。 */
+    protected abstract OwnedApp persistSecretRotation(ClientOwner owner, String appId, String encodedSecret);
+
+    /** 编辑落位：写名与白名单并回读视图（miss → B0502）。 */
+    protected abstract OwnedApp persistUpdate(ClientOwner owner, String appId, String name, Set<String> redirectUris);
+
+    /** 删除落位：级联清剿（授权/consent/安装/族谱烧断/本行删除；miss → B0502）。 */
+    protected abstract void persistDelete(ClientOwner owner, String appId);
+
+    /**
      * 双写落位（client 本体 + owner 归属）：jdbc 实现包事务，memory 实现为框架 save + owner 登记表 put。
      *
      * @param client 已构造完成的客户端

@@ -21,6 +21,8 @@
                       font-family: ui-monospace, Consolas, monospace; min-height: 96px; }
     .field select { border: 1px solid #dfe3ef; border-radius: 8px; padding: 10px 12px; font-size: 15px; }
     .card h2 { margin: 20px 0 12px; font-size: 17px; }
+    .ss-actions button { margin-right: 6px; padding: 3px 10px; font-size: 13px; cursor: pointer; }
+    .ss-actions button.danger { color: #b02a37; }
   </style>
   <div class="page">
     <main class="card ss-wide">
@@ -58,10 +60,11 @@
               <th th:text="#{jauth.orgapps.col-type}">类型</th>
               <th th:text="#{jauth.orgapps.col-redirects}">回调地址</th>
               <th th:text="#{jauth.orgapps.col-created}">创建时间</th>
+              <th th:text="#{jauth.orgapps.col-actions}">管理</th>
             </tr>
           </thead>
           <tbody>
-            <tr th:each="app : ${apps}">
+            <tr th:each="app : ${apps}" th:attr="data-app-id=${app.id}">
               <td class="scope-name" th:text="${app.name}">组织应用</td>
               <td class="ss-mono" th:text="${app.clientId}">app_xxxxxxxx</td>
               <td>
@@ -70,6 +73,12 @@
               </td>
               <td class="ss-mono" th:text="${#strings.listJoin(app.redirectUris, ' ')}">https://app.example.com/callback</td>
               <td th:text="${#temporals.format(app.createdAt, 'yyyy-MM-dd HH:mm')}">2026-09-30 10:00</td>
+              <td class="ss-actions">
+                <button type="button" class="rotate" th:if="${app.confidential}"
+                        th:text="#{jauth.orgapps.rotate}">轮转密钥</button>
+                <button type="button" class="edit" th:text="#{jauth.orgapps.edit}">编辑</button>
+                <button type="button" class="danger delete" th:text="#{jauth.orgapps.delete}">删除</button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -129,6 +138,58 @@
             document.getElementById('secret-banner').hidden = false;
             form.hidden = true;
           });
+      });
+
+      /* 管理动作（v1.3 D2）：轮转/编辑/删除（A0515 = sudo 过期跳验证页，C3 语义） */
+      var orgBase = /*[[ @{/selfservice/orgs/{orgId}/apps(orgId=${org.id})} ]]*/ '/selfservice/orgs/org/apps';
+      function manage(method, suffix, body) {
+        var headers = { 'Accept': 'application/json' };
+        if (csrfMeta && csrfHeaderMeta) { headers[csrfHeaderMeta.content] = csrfMeta.content; }
+        return fetch(orgBase + suffix, {
+          method: method,
+          headers: headers,
+          credentials: 'same-origin',
+          body: body ? JSON.stringify(body) : undefined
+        }).then(function (response) {
+          return response.json().then(function (payload) { return { ok: response.ok, payload: payload }; });
+        });
+      }
+      function handleResult(result, onOk) {
+        if (result.ok) { onOk(result.payload); return; }
+        if (result.payload && result.payload.code === 'A0515') {
+          window.location.href = '/selfservice/sudo?returnTo=' + encodeURIComponent(window.location.pathname);
+          return;
+        }
+        window.alert((result.payload && result.payload.message) || '操作失败');
+      }
+      document.querySelectorAll('tr[data-app-id]').forEach(function (row) {
+        var appId = row.getAttribute('data-app-id');
+        var rotateButton = row.querySelector('button.rotate');
+        if (rotateButton) {
+          rotateButton.addEventListener('click', function () {
+            manage('POST', '/' + appId + '/secret').then(function (result) {
+              handleResult(result, function (payload) {
+                document.getElementById('client-id-value').textContent = payload.data.clientId;
+                document.getElementById('secret-value').textContent = payload.data.clientSecret;
+                document.getElementById('secret-row').hidden = false;
+                document.getElementById('secret-banner').hidden = false;
+              });
+            });
+          });
+        }
+        row.querySelector('button.edit').addEventListener('click', function () {
+          var name = window.prompt('新应用名', '');
+          if (name === null) { return; }
+          var redirects = window.prompt('回调地址（每行一个，精确匹配）', '');
+          if (redirects === null) { return; }
+          manage('POST', '/' + appId, { name: name, redirectUris: redirects })
+            .then(function (result) { handleResult(result, function () { window.location.reload(); }); });
+        });
+        row.querySelector('button.delete').addEventListener('click', function () {
+          if (!window.confirm('确认删除该应用？其全部授权与安装将一并失效，不可恢复。')) { return; }
+          manage('DELETE', '/' + appId)
+            .then(function (result) { handleResult(result, function () { window.location.reload(); }); });
+        });
       });
     })();
   </script>

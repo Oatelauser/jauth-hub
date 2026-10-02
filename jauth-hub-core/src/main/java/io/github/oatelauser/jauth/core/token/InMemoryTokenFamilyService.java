@@ -114,6 +114,17 @@ public class InMemoryTokenFamilyService {
     }
 
     /**
+     * 烧断该 client 的全部族谱行（跨主体，v1.3 D2 应用删除级联；JDBC 版镜像方法）。
+     *
+     * @param registeredClientId 客户端 id
+     * @return 标记行数
+     */
+    public synchronized int burnAllByClient(String registeredClientId) {
+        Assert.hasText(registeredClientId, "registeredClientId cannot be empty");
+        return markBurned(row -> row.registeredClientId().equals(registeredClientId));
+    }
+
+    /**
      * 记一条授权归属（FamilyAware 包装的 save 侧调用，授权 id 索引维护）。幂等。
      *
      * @param principalName 主体名

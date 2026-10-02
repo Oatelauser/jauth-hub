@@ -9,6 +9,8 @@ import io.github.oatelauser.jauth.core.response.DefaultResponseRenderer;
 import io.github.oatelauser.jauth.core.response.ResponseRenderer;
 import io.github.oatelauser.jauth.core.scope.InMemoryScopeCatalog;
 import io.github.oatelauser.jauth.core.scope.ScopeCatalog;
+import io.github.oatelauser.jauth.core.token.InMemoryTokenFamilyService;
+import io.github.oatelauser.jauth.core.token.JdbcTokenFamilyService;
 import io.github.oatelauser.jauth.core.user.InMemoryUserRepository;
 import io.github.oatelauser.jauth.core.user.UserRepository;
 import io.github.oatelauser.jauth.core.web.EducationalFlag;
@@ -62,7 +64,9 @@ class JauthSelfServiceAutoConfigurationTest {
             .withBean(ResponseRenderer.class, DefaultResponseRenderer::new)
             .withBean(PasswordEncoder.class, BCryptPasswordEncoder::new)
             .withBean(MessageSource.class, JauthSelfServiceAutoConfigurationTest::messageSource)
-            .withBean(Clock.class, () -> Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
+            .withBean(Clock.class, () -> Clock.fixed(Instant.EPOCH, ZoneOffset.UTC))
+            .withBean(io.github.oatelauser.jauth.core.audit.AuditEventPublisher.class, () -> event -> {})
+            .withBean(InMemoryTokenFamilyService.class, InMemoryTokenFamilyService::new);
 
     @Test
     void jdbcModeRegistersPatAndDashboardServices() {
@@ -74,6 +78,9 @@ class JauthSelfServiceAutoConfigurationTest {
                 .withBean(
                         JauthJdbcRegisteredClientRepository.class,
                         () -> mock(JauthJdbcRegisteredClientRepository.class))
+                .withBean(
+                        JdbcTokenFamilyService.class,
+                        () -> new JdbcTokenFamilyService(mock(org.springframework.jdbc.core.JdbcOperations.class)))
                 .run(context -> {
                     assertThat(context).hasSingleBean(PatService.class);
                     assertThat(context).hasSingleBean(JdbcPatService.class);

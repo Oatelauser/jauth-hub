@@ -94,6 +94,7 @@ class OrgAppsControllerTest {
                         .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
                         .build()),
                 new InMemoryClientOwnerResolver(),
+                new io.github.oatelauser.jauth.core.token.InMemoryTokenFamilyService(),
                 new BCryptPasswordEncoder(),
                 new InMemoryScopeCatalog(),
                 Clock.fixed(T0, ZoneOffset.UTC));
@@ -171,7 +172,7 @@ class OrgAppsControllerTest {
                         .content("{\"name\":\"x\",\"redirectUris\":\"https://a.example.com/cb\"}"))
                 .andExpect(jsonPath("$.code").value("A0503"));
         MockMvc missing = MockMvcBuilders.standaloneSetup(new OrgAppsController(
-                        null, null, null, this.users, EducationalFlag.ON, new DefaultResponseRenderer()))
+                        null, null, null, this.users, EducationalFlag.ON, new DefaultResponseRenderer(), event -> {}))
                 .setControllerAdvice(jauthAdvice())
                 .build();
         missing.perform(post(appsPath())
@@ -211,7 +212,8 @@ class OrgAppsControllerTest {
                 this.orgRepository,
                 this.users,
                 EducationalFlag.ON,
-                new DefaultResponseRenderer());
+                new DefaultResponseRenderer(),
+                event -> {});
     }
 
     private static JauthResponseAdvice jauthAdvice() {
