@@ -47,11 +47,17 @@ describe('设计系统 app.css', () => {
     }
   });
 
-  it('旧暗色教学皮肤退场：渐变背景与侧栏/步骤条/教学块样式不再出现', () => {
-    expect(css).not.toContain('gradient');
-    expect(css).not.toContain('.sidebar');
-    expect(css).not.toContain('.steps');
-    expect(css).not.toContain('.teach');
-    expect(css).not.toContain('.httplog');
+  it('暗色教学皮肤只活在 /front/demo 教学区分区：主站无渐变/侧栏/步骤条/教学块，demo 分区俱全（B4 宪法）', () => {
+    const cut = css.indexOf('---------- 16.');
+    expect(cut).toBeGreaterThan(0); // 教学区分节在场（被误删即此断言先红）
+    const mainSite = css.slice(0, cut);
+    const demoZone = css.slice(cut);
+    for (const frag of ['gradient', '.sidebar', '.steps', '.teach', '.httplog']) {
+      expect(mainSite).not.toContain(frag);
+    }
+    expect(demoZone).toContain('gradient');
+    expect(demoZone).toContain('.demo-steps');
+    expect(demoZone).toContain('.demo-log-entries');
+    expect(demoZone).toContain('.demo-teach');
   });
 });

@@ -19,6 +19,8 @@ const navItems = [
   // 非超管点入由 AdminUsers 页的 403 错误态兜底，不白屏
   { to: '/profile', key: 'nav.profile' },
   { to: '/admin/users', key: 'nav.admin-users' },
+  // B4 教学区单项：demo 四页壳外自有布局（三层教学），此处只是跨区入口（SPA 内路由切换）
+  { to: '/demo', key: 'nav.demo' },
 ];
 
 onMounted(async () => {

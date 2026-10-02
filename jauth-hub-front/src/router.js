@@ -14,11 +14,16 @@ import OrgMembers from './pages/OrgMembers.vue';
 import Passkey from './pages/Passkey.vue';
 import Profile from './pages/Profile.vue';
 import AdminUsers from './pages/AdminUsers.vue';
+import DemoIndex from './pages/DemoIndex.vue';
+import DemoCallback from './pages/DemoCallback.vue';
+import DemoToken from './pages/DemoToken.vue';
+import DemoApiCall from './pages/DemoApiCall.vue';
 
 // base /front/（B4 装配的服务路径）；consent/sudo 页参数从 location.search 自取，不入路由状态
-// （org 子页的 orgId 同理，从 pathname 自取——照 consent 页先例）。
+// （org 子页的 orgId 同理，从 pathname 自取——照 consent 页先例；demo 回调的 code/state 同款）。
 // 信任页（login/consent/device-verify/sudo）不进导航壳（v1.5 宪法：壳只挂自助面）；
-// my-app-new 不设独立路由，注册并入 my-apps 页内对话框（B0 普查决议）。
+// my-app-new 不设独立路由，注册并入 my-apps 页内对话框（B0 普查决议）；
+// demo 教学区四页（B4）壳外独立路由——教学区自有布局（三层教学），不入企业级壳。
 export const router = createRouter({
   history: createWebHistory('/front/'),
   routes: [
@@ -26,6 +31,10 @@ export const router = createRouter({
     { path: '/consent', component: Consent },
     { path: '/device-verify', component: DeviceVerify },
     { path: '/sudo', component: Sudo },
+    { path: '/demo', component: DemoIndex },
+    { path: '/demo/callback', component: DemoCallback },
+    { path: '/demo/token', component: DemoToken },
+    { path: '/demo/api-call', component: DemoApiCall },
     {
       path: '/',
       component: ShellLayout,

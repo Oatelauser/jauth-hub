@@ -103,7 +103,9 @@ class JauthHubAppIntegrationTest {
         assertThat(publicClient.getClientSettings().isRequireAuthorizationConsent())
                 .as("教学第 2 步：consent 页可见（B6-fix 缺陷 3）")
                 .isTrue();
-        assertThat(publicClient.getRedirectUris()).contains("http://localhost:8080/demo/callback");
+        // v1.5 B4：白名单新旧两条（旧 SSR 回调 + SPA 回调），缺一即授权码流程换端断链
+        assertThat(publicClient.getRedirectUris())
+                .contains("http://localhost:8080/demo/callback", "http://localhost:8080/front/demo/callback");
         assertThat(publicClient.getScopes()).containsExactlyInAnyOrder("openid", "profile");
 
         RegisteredClient rsClient = this.registeredClientRepository.findByClientId("demo-rs");

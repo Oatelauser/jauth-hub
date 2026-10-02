@@ -695,3 +695,319 @@ a {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 0;
 }
+
+/* ---------- 16. /front/demo 教学区（B4） ---------- */
+/* v1.5 宪法：教学形态收缩进 /demo 专区，三层教学全量保留；暗色渐变视觉基因在此回归
+   （core jauth.css 的渐变背景 + 白卡 + #e94560 强调色一系，照搬自 SSR 教学区），与企业级
+   浅色主站刻意区分。全部选择器挂在 .demo-zone 之下，主站皮肤零感染——design.spec 以本
+   分节边界守护（16 节之前不得出现渐变/教学类）。 */
+
+.demo-zone {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+  background-attachment: fixed;
+  padding: 32px 16px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  align-items: center;
+}
+
+/* 顶部流程图步骤条（第一层教学）：横向四格，counter 出序号，active 高亮当前步 */
+.demo-steps {
+  width: 100%;
+  max-width: 1040px;
+}
+
+.demo-steps ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: step;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.demo-steps li {
+  position: relative;
+  counter-increment: step;
+  flex: 1 1 200px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  padding: 10px 12px 10px 40px;
+  font-size: var(--font-size-sm);
+  line-height: 20px;
+  color: #c9d1e8;
+}
+
+.demo-steps li::before {
+  position: absolute;
+  left: 12px;
+  top: 10px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: var(--font-size-xs);
+  line-height: 20px;
+  text-align: center;
+  content: counter(step);
+}
+
+.demo-steps li.active {
+  color: #ffffff;
+  font-weight: 600;
+  border-color: #e94560;
+}
+
+.demo-steps li.active::before {
+  background: #e94560;
+  color: #ffffff;
+}
+
+/* 主列：httplog 侧栏（第二层教学）+ 白卡主内容 */
+.demo-columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  align-items: flex-start;
+  justify-content: center;
+  width: 100%;
+  max-width: 1040px;
+}
+
+.demo-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 300px;
+  max-width: 100%;
+}
+
+.demo-panel {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  color: #c9d1e8;
+}
+
+.demo-panel h2 {
+  margin: 0 0 10px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8fa3cf;
+}
+
+/* 终端式 HTTP 日志（照 SSR demo.css 的 httplog-entries 一系） */
+.demo-log-entries {
+  max-height: 260px;
+  overflow-y: auto;
+  border-radius: var(--radius-md);
+  background: #10142a;
+  padding: 10px 12px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: var(--font-size-xs);
+  line-height: 1.7;
+  color: #c9d1e8;
+  word-break: break-all;
+}
+
+.demo-log-empty {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: #8fa3cf;
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-md);
+  padding: 12px 10px;
+  text-align: center;
+}
+
+.demo-log-entry.req .demo-log-text {
+  color: #8fa3cf;
+}
+
+.demo-log-entry.ok .demo-log-text {
+  color: #95de64;
+}
+
+.demo-log-entry.err .demo-log-text {
+  color: #ff9498;
+}
+
+.demo-log-time {
+  margin-right: 4px;
+  color: #5d6787;
+}
+
+.demo-log-body {
+  margin: 2px 0 4px;
+}
+
+.demo-log-body summary {
+  cursor: pointer;
+  color: #8fa3cf;
+}
+
+.demo-log-body pre {
+  margin: 4px 0;
+  max-height: 180px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+/* 白卡（教学区卡放宽到 680px、影加深——照 SSR demo-card）；强调色回归教学区红 */
+.demo-zone .card {
+  max-width: 680px;
+  border: none;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.38);
+}
+
+.demo-zone .card .brand {
+  color: #e94560;
+}
+
+.demo-zone .btn.primary {
+  background: #e94560;
+  border-color: #e94560;
+}
+
+.demo-zone .btn.primary:hover {
+  background: #c73350;
+  border-color: #c73350;
+}
+
+/* "发生了什么"折叠说明块（第三层教学，原生 details 无 JS） */
+.demo-teach {
+  margin: 0 0 16px;
+  border: 1px solid #dfe3ef;
+  border-radius: 10px;
+  background: #f6f8fd;
+}
+
+.demo-teach summary {
+  cursor: pointer;
+  padding: 10px 12px;
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.demo-teach p {
+  margin: 0;
+  padding: 0 12px 12px;
+  font-size: var(--font-size-sm);
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+}
+
+/* 以下拼装件照 SSR demo.css 逐条迁移（demo- 前缀收编命名空间） */
+.demo-client-line {
+  margin: 0 0 16px;
+  font-size: var(--font-size-body);
+  color: var(--color-text-secondary);
+}
+
+.demo-client-line strong {
+  color: var(--color-text);
+}
+
+.demo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.demo-kv {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-body);
+  margin: 8px 0;
+}
+
+.demo-kv th,
+.demo-kv td {
+  border-bottom: 1px solid #dfe3ef;
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.demo-kv th {
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  width: 9em;
+}
+
+.demo-kv td {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: var(--font-size-sm);
+  word-break: break-all;
+}
+
+.demo-json {
+  margin: 8px 0 0;
+  border-radius: var(--radius-md);
+  border: 1px solid #dfe3ef;
+  background: #f6f8fd;
+  padding: 12px 14px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: var(--font-size-xs);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.demo-token {
+  border-radius: var(--radius-md);
+  background: #10142a;
+  color: #7ce8b2;
+  padding: 10px 14px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: var(--font-size-xs);
+  word-break: break-all;
+}
+
+.demo-status {
+  display: inline-block;
+  border-radius: 10px;
+  padding: 1px 10px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.demo-status.s2xx {
+  background: #e8f8ee;
+  color: #1f7a3d;
+}
+
+.demo-status.s4xx {
+  background: #fdeef1;
+  color: #b02a37;
+}
+
+.demo-countdown {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.demo-countdown.expired {
+  color: #b02a37;
+}
+
+.demo-section-title {
+  margin: 22px 0 8px;
+  font-size: var(--font-size-lg);
+}
+
+.demo-hint {
+  margin: 6px 0 12px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}

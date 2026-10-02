@@ -92,7 +92,8 @@ public class DemoController {
         config.put("tokenEndpoint", issuer + authorizationServerSettings.getTokenEndpoint());
         config.put("introspectEndpoint", issuer + authorizationServerSettings.getTokenIntrospectionEndpoint());
         config.put("clientId", DEMO_PUBLIC_CLIENT_ID);
-        config.put("redirectUri", issuer + "/demo/callback");
+        // v1.5 B4：回调指向 SPA（/front/demo/callback）；旧 SSR 回调路径由种子白名单旧条目继续兼容
+        config.put("redirectUri", issuer + "/front/demo/callback");
         config.put("scope", DEMO_SCOPE);
         // 内省演示凭证与 rs-starter 同源（jauth-hub.rs.*）：教学页直连 /introspect 复用同一机密客户端。
         // 仅 dev 教学夹具可如此——生产内省凭证只存在于资源服务器后端，页面教学文案明示这一点。

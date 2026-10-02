@@ -4,7 +4,8 @@
 // navigator.language 判 en、缺键回退 zh，其余语言一律 zh（与 SSR messageSource 行为同向）。
 // 动态族两处：pat.validity-{30|90|365}、orginst.status-{PENDING|APPROVED|REJECTED|REVOKED}
 // （枚举名直拼，B1b 决议：JSON 面出原始枚举名，i18n 键归前端字典）；scope 描述由服务端
-// 状态面随目录带出，不进字典（B3 决议）。教学文案已随 B2a 企业化换皮退场。
+// 状态面随目录带出，不进字典（B3 决议）。教学文案在 B4 随 /demo 教学区四页回归（demo.* 族，
+// 主站页面仍无教学层）。
 const zh = {
   'brand': 'jauth-hub',
   'login.title': '登录',
@@ -275,6 +276,55 @@ const zh = {
   'adminusers.page-prev': '上一页',
   'adminusers.page-next': '下一页',
   'adminusers.page-summary': '共 {0} 条 / 第 {1} 页 / 共 {2} 页',
+
+  // ---------- /demo 教学区（B4，三层教学照 SSR 键义迁移） ----------
+  'nav.demo': '教学区',
+  'demo.flow-title': '当前流程',
+  'demo.flow.step1': '应用发起授权，跳转登录',
+  'demo.flow.step2': '用户授权确认',
+  'demo.flow.step3': '回调用授权码换取令牌',
+  'demo.flow.step4': '持令牌访问资源',
+  'demo.what-happened': '发生了什么',
+  'demo.httplog': 'HTTP 日志',
+  'demo.httplog-empty': '（等待首个请求）',
+  'demo.log-body': '响应体',
+  'demo.index.title': '发起授权码流程',
+  'demo.index.teach':
+    '点击"开始授权"后，本页脚本会生成 PKCE 的 code_verifier 与随机 state 存入 sessionStorage，再用 SHA-256 算出 code_challenge（S256），携带 client_id 与 redirect_uri 跳转认证中心的 /oauth2/authorize。公开客户端没有 secret，全程靠 PKCE 防授权码被截走。',
+  'demo.index.client-line': '将以公开客户端 <strong>demo-public</strong>（强制 PKCE）申请 scope：openid profile',
+  'demo.index.start': '开始授权',
+  'demo.callback.title': '回调：用授权码换令牌',
+  'demo.callback.teach':
+    '认证中心把浏览器重定向回本页并带上一次性授权码。页面脚本先校验 state（防 CSRF），再从 sessionStorage 取出 code_verifier，由浏览器直接向同源 /oauth2/token 发起交换——公开客户端没有后端，这一步合法且必须携带 PKCE 验证因子。授权码 5 分钟有效且一次性。',
+  'demo.callback.no-code': '回调中没有 authorization_code',
+  'demo.callback.missing-verifier': '未找到 code_verifier，请回首页重新发起授权',
+  'demo.callback.state-mismatch':
+    'state 校验失败：回调参数与发起时不一致，可能是会话串号或注入，已中止交换',
+  'demo.callback.exchange-fail': '换令牌失败',
+  'demo.callback.go-token': '查看令牌面板',
+  'demo.callback.has-id-token': '有（OIDC）',
+  'demo.callback.has-refresh-token': '有（可轮转）',
+  'demo.callback.none': '无',
+  'demo.token.title': '令牌面板',
+  'demo.token.teach':
+    '本服务签发的是 opaque 令牌——它是不透明随机串，客户端无法像 JWT 那样本地解码 payload。想知道"令牌背后是谁、有哪些 scope"，正确姿势是把它交给内省端点（/oauth2/introspect）：认证中心查库返回 active/sub/username/scope。生产环境中这一步在资源服务器后端完成（正是 /api/demo/whoami 的做法），本页由脚本携带机密客户端凭证直连，只为让你看见原始报文。',
+  'demo.token.no-token': 'sessionStorage 中没有令牌，请先完成授权',
+  'demo.token.access-label': '访问令牌（opaque）',
+  'demo.token.masked': '…（已折叠）',
+  'demo.token.reveal': '显示 / 隐藏',
+  'demo.token.expires-label': '剩余有效期',
+  'demo.token.expired': '已过期（重新授权获取新令牌）',
+  'demo.token.introspect-title': '内省结果',
+  'demo.token.introspect-submit': '内省此令牌',
+  'demo.token.go-api': '持令牌调用受保护接口',
+  'demo.token.restart': '重新发起授权',
+  'demo.api.title': '持令牌调用受保护接口',
+  'demo.api.teach':
+    '最后一格的闭环：浏览器携带 Authorization: Bearer 访问 /api/demo/whoami。该接口由本应用以 rs-starter 接成资源服务器——它拿令牌去内省端点换回主体与权限，再把结果作为响应返回。不带令牌调用会得到 401，这就是"资源服务器视角"的全部秘密。',
+  'demo.api.need-token': '没有可用令牌，请先完成授权',
+  'demo.api.call': '带令牌调用 /api/demo/whoami',
+  'demo.api.call-bare': '不带令牌调用（预期 401）',
+  'demo.api.response-title': '响应',
 };
 
 const en = {
@@ -550,6 +600,54 @@ const en = {
   'adminusers.page-prev': 'Previous',
   'adminusers.page-next': 'Next',
   'adminusers.page-summary': '{0} users / page {1} of {2}',
+
+  // ---------- /demo teaching zone (B4, three-layer teaching per SSR keys) ----------
+  'nav.demo': 'Teaching zone',
+  'demo.flow-title': 'Current flow',
+  'demo.flow.step1': 'App starts authorization, redirects to login',
+  'demo.flow.step2': 'User grants consent',
+  'demo.flow.step3': 'Exchange code for token',
+  'demo.flow.step4': 'Access resource with token',
+  'demo.what-happened': 'What happened',
+  'demo.httplog': 'HTTP log',
+  'demo.httplog-empty': '(waiting for the first request)',
+  'demo.log-body': 'Response body',
+  'demo.index.title': 'Start the authorization code flow',
+  'demo.index.teach':
+    'On start, this page generates a PKCE code_verifier and a random state into sessionStorage, derives the S256 code_challenge, then redirects to /oauth2/authorize with client_id and redirect_uri. A public client has no secret; PKCE is the guard.',
+  'demo.index.client-line': 'Will request scope openid profile as public client <strong>demo-public</strong> (PKCE enforced)',
+  'demo.index.start': 'Start authorization',
+  'demo.callback.title': 'Callback: exchange the code for tokens',
+  'demo.callback.teach':
+    'The hub redirected back with a one-time authorization code. The script validates state, takes code_verifier from sessionStorage and exchanges it browser-side at /oauth2/token — legal for a public client with PKCE. Codes expire in 5 minutes and are single-use.',
+  'demo.callback.no-code': 'No authorization_code in the callback',
+  'demo.callback.missing-verifier': 'code_verifier not found; restart from the index page',
+  'demo.callback.state-mismatch': 'State mismatch: the callback differs from the request; exchange aborted',
+  'demo.callback.exchange-fail': 'Token exchange failed',
+  'demo.callback.go-token': 'Open the token panel',
+  'demo.callback.has-id-token': 'Yes (OIDC)',
+  'demo.callback.has-refresh-token': 'Yes (rotatable)',
+  'demo.callback.none': 'None',
+  'demo.token.title': 'Token panel',
+  'demo.token.teach':
+    'Tokens issued here are opaque: there is no payload to decode. To learn who is behind a token, hand it to /oauth2/introspect. In production this happens inside the resource server backend (as /api/demo/whoami does); this page calls it directly with the confidential client credentials only to show the raw exchange.',
+  'demo.token.no-token': 'No token in sessionStorage; complete authorization first',
+  'demo.token.access-label': 'Access token (opaque)',
+  'demo.token.masked': '… (masked)',
+  'demo.token.reveal': 'Show / hide',
+  'demo.token.expires-label': 'Time remaining',
+  'demo.token.expired': 'Expired (re-authorize for a new token)',
+  'demo.token.introspect-title': 'Introspection result',
+  'demo.token.introspect-submit': 'Introspect this token',
+  'demo.token.go-api': 'Call the protected API with the token',
+  'demo.token.restart': 'Restart authorization',
+  'demo.api.title': 'Call a protected API with the token',
+  'demo.api.teach':
+    'The closing loop: the browser calls /api/demo/whoami with Authorization: Bearer. The endpoint is wired as a resource server via rs-starter — it introspects the token and answers with the principal. Without a token you get 401.',
+  'demo.api.need-token': 'No token available; complete authorization first',
+  'demo.api.call': 'Call /api/demo/whoami with the token',
+  'demo.api.call-bare': 'Call without a token (expect 401)',
+  'demo.api.response-title': 'Response',
 };
 
 const locale = String(navigator.language || 'zh').toLowerCase().startsWith('en') ? 'en' : 'zh';

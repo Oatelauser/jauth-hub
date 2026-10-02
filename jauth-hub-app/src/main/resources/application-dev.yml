@@ -22,7 +22,9 @@ jauth-hub:
         - authorization_code
         - refresh_token
       redirect-uris:
+        # 旧 SSR 回调保留（SSR demo 活到 B5）；v1.5 B4 追加 SPA 回调（jauth-hub-front /front/demo/callback）
         - ${JAUTH_DEMO_REDIRECT_BASE:http://localhost:8080}/demo/callback
+        - ${JAUTH_DEMO_REDIRECT_BASE:http://localhost:8080}/front/demo/callback
       scopes:
         - openid
         - profile

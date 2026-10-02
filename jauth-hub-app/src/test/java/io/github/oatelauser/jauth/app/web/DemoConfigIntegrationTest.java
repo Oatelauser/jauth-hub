@@ -71,7 +71,7 @@ class DemoConfigIntegrationTest {
                 .andExpect(jsonPath("$.data.demoConfig.tokenEndpoint").value(containsString("/oauth2/token")))
                 .andExpect(jsonPath("$.data.demoConfig.introspectEndpoint").value(containsString("/oauth2/introspect")))
                 .andExpect(jsonPath("$.data.demoConfig.clientId").value("demo-public"))
-                .andExpect(jsonPath("$.data.demoConfig.redirectUri").value(containsString("/demo/callback")))
+                .andExpect(jsonPath("$.data.demoConfig.redirectUri").value(containsString("/front/demo/callback")))
                 .andExpect(jsonPath("$.data.demoConfig.scope").value("openid profile"))
                 .andExpect(jsonPath("$.data.demoConfig.rsClientId").value("demo-rs"))
                 .andExpect(jsonPath("$.data.demoConfig.rsClientSecret").value(not(emptyString())))
