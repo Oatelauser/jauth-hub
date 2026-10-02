@@ -223,6 +223,58 @@ class AdminUsersIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    @DisplayName("用户管理状态 API（v1.5 B1a）：PageResponse 形状（item/total/pageNum/pageSize/totalPage）+ clamp；门控同 SSR")
+    void adminUsersStateApiReturnsPageShapeAndGates() throws Exception {
+        long baseline = this.userRepository.countAll();
+        createUser("state-kate", null);
+        createUser("state-liam", "利亚姆");
+        createUser("state-mona", null);
+        long total = baseline + 3;
+
+        this.mockMvc
+                .perform(get("/api/admin/users")
+                        .with(superAdmin())
+                        .with(csrf())
+                        .queryParam("page", "2")
+                        .queryParam("size", "2")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("00000"))
+                .andExpect(jsonPath("$.data.educational").value(true))
+                .andExpect(jsonPath("$.data.total").value((int) total))
+                .andExpect(jsonPath("$.data.pageNum").value(2))
+                .andExpect(jsonPath("$.data.pageSize").value(2))
+                .andExpect(jsonPath("$.data.totalPage").value((int) ((total + 1) / 2)))
+                .andExpect(jsonPath("$.data.item.length()").value(2))
+                .andExpect(jsonPath("$.data.item[0].username").isNotEmpty())
+                .andExpect(jsonPath("$.data.item[0].role").isNotEmpty())
+                .andExpect(jsonPath("$.data.item[0].status").isNotEmpty())
+                .andExpect(jsonPath("$.data.item[0].password").doesNotExist())
+                .andExpect(jsonPath("$.data.csrfToken").isNotEmpty())
+                .andExpect(jsonPath("$.data.csrfHeaderName").value("X-CSRF-TOKEN"));
+
+        // clamp 同 SSR 页：size 超上限收到 100、page<1 收到 1
+        this.mockMvc
+                .perform(get("/api/admin/users")
+                        .with(superAdmin())
+                        .with(csrf())
+                        .queryParam("page", "0")
+                        .queryParam("size", "1000")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.data.pageNum").value(1))
+                .andExpect(jsonPath("$.data.pageSize").value(100));
+
+        this.mockMvc
+                .perform(get("/api/admin/users")
+                        .with(user("plain-user").roles("USER"))
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isForbidden());
+        this.mockMvc
+                .perform(get("/api/admin/users").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isUnauthorized());
+    }
+
     /** 翻转动作（role/status）：路径取 id 后缀，统一超管 + CSRF + 空 JSON 体。 */
     private ResultActions toggle(String idSuffix) throws Exception {
         return this.mockMvc.perform(adminJson(post("/api/admin/users/" + idSuffix), "{}"));

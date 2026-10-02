@@ -88,6 +88,29 @@ class ProfileIntegrationTest {
     }
 
     @Test
+    @DisplayName("档案页状态 API（v1.5 B1a）：00000 + username/displayName/educational + csrf 对；未认证 401")
+    void profileStateApiReturnsAccountAndCsrf() throws Exception {
+        createUser("state-olivia", "奥利维亚");
+
+        this.mockMvc
+                .perform(get("/api/profile")
+                        .with(user("state-olivia").roles("USER"))
+                        .with(csrf())
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("00000"))
+                .andExpect(jsonPath("$.data.educational").value(true))
+                .andExpect(jsonPath("$.data.username").value("state-olivia"))
+                .andExpect(jsonPath("$.data.displayName").value("奥利维亚"))
+                .andExpect(jsonPath("$.data.csrfToken").isNotEmpty())
+                .andExpect(jsonPath("$.data.csrfHeaderName").value("X-CSRF-TOKEN"));
+
+        this.mockMvc
+                .perform(get("/api/profile").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     @DisplayName("改显示名：落库可清空（null 回退用户名）；未认证 401/302")
     void updateDisplayNamePersistsAndClears() throws Exception {
         createUser("rename-pat", null);

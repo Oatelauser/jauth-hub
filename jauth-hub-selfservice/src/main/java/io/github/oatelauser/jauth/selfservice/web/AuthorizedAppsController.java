@@ -93,7 +93,7 @@ public class AuthorizedAppsController {
         if (this.appService == null || principal == null) {
             return VIEW_APPS;
         }
-        model.addAttribute("apps", appViews(this.appService.list(principal.getName())));
+        model.addAttribute("apps", appViews(this.appService.list(principal.getName()), this.clientRepository));
         return VIEW_APPS;
     }
 
@@ -108,7 +108,7 @@ public class AuthorizedAppsController {
     public Object list(@Nullable Principal principal) {
         AuthorizedAppService service = requireService();
         requirePrincipal(principal);
-        return this.responseRenderer.renderSuccess(appViews(service.list(principal.getName())));
+        return this.responseRenderer.renderSuccess(appViews(service.list(principal.getName()), this.clientRepository));
     }
 
     /**
@@ -168,20 +168,21 @@ public class AuthorizedAppsController {
         }
     }
 
-    private List<AppView> appViews(List<AuthorizedApp> apps) {
+    /** 行装配包内共径（v1.5 B1a：页面 / list / JSON 状态面三处同源，提为 static——不复制行装配逻辑）。 */
+    static List<AppView> appViews(List<AuthorizedApp> apps, RegisteredClientRepository clientRepository) {
         List<AppView> views = new ArrayList<>(apps.size());
         for (AuthorizedApp app : apps) {
             views.add(new AppView(
                     app.registeredClientId(),
-                    resolveClientName(app.registeredClientId()),
+                    resolveClientName(clientRepository, app.registeredClientId()),
                     new ArrayList<>(new TreeSet<>(app.scopes())),
                     app.lastAuthorizedAt()));
         }
         return views;
     }
 
-    private String resolveClientName(String registeredClientId) {
-        RegisteredClient client = this.clientRepository.findById(registeredClientId);
+    private static String resolveClientName(RegisteredClientRepository clientRepository, String registeredClientId) {
+        RegisteredClient client = clientRepository.findById(registeredClientId);
         return client != null && client.getClientName() != null ? client.getClientName() : registeredClientId;
     }
 

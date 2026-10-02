@@ -16,17 +16,21 @@ import io.github.oatelauser.jauth.core.user.UserRepository;
 import io.github.oatelauser.jauth.core.web.EducationalFlag;
 import io.github.oatelauser.jauth.selfservice.pat.JdbcPatService;
 import io.github.oatelauser.jauth.selfservice.pat.PatService;
+import io.github.oatelauser.jauth.selfservice.web.AppsStateController;
 import io.github.oatelauser.jauth.selfservice.web.AuthorizedAppService;
 import io.github.oatelauser.jauth.selfservice.web.AuthorizedAppsController;
 import io.github.oatelauser.jauth.selfservice.web.InMemoryOwnedAppService;
 import io.github.oatelauser.jauth.selfservice.web.JdbcOwnedAppService;
 import io.github.oatelauser.jauth.selfservice.web.MyAppsController;
+import io.github.oatelauser.jauth.selfservice.web.MyAppsStateController;
 import io.github.oatelauser.jauth.selfservice.web.MyOrgsController;
+import io.github.oatelauser.jauth.selfservice.web.MyOrgsStateController;
 import io.github.oatelauser.jauth.selfservice.web.OrgAppsController;
 import io.github.oatelauser.jauth.selfservice.web.OrgInstallationsController;
 import io.github.oatelauser.jauth.selfservice.web.OwnedAppService;
 import io.github.oatelauser.jauth.selfservice.web.PasskeyController;
 import io.github.oatelauser.jauth.selfservice.web.PatController;
+import io.github.oatelauser.jauth.selfservice.web.PatStateController;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
@@ -99,6 +103,11 @@ class JauthSelfServiceAutoConfigurationTest {
                     assertThat(context).hasSingleBean(MyOrgsController.class);
                     assertThat(context).hasSingleBean(OrgInstallationsController.class);
                     assertThat(context).hasSingleBean(OrgAppsController.class);
+                    // v1.5 B1a 状态面四页（apps/pat/my-apps/my-orgs）：与 SSR 控制器同场注册
+                    assertThat(context).hasSingleBean(AppsStateController.class);
+                    assertThat(context).hasSingleBean(PatStateController.class);
+                    assertThat(context).hasSingleBean(MyAppsStateController.class);
+                    assertThat(context).hasSingleBean(MyOrgsStateController.class);
                     assertThat(context).hasBean("jauthSelfServiceViewResolver");
                 });
     }
@@ -121,6 +130,10 @@ class JauthSelfServiceAutoConfigurationTest {
                     assertThat(context).hasSingleBean(MyOrgsController.class);
                     assertThat(context).hasSingleBean(OrgInstallationsController.class);
                     assertThat(context).hasSingleBean(OrgAppsController.class);
+                    assertThat(context).hasSingleBean(AppsStateController.class);
+                    assertThat(context).hasSingleBean(PatStateController.class);
+                    assertThat(context).hasSingleBean(MyAppsStateController.class);
+                    assertThat(context).hasSingleBean(MyOrgsStateController.class);
                 });
     }
 

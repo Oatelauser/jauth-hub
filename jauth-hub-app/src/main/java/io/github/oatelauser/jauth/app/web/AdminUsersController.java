@@ -110,18 +110,31 @@ public class AdminUsersController {
             @RequestParam(value = "size", defaultValue = USERS_PAGE_DEFAULT_SIZE) int size,
             Model model) {
         model.addAttribute("educational", this.educational.enabled());
-        // 分页参数规整（v1.3 D5 老账⑦,家族 PageResponse 契约口径 item/total/pageNum/pageSize/totalPage）
-        int pageSize = Math.min(Math.max(size, 1), USERS_PAGE_MAX_SIZE);
         long total = this.userRepository.countAll();
-        int totalPage = (int) ((total + pageSize - 1) / pageSize);
-        int pageNum = Math.min(Math.max(page, 1), Math.max(totalPage, 1));
-        model.addAttribute("users", this.userRepository.findPage((pageNum - 1) * pageSize, pageSize));
-        model.addAttribute("pageNum", pageNum);
-        model.addAttribute("pageSize", pageSize);
+        PageWindow window = pageWindow(page, size, total);
+        model.addAttribute(
+                "users", this.userRepository.findPage((window.pageNum() - 1) * window.pageSize(), window.pageSize()));
+        model.addAttribute("pageNum", window.pageNum());
+        model.addAttribute("pageSize", window.pageSize());
         model.addAttribute("total", total);
-        model.addAttribute("totalPage", totalPage);
+        model.addAttribute("totalPage", window.totalPage());
         return VIEW_ADMIN_USERS;
     }
+
+    /**
+     * 分页参数规整（v1.3 D5 老账⑦，家族 PageResponse 契约口径 item/total/pageNum/pageSize/totalPage）：
+     * size clamp 到 [1, {@value #USERS_PAGE_MAX_SIZE}]、page clamp 到 [1,totalPage]（空表钉 1）。
+     * v1.5 B1a 提为包内共径——SSR 页与 JSON 状态面同源。
+     */
+    static PageWindow pageWindow(int page, int size, long total) {
+        int pageSize = Math.min(Math.max(size, 1), USERS_PAGE_MAX_SIZE);
+        int totalPage = (int) ((total + pageSize - 1) / pageSize);
+        int pageNum = Math.min(Math.max(page, 1), Math.max(totalPage, 1));
+        return new PageWindow(pageNum, pageSize, totalPage);
+    }
+
+    /** 规整后的分页窗口（当页行取数区间由 pageNum/pageSize 推导）。 */
+    record PageWindow(int pageNum, int pageSize, int totalPage) {}
 
     /**
      * 建号 JSON：用户名唯一（A0512，并发撞唯一约束同译）；密码 ≥8 位；显示名可选。

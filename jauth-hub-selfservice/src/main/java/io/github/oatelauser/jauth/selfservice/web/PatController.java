@@ -114,7 +114,8 @@ public class PatController {
             return VIEW_PAT;
         }
         JauthUser user = requireUser(principal);
-        model.addAttribute("scopes", scopeItems(LocaleContextHolder.getLocale()));
+        model.addAttribute(
+                "scopes", scopeItems(this.scopeCatalog, this.messageSource, LocaleContextHolder.getLocale()));
         model.addAttribute("validityDays", VALIDITY_DAYS.stream().sorted().toList());
         model.addAttribute("defaultValidityDays", DEFAULT_VALIDITY_DAYS);
         model.addAttribute("pats", this.patService.listActive(user.id()));
@@ -226,17 +227,18 @@ public class PatController {
         return requested;
     }
 
-    /** scope 表单项（名称 + i18n 描述），照 ConsentController 的目录展示契约。 */
-    private List<ScopeItem> scopeItems(Locale locale) {
+    /** scope 表单项（名称 + i18n 描述），照 ConsentController 的目录展示契约。包内共径（v1.5 B1a：SSR 页与 JSON 状态面同源，scope 描述保持服务端解析——B3 决议）。 */
+    static List<ScopeItem> scopeItems(ScopeCatalog scopeCatalog, MessageSource messageSource, Locale locale) {
         List<ScopeItem> items = new ArrayList<>();
-        for (ScopeDefinition definition : this.scopeCatalog.all()) {
-            String description = this.messageSource.getMessage(definition.i18nKey(), null, definition.name(), locale);
+        for (ScopeDefinition definition : scopeCatalog.all()) {
+            String description = messageSource.getMessage(definition.i18nKey(), null, definition.name(), locale);
             items.add(new ScopeItem(definition.name(), description));
         }
         return items;
     }
 
-    private Map<String, Object> patView(PatRecord record, Instant now) {
+    /** PAT 行视图包内共径（v1.5 B1a：/list 与 JSON 状态面同源；明文令牌永不出现）。 */
+    static Map<String, Object> patView(PatRecord record, Instant now) {
         Map<String, Object> view = new LinkedHashMap<>(8);
         view.put("id", record.id());
         view.put("name", record.name());

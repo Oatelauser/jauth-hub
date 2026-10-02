@@ -19,18 +19,22 @@ import io.github.oatelauser.jauth.core.web.PasskeyFlag;
 import io.github.oatelauser.jauth.core.web.TrustSkinFlag;
 import io.github.oatelauser.jauth.selfservice.pat.JdbcPatService;
 import io.github.oatelauser.jauth.selfservice.pat.PatService;
+import io.github.oatelauser.jauth.selfservice.web.AppsStateController;
 import io.github.oatelauser.jauth.selfservice.web.AuthorizedAppService;
 import io.github.oatelauser.jauth.selfservice.web.AuthorizedAppsController;
 import io.github.oatelauser.jauth.selfservice.web.InMemoryOwnedAppService;
 import io.github.oatelauser.jauth.selfservice.web.JdbcOwnedAppService;
 import io.github.oatelauser.jauth.selfservice.web.MyAppsController;
+import io.github.oatelauser.jauth.selfservice.web.MyAppsStateController;
 import io.github.oatelauser.jauth.selfservice.web.MyOrgsController;
+import io.github.oatelauser.jauth.selfservice.web.MyOrgsStateController;
 import io.github.oatelauser.jauth.selfservice.web.OrgAppsController;
 import io.github.oatelauser.jauth.selfservice.web.OrgInstallationsController;
 import io.github.oatelauser.jauth.selfservice.web.OrgMembersController;
 import io.github.oatelauser.jauth.selfservice.web.OwnedAppService;
 import io.github.oatelauser.jauth.selfservice.web.PasskeyController;
 import io.github.oatelauser.jauth.selfservice.web.PatController;
+import io.github.oatelauser.jauth.selfservice.web.PatStateController;
 import io.github.oatelauser.jauth.selfservice.web.SensitiveScopeSudoInterceptor;
 import io.github.oatelauser.jauth.selfservice.web.SudoController;
 import io.github.oatelauser.jauth.selfservice.web.SudoInterceptor;
@@ -194,6 +198,71 @@ public class JauthSelfServiceAutoConfiguration {
                 ResponseRenderer responseRenderer) {
             return new SudoStateController(
                     sudoGate, passkey.getIfAvailable(() -> PasskeyFlag.OFF), educational, responseRenderer);
+        }
+
+        /**
+         * 看板页 JSON 状态面（v1.5 B1a）：依赖与降级形态照 jauthAuthorizedAppsController——服务缺席
+         * （memory 模式）即 appsSupported=false 状态体；PasskeyFlag 宿主缺它时降级 OFF 同先例。
+         */
+        @Bean
+        @ConditionalOnMissingBean
+        AppsStateController jauthAppsStateController(
+                ObjectProvider<AuthorizedAppService> appService,
+                RegisteredClientRepository clientRepository,
+                EducationalFlag educational,
+                ObjectProvider<PasskeyFlag> passkey,
+                ResponseRenderer responseRenderer) {
+            return new AppsStateController(
+                    appService.getIfAvailable(),
+                    clientRepository,
+                    educational,
+                    passkey.getIfAvailable(() -> PasskeyFlag.OFF),
+                    responseRenderer);
+        }
+
+        /** PAT 页 JSON 状态面（v1.5 B1a）：服务缺席（memory 模式）即 patSupported=false 状态体，Clock 缺席回退 UTC。 */
+        @Bean
+        @ConditionalOnMissingBean
+        PatStateController jauthPatStateController(
+                ObjectProvider<PatService> patService,
+                ScopeCatalog scopeCatalog,
+                UserRepository userRepository,
+                MessageSource messageSource,
+                EducationalFlag educational,
+                ResponseRenderer responseRenderer,
+                ObjectProvider<Clock> clock) {
+            return new PatStateController(
+                    patService.getIfAvailable(),
+                    scopeCatalog,
+                    userRepository,
+                    messageSource,
+                    educational,
+                    responseRenderer,
+                    clock.getIfAvailable(Clock::systemUTC));
+        }
+
+        /** 我的应用页 JSON 状态面（v1.5 B1a，my-app-new 页复用）：服务缺席即 appsSupported=false 状态体。 */
+        @Bean
+        @ConditionalOnMissingBean
+        MyAppsStateController jauthMyAppsStateController(
+                ObjectProvider<OwnedAppService> ownedAppService,
+                UserRepository userRepository,
+                EducationalFlag educational,
+                ResponseRenderer responseRenderer) {
+            return new MyAppsStateController(
+                    ownedAppService.getIfAvailable(), userRepository, educational, responseRenderer);
+        }
+
+        /** 我的组织页 JSON 状态面（v1.5 B1a）：OrgService 缺席即 orgsSupported=false 状态体。 */
+        @Bean
+        @ConditionalOnMissingBean
+        MyOrgsStateController jauthMyOrgsStateController(
+                ObjectProvider<OrgService> orgService,
+                UserRepository userRepository,
+                EducationalFlag educational,
+                ResponseRenderer responseRenderer) {
+            return new MyOrgsStateController(
+                    orgService.getIfAvailable(), userRepository, educational, responseRenderer);
         }
 
         /**
