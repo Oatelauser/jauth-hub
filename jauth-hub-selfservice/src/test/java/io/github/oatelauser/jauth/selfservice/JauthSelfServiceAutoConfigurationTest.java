@@ -32,6 +32,7 @@ import io.github.oatelauser.jauth.selfservice.web.OrgInstallationsStateControlle
 import io.github.oatelauser.jauth.selfservice.web.OrgMembersStateController;
 import io.github.oatelauser.jauth.selfservice.web.OwnedAppService;
 import io.github.oatelauser.jauth.selfservice.web.PasskeyController;
+import io.github.oatelauser.jauth.selfservice.web.PasskeyStateController;
 import io.github.oatelauser.jauth.selfservice.web.PatController;
 import io.github.oatelauser.jauth.selfservice.web.PatStateController;
 import java.nio.charset.StandardCharsets;
@@ -115,6 +116,8 @@ class JauthSelfServiceAutoConfigurationTest {
                     assertThat(context).hasSingleBean(OrgAppsStateController.class);
                     assertThat(context).hasSingleBean(OrgInstallationsStateController.class);
                     assertThat(context).hasSingleBean(OrgMembersStateController.class);
+                    // v1.5 B1c 通行密钥状态面：同场注册（凭据仓储缺席即 passkeyEnabled=false 状态体）
+                    assertThat(context).hasSingleBean(PasskeyStateController.class);
                     assertThat(context).hasBean("jauthSelfServiceViewResolver");
                 });
     }
@@ -144,6 +147,7 @@ class JauthSelfServiceAutoConfigurationTest {
                     assertThat(context).hasSingleBean(OrgAppsStateController.class);
                     assertThat(context).hasSingleBean(OrgInstallationsStateController.class);
                     assertThat(context).hasSingleBean(OrgMembersStateController.class);
+                    assertThat(context).hasSingleBean(PasskeyStateController.class);
                 });
     }
 

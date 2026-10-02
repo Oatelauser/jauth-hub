@@ -47,7 +47,9 @@ public class AppSecurityConfiguration {
         MediaTypeRequestMatcher textHtmlMatcher = new MediaTypeRequestMatcher(
                 contentNegotiationStrategy, MediaType.APPLICATION_XHTML_XML, MediaType.TEXT_HTML);
         http.authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/demo/**", "/error")
+                        // /api/demo/config（v1.5 B1c）：demoConfig 状态面随教学区匿名可达——教学流程从未认证
+                        // 态发起 authorize，配置须登录前可取；SSR 页 ${demoConfig} 内联本就同面公开
+                        .requestMatchers("/demo/**", "/api/demo/config", "/error")
                         .permitAll()
                         // /front/**（v1.4 B4）是登录前皮肤：jauth-hub-front 的 SPA 产物，登录页本尊就在其中，
                         // 必须匿名可达（照 /login 的 permitAll 先例）；静态装配见 AppWebConfiguration

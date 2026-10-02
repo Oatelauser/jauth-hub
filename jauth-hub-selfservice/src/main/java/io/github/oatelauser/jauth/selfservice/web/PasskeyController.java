@@ -93,7 +93,14 @@ public class PasskeyController {
         return user;
     }
 
-    private List<PasskeyCredentialView> credentialViews(List<CredentialRecord> records) {
+    /**
+     * 凭据行装配（v1.5 B1c 提升包内 static）：SSR 页与 JSON 状态面（{@link PasskeyStateController}）
+     * 共用单点，不复制。
+     *
+     * @param records 框架凭据记录
+     * @return 列表行
+     */
+    static List<PasskeyCredentialView> credentialViews(List<CredentialRecord> records) {
         List<PasskeyCredentialView> views = new ArrayList<>();
         for (CredentialRecord record : records) {
             String credentialId = record.getCredentialId().toBase64UrlString();
@@ -108,7 +115,7 @@ public class PasskeyController {
     }
 
     /** 凭据列表行（label 可空——框架注册面不强制；模板回退 i18n 未命名）。 */
-    record PasskeyCredentialView(
+    public record PasskeyCredentialView(
             String credentialId,
             String credentialIdShort,
             @Nullable String label,

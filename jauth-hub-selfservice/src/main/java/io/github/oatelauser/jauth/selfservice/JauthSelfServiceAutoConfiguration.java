@@ -36,6 +36,7 @@ import io.github.oatelauser.jauth.selfservice.web.OrgMembersController;
 import io.github.oatelauser.jauth.selfservice.web.OrgMembersStateController;
 import io.github.oatelauser.jauth.selfservice.web.OwnedAppService;
 import io.github.oatelauser.jauth.selfservice.web.PasskeyController;
+import io.github.oatelauser.jauth.selfservice.web.PasskeyStateController;
 import io.github.oatelauser.jauth.selfservice.web.PatController;
 import io.github.oatelauser.jauth.selfservice.web.PatStateController;
 import io.github.oatelauser.jauth.selfservice.web.SensitiveScopeSudoInterceptor;
@@ -166,6 +167,20 @@ public class JauthSelfServiceAutoConfiguration {
                 UserRepository userRepository,
                 EducationalFlag educational) {
             return new PasskeyController(credentials, userRepository, educational);
+        }
+
+        /**
+         * 通行密钥页 JSON 状态面（v1.5 B1c）：门控与依赖形态照 jauthPasskeyController——凭据仓储经
+         * ObjectProvider 持有，缺席（passkey 关）即 passkeyEnabled=false 状态体（不 500）。
+         */
+        @Bean
+        @ConditionalOnMissingBean
+        PasskeyStateController jauthPasskeyStateController(
+                ObjectProvider<UserCredentialRepository> credentials,
+                UserRepository userRepository,
+                EducationalFlag educational,
+                ResponseRenderer responseRenderer) {
+            return new PasskeyStateController(credentials, userRepository, educational, responseRenderer);
         }
 
         /**
