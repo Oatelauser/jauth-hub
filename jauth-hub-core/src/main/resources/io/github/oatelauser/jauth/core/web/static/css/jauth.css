@@ -334,3 +334,14 @@ body {
 .scope-item.disabled {
   opacity: 0.55;
 }
+
+/* 既有授权徽标（consent 页，v1.3 D4）：与 scope 名同行的小标签 */
+.scope-granted {
+  display: inline-block;
+  margin-left: 6px;
+  border-radius: 6px;
+  padding: 1px 8px;
+  font-size: 12px;
+  background: #eef7ee;
+  color: #2f6b3a;
+}

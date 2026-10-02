@@ -19,6 +19,8 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsent;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.stereotype.Controller;
@@ -49,8 +51,13 @@ public class ConsentController {
     /** 视图名：模板位于 core 命名空间 templates 目录，解析前缀由装配方配置。 */
     static final String VIEW_CONSENT = "consent";
 
-    /** scope 表单项：目录未收录的 scope 也如实展示，描述回退为 scope 名本身；grantable=false 渲染为禁用（超出 ceiling）。 */
-    public record ScopeItem(String name, String description, boolean checked, boolean grantable) {}
+    /**
+     * scope 表单项：目录未收录的 scope 也如实展示，描述回退为 scope 名本身；grantable=false 渲染为禁用（超出
+     * ceiling）；alreadyGranted=true 为既有授权（v1.3 D4 老账⑥：默认勾选 + 「已授权」徽标，勾选语义不变——
+     * consent 重录需要完整勾选集，徽标只做增量授权的知情区分）。
+     */
+    public record ScopeItem(
+            String name, String description, boolean checked, boolean grantable, boolean alreadyGranted) {}
 
     /** org 选择器条目：orgId 供选中标识，href 为保留 client_id/state/scope 的本页重入链接。 */
     public record OrgChoice(String orgId, String orgName, String href) {}
@@ -83,19 +90,27 @@ public class ConsentController {
 
     private final ClientOwnerResolver clientOwnerResolver;
 
+    private final OAuth2AuthorizationConsentService consentService;
+
+    /**
+     * EI_EXPOSE_REP2 定向豁免：consent 服务是容器单例门面（Spring 注入通行形态，构造后无可变面暴露）。
+     */
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(value = "EI_EXPOSE_REP2")
     public ConsentController(
             RegisteredClientRepository clientRepository,
             ScopeCatalog scopeCatalog,
             MessageSource messageSource,
             EducationalFlag educational,
             OrgScopeGate orgScopeGate,
-            ClientOwnerResolver clientOwnerResolver) {
+            ClientOwnerResolver clientOwnerResolver,
+            OAuth2AuthorizationConsentService consentService) {
         this.clientRepository = clientRepository;
         this.scopeCatalog = scopeCatalog;
         this.messageSource = messageSource;
         this.educational = educational;
         this.orgScopeGate = orgScopeGate;
         this.clientOwnerResolver = clientOwnerResolver;
+        this.consentService = consentService;
     }
 
     /**
@@ -132,7 +147,12 @@ public class ConsentController {
         model.addAttribute("orgChoices", orgView.choices());
         model.addAttribute("orgBadge", orgView.selectedOrgName());
         model.addAttribute(
-                "scopes", scopeItems(requestedScopes, orgView.ceilingScopes(), LocaleContextHolder.getLocale()));
+                "scopes",
+                scopeItems(
+                        requestedScopes,
+                        grantedScopes(clientId, principal),
+                        orgView.ceilingScopes(),
+                        LocaleContextHolder.getLocale()));
         return VIEW_CONSENT;
     }
 
@@ -149,14 +169,31 @@ public class ConsentController {
     }
 
     /** scope 项：ceiling 为 null（个人/平台或未选定 org）全部可勾选；组织客户端选定后 ceiling 内勾选、超界禁用。 */
-    private List<ScopeItem> scopeItems(Set<String> scopes, @Nullable Set<String> ceiling, Locale locale) {
+    private List<ScopeItem> scopeItems(
+            Set<String> scopes, Set<String> granted, @Nullable Set<String> ceiling, Locale locale) {
         List<ScopeItem> items = new ArrayList<>(scopes.size());
         for (String name : scopes) {
             boolean grantable = ceiling == null || ceiling.contains(name);
-            items.add(new ScopeItem(name, description(name, locale), grantable, grantable));
+            items.add(new ScopeItem(name, description(name, locale), grantable, grantable, granted.contains(name)));
         }
         items.sort(Comparator.comparing(ScopeItem::name));
         return items;
+    }
+
+    /**
+     * 该用户在该 client 上的既有授权 scope（v1.3 D4 老账⑥）：consent 行查询（框架服务口径 =
+     * registered_client_id 内部 id + principal 名）；无行/无主体返回空集。
+     */
+    private Set<String> grantedScopes(String clientId, @Nullable Authentication principal) {
+        if (principal == null) {
+            return Set.of();
+        }
+        RegisteredClient client = clientRepository.findByClientId(clientId);
+        if (client == null) {
+            return Set.of();
+        }
+        OAuth2AuthorizationConsent consent = consentService.findById(client.getId(), principal.getName());
+        return consent == null ? Set.of() : consent.getScopes();
     }
 
     /**

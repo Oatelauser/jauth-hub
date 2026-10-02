@@ -50,6 +50,8 @@
               <label class="scope-item" th:classappend="${!scope.grantable()} ? disabled">
                 <input type="checkbox" name="scope" th:value="${scope.name()}" th:checked="${scope.checked()}" th:disabled="${!scope.grantable()}" />
                 <span class="scope-name" th:text="${scope.name()}">profile</span>
+                <!--/* 既有授权徽标(v1.3 D4 老账⑥):默认勾选不变,只做增量授权的知情区分 */-->
+                <span class="scope-granted" th:if="${scope.alreadyGranted()}" th:text="#{jauth.consent.granted}">已授权</span>
                 <span class="scope-desc" th:text="${scope.description()}">描述</span>
               </label>
             </li>

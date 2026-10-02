@@ -531,9 +531,16 @@ public class JauthHubAutoConfiguration {
             MessageSource messageSource,
             EducationalFlag educational,
             OrgScopeGate orgScopeGate,
-            ClientOwnerResolver clientOwnerResolver) {
+            ClientOwnerResolver clientOwnerResolver,
+            OAuth2AuthorizationConsentService consentService) {
         return new ConsentController(
-                clientRepository, scopeCatalog, messageSource, educational, orgScopeGate, clientOwnerResolver);
+                clientRepository,
+                scopeCatalog,
+                messageSource,
+                educational,
+                orgScopeGate,
+                clientOwnerResolver,
+                consentService);
     }
 
     @Bean

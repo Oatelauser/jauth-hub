@@ -79,6 +79,10 @@ class ConsentOrgContextPageTest {
     private final InMemoryInstallationRepository installationRepository = new InMemoryInstallationRepository();
 
     private final InMemoryClientOwnerResolver ownerResolver = new InMemoryClientOwnerResolver();
+    private final org.springframework.security.oauth2.server.authorization.InMemoryOAuth2AuthorizationConsentService
+            consentService =
+                    new org.springframework.security.oauth2.server.authorization
+                            .InMemoryOAuth2AuthorizationConsentService();
 
     private MockMvc mockMvc;
 
@@ -251,7 +255,8 @@ class ConsentOrgContextPageTest {
                         messageSource(),
                         () -> false,
                         new OrgScopeGate(this.userRepository, this.orgRepository, this.installationRepository),
-                        this.ownerResolver))
+                        this.ownerResolver,
+                        this.consentService))
                 .setViewResolvers(viewResolver)
                 .setLocaleResolver(new FixedLocaleResolver(Locale.SIMPLIFIED_CHINESE))
                 .addFilters(UTF8_RESPONSE_FILTER, new CsrfFilter(new HttpSessionCsrfTokenRepository()))
@@ -296,5 +301,29 @@ class ConsentOrgContextPageTest {
                         .build();
             }
         };
+    }
+
+    @Test
+    @DisplayName("已授权 scope 徽标(老账⑥):既有授权渲染「已授权」徽标,新 scope 无徽标;默认勾选不变")
+    void alreadyGrantedScopesBadgedWhileNewOnesPlain() throws Exception {
+        // rc-personal = personal-app 的内部 id(clients() 桩映射);alice 已授过 openid
+        this.consentService.save(
+                org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsent.withId(
+                                "rc-personal", "alice")
+                        .scope("openid")
+                        .build());
+
+        this.mockMvc
+                .perform(get("/oauth2/consent")
+                        .queryParam("client_id", "personal-app")
+                        .queryParam("state", "st-6")
+                        .queryParam("scope", "openid profile")
+                        .principal(new TestingAuthenticationToken("alice", "n/a")))
+                .andExpect(status().isOk())
+                // openid:已授权徽标;profile:无徽标(增量)
+                .andExpect(content().string(containsString("scope-granted")))
+                // 勾选态不变:两项仍默认勾选(老账⑥只做知情区分,不动 consent 语义)
+                .andExpect(content().string(containsString("value=\"openid\" checked")))
+                .andExpect(content().string(containsString("value=\"profile\" checked")));
     }
 }

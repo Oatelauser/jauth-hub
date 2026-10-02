@@ -238,7 +238,9 @@ class ProtocolPagesTest {
                                         new InMemoryUserRepository(),
                                         new InMemoryOrgRepository(),
                                         new InMemoryInstallationRepository()),
-                                new InMemoryClientOwnerResolver()),
+                                new InMemoryClientOwnerResolver(),
+                                new org.springframework.security.oauth2.server.authorization
+                                        .InMemoryOAuth2AuthorizationConsentService()),
                         new DeviceVerifyController(flag))
                 .setViewResolvers(viewResolver)
                 .setLocaleResolver(new FixedLocaleResolver(Locale.SIMPLIFIED_CHINESE))
