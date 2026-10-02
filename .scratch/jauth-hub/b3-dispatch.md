@@ -18,6 +18,10 @@ jauth-hub v1.4:仓库根目录新建 `jauth-hub-front/` 工程——Vue 3 + Vite
 | /api/device/verify | GET | educational, csrfToken, csrfHeaderName |
 | /api/sudo | GET | educational, sudoEnabled, returnTo(已消毒), csrfToken, csrfHeaderName;参数 returnTo |
 
+**B2 落地的两条现场事实(必遵守)**:
+1. **登录成功后 CSRF token 换发**(框架 CsrfAuthenticationStrategy 语义):GET /api/login 拿到的 token 在 POST /api/login 成功后即作废。登录页只需:POST 成功 → `window.location = data.redirectUrl`,该页不再发 POST;若某流程登录后还要 POST(如 consent 表单),必须先重新 GET 该页状态面取新 token——consent/device/sudo 各页自己的状态 GET 永远给当刻有效 token,按页取用即可。
+2. redirectUrl 无 saved request 时为 `/`(浏览器 GET 302 到登录页才有 saved request;非浏览器 401 分支不存)。
+
 **表单提交契约(SSR 同款,不许发明)**:consent 批准/拒绝、设备码提交是**原生表单 POST 浏览器导航**(fetch 不会带着授权码 302 到 RP 回调):
 - consent → `POST /oauth2/authorize`,字段照 SSR 模板 `login/consent.html` 的表单(client_id/state/scope 勾选集 + `_csrf=csrfToken`);
 - 设备码 → `POST /device/verify`,字段照 `device-verify.html`;
