@@ -61,19 +61,14 @@ async function verify() {
     <main class="card">
       <p class="brand">{{ t('brand') }}</p>
       <h1>{{ t('sudo.title') }}</h1>
-      <p class="alert" v-if="error">{{ error }}</p>
+      <p class="alert error" v-if="error" role="alert">{{ error }}</p>
       <template v-if="state">
-        <details class="teach" v-if="state.educational">
-          <summary>{{ t('teach.whatHappened') }}</summary>
-          <p>{{ t('sudo.teach') }}</p>
-        </details>
-
-        <div class="alert" v-if="!state.sudoEnabled">{{ t('sudo.unsupported') }}</div>
+        <div class="alert info" v-if="!state.sudoEnabled">{{ t('sudo.unsupported') }}</div>
 
         <template v-if="state.sudoEnabled">
-          <p>{{ t('sudo.intro') }}</p>
-          <div class="alert" v-if="sudoError" role="alert">{{ sudoMessage || t('sudo.error') }}</div>
-          <button class="btn primary" type="button" @click="verify">{{ t('sudo.verify') }}</button>
+          <p class="hint">{{ t('sudo.intro') }}</p>
+          <div class="alert error" v-if="sudoError" role="alert">{{ sudoMessage || t('sudo.error') }}</div>
+          <button class="btn primary btn-block" type="button" @click="verify">{{ t('sudo.verify') }}</button>
           <p class="hint"><a :href="state.returnTo">{{ t('sudo.back') }}</a></p>
         </template>
       </template>

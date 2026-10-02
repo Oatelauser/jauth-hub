@@ -28,6 +28,13 @@ describe('api fetch 包装', () => {
     expect(window.location.href).toBe('/front/login');
   });
 
+  it('code=A0515（sudo 过期）整页跳强验证页，returnTo 去 /front 前缀并保留查询串', async () => {
+    vi.stubGlobal('fetch', mockFetch({ code: 'A0515', message: '需要强验证' }, false, 403));
+    vi.stubGlobal('location', { pathname: '/front/selfservice/passkey', search: '?tab=1', href: '' });
+    await expect(getJson('/api/selfservice/passkey')).rejects.toThrow('sudo-required');
+    expect(window.location.href).toBe('/front/sudo?returnTo=' + encodeURIComponent('/selfservice/passkey?tab=1'));
+  });
+
   it('带 code 的 401（登录桥 A0520/A0521 业务失败）不跳转、抛 message', async () => {
     vi.stubGlobal('fetch', mockFetch({ code: 'A0521', message: '尝试过多已锁定' }, false, 401));
     vi.stubGlobal('location', { search: '', href: '' });

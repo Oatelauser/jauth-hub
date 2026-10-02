@@ -1,9 +1,8 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
 import { getJson } from '../api';
-import { flowSteps, t } from '../i18n';
+import { t } from '../i18n';
 
-const steps = flowSteps('authcode');
 const state = ref(null);
 const error = ref('');
 
@@ -40,36 +39,20 @@ function orgHref(choice) {
 
 <template>
   <div class="page">
-    <aside class="sidebar" v-if="state && state.educational">
-      <section class="panel">
-        <h2>{{ t('teach.flowTitle') }}</h2>
-        <nav class="steps" aria-label="flow">
-          <ol>
-            <li v-for="(step, i) in steps" :key="i" :class="{ active: i === 1 }">{{ step }}</li>
-          </ol>
-        </nav>
-      </section>
-      <section class="panel httplog">
-        <h2>{{ t('teach.httplogTitle') }}</h2>
-        <p class="placeholder">{{ t('teach.httplogPlaceholder') }}</p>
-      </section>
-    </aside>
-    <main class="card">
+    <main class="card card-wide">
       <p class="brand">{{ t('brand') }}</p>
       <h1>{{ t('consent.title') }}</h1>
-      <p class="alert" v-if="error">{{ error }}</p>
+      <p class="alert error" v-if="error" role="alert">{{ error }}</p>
       <template v-if="state">
-        <p class="client-line">
-          <span>{{ t('consent.clientLabel') }}</span>：<strong>{{ state.clientName }}</strong>
-        </p>
-        <p class="org-badge" v-if="state.orgBadge">
-          <span>{{ t('consent.orgContext') }}</span>：<strong>{{ state.orgBadge }}</strong>
-        </p>
-        <details class="teach" v-if="state.educational">
-          <summary>{{ t('teach.whatHappened') }}</summary>
-          <p>{{ t('consent.teach') }}</p>
-        </details>
-        <div class="org-guide" v-if="state.orgGuide">{{ t('consent.orgGuide') }}</div>
+        <div class="panel client-block">
+          <p class="client-line">
+            <span>{{ t('consent.clientLabel') }}</span>：<strong>{{ state.clientName }}</strong>
+          </p>
+          <p class="org-badge" v-if="state.orgBadge">
+            <span>{{ t('consent.orgContext') }}</span>：<strong>{{ state.orgBadge }}</strong>
+          </p>
+        </div>
+        <div class="alert info org-guide" v-if="state.orgGuide">{{ t('consent.orgGuide') }}</div>
         <div class="org-select" v-if="(state.orgChoices || []).length">
           <p class="scopes-label">{{ t('consent.orgSelect') }}</p>
           <ul class="org-choices">
@@ -95,8 +78,10 @@ function orgHref(choice) {
                     :checked="scope.checked"
                     :disabled="!scope.grantable"
                   />
-                  <span class="scope-name">{{ scope.name }}</span>
-                  <span class="scope-granted" v-if="scope.alreadyGranted">{{ t('consent.granted') }}</span>
+                  <span class="scope-name">
+                    {{ scope.name }}
+                    <span class="pill pill-success" v-if="scope.alreadyGranted">{{ t('consent.granted') }}</span>
+                  </span>
                   <span class="scope-desc">{{ scope.description }}</span>
                 </label>
               </li>
@@ -106,7 +91,7 @@ function orgHref(choice) {
             <button class="btn primary" type="submit" name="action" value="authorize" v-if="formReady">
               {{ t('consent.authorize') }}
             </button>
-            <button class="btn" type="submit" name="action" value="deny">{{ t('consent.deny') }}</button>
+            <button class="btn secondary" type="submit" name="action" value="deny">{{ t('consent.deny') }}</button>
           </div>
         </form>
       </template>

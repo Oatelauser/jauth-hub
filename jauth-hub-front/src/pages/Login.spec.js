@@ -21,6 +21,21 @@ describe('Login 页', () => {
     expect(wrapper.find('.alert').text()).toBe(t('login.error'));
   });
 
+  it('企业级单卡结构在场，教学元素（侧栏/发生了什么）退场', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => stateResponse({ educational: true, passkeyEnabled: true, error: false, csrfToken: null, csrfHeaderName: null })));
+    vi.stubGlobal('location', { search: '', href: '' });
+    const wrapper = mount(Login);
+    await flushPromises();
+    expect(wrapper.find('.card').exists()).toBe(true);
+    expect(wrapper.findAll('.field')).toHaveLength(2);
+    expect(wrapper.find('form').exists()).toBe(true);
+    expect(wrapper.find('.btn.primary').exists()).toBe(true);
+    expect(wrapper.find('.btn.secondary').exists()).toBe(true); // passkey 次级按钮
+    expect(wrapper.find('.sidebar').exists()).toBe(false);
+    expect(wrapper.find('.teach').exists()).toBe(false);
+    expect(wrapper.find('details').exists()).toBe(false);
+  });
+
   it('提交构造 JSON body + CSRF 头，成功后跳 redirectUrl', async () => {
     const fetchMock = vi.fn((path, init) =>
       init && init.method === 'POST'

@@ -1,10 +1,9 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
 import { getJson, postJson } from '../api';
-import { flowSteps, t } from '../i18n';
+import { t } from '../i18n';
 import { assertionBody, toArrayBuffer, webauthnRawPost } from '../webauthn';
 
-const steps = flowSteps('authcode');
 const state = ref(null);
 const error = ref('');
 const submitting = ref(false);
@@ -73,29 +72,10 @@ async function passkeyLogin() {
 
 <template>
   <div class="page">
-    <aside class="sidebar" v-if="state && state.educational">
-      <section class="panel">
-        <h2>{{ t('teach.flowTitle') }}</h2>
-        <nav class="steps" aria-label="flow">
-          <ol>
-            <li v-for="(step, i) in steps" :key="i" :class="{ active: i === 0 }">{{ step }}</li>
-          </ol>
-        </nav>
-      </section>
-      <section class="panel httplog">
-        <h2>{{ t('teach.httplogTitle') }}</h2>
-        <p class="placeholder">{{ t('teach.httplogPlaceholder') }}</p>
-      </section>
-    </aside>
     <main class="card">
       <p class="brand">{{ t('brand') }}</p>
       <h1>{{ t('login.title') }}</h1>
-      <p class="alert" v-if="error">{{ error }}</p>
-      <details class="teach" v-if="state && state.educational">
-        <summary>{{ t('teach.whatHappened') }}</summary>
-        <p>{{ t('login.teach') }}</p>
-        <p v-if="state.passkeyEnabled">{{ t('login.passkey.teach') }}</p>
-      </details>
+      <p class="alert error" v-if="error" role="alert">{{ error }}</p>
       <form class="form" @submit.prevent="submit">
         <label class="field">
           <span>{{ t('login.username') }}</span>
@@ -105,12 +85,12 @@ async function passkeyLogin() {
           <span>{{ t('login.password') }}</span>
           <input type="password" v-model="form.password" autocomplete="current-password" required />
         </label>
-        <button class="btn primary" type="submit" :disabled="submitting">{{ t('login.submit') }}</button>
+        <button class="btn primary btn-block" type="submit" :disabled="submitting">{{ t('login.submit') }}</button>
       </form>
       <template v-if="state && state.passkeyEnabled">
         <hr class="pk-divider" />
-        <button class="btn" type="button" @click="passkeyLogin">{{ t('login.passkey.button') }}</button>
-        <p class="alert" v-if="passkeyError" role="alert">
+        <button class="btn secondary btn-block" type="button" @click="passkeyLogin">{{ t('login.passkey.button') }}</button>
+        <p class="alert error" v-if="passkeyError" role="alert">
           {{ passkeyMessage || t('login.passkey.error') }}
         </p>
       </template>

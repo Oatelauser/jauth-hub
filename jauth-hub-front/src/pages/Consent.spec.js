@@ -47,8 +47,15 @@ describe('Consent 页', () => {
     expect(boxes).toHaveLength(3);
     expect(boxes[0].element.checked).toBe(true);
     expect(boxes[2].attributes('disabled')).toBeDefined();
-    expect(wrapper.find('.scope-granted').text()).toBe(t('consent.granted'));
+    expect(wrapper.find('.scope-item.disabled').exists()).toBe(true);
+    expect(wrapper.find('.scope-item .pill').text()).toBe(t('consent.granted'));
     expect(wrapper.find('.org-badge strong').text()).toBe('acme');
+
+    // 企业级换皮结构：单卡 + 客户端身份子面板；教学侧栏/发生了什么退场
+    expect(wrapper.find('.card').exists()).toBe(true);
+    expect(wrapper.find('.client-block .client-line strong').text()).toBe('Demo App');
+    expect(wrapper.find('.sidebar').exists()).toBe(false);
+    expect(wrapper.find('details').exists()).toBe(false);
 
     // 原生表单导航契约（照 SSR consent.html）：action + 隐藏域 + action 按钮
     const form = wrapper.find('form');

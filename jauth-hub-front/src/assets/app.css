@@ -1,22 +1,60 @@
-/* jauth-hub-front 单文件皮肤：逐条拷贝后端 SSR 皮肤 jauth.css（暗色渐变背景 + 白色圆角卡片 +
-   系统字体栈，零框架零 CDN 零外链，SPEC §7 视觉基调），仅追加登录页 passkey 分隔线
-   （SSR login.html 的内联样式收拢至此）。 */
+/* =============================================================
+   jauth-hub-front 设计系统（v1.5 B2a）：浅色企业级认证中心
+   （GitHub Settings / Okta 管理台一系）。白/近白面板、深灰墨文字、
+   单一机构蓝强调色只用于主操作/焦点/链接；语义色仅 success/danger/alert。
+   默认浅色单主题（暗色模式 YAGNI）。单文件手写 CSS，零依赖零外链；
+   组件以 CSS 类形态供各页拼装（v1.4 形态：无组件抽象层）。
+   ============================================================= */
 
+/* ---------- 1. 设计 token ---------- */
 :root {
-  --bg-gradient: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
-  --card-bg: #ffffff;
-  --text-primary: #1a1a2e;
-  --text-secondary: #5a607a;
-  --accent: #e94560;
-  --accent-dark: #c73350;
-  --danger-bg: #fdeef1;
-  --danger-text: #b02a37;
-  --border: #dfe3ef;
-  --panel-bg: rgba(255, 255, 255, 0.08);
-  --panel-border: rgba(255, 255, 255, 0.16);
-  --panel-text: #c9d1e8;
+  /* 色彩：面板/文字/边框 */
+  --color-canvas: #f6f8fa;
+  --color-surface: #ffffff;
+  --color-surface-subtle: #f6f8fa;
+  --color-border: #d1d9e0;
+  --color-border-muted: #e4e8ed;
+  --color-text: #1f2328;
+  --color-text-secondary: #59636e;
+  --color-text-muted: #818b98;
+  /* 色彩：强调（机构蓝，仅主操作/焦点/链接） */
+  --color-accent: #0969da;
+  --color-accent-hover: #0860ca;
+  --color-accent-subtle: #ddf4ff;
+  --color-focus-ring: rgba(9, 105, 218, 0.35);
+  /* 色彩：语义（仅 success/danger/alert） */
+  --color-danger: #cf222e;
+  --color-danger-bg: #ffebe9;
+  --color-danger-border: #f5c2c3;
+  --color-success: #1a7f37;
+  --color-success-bg: #dafbe1;
+  --color-success-border: #b6e3a7;
+  --color-alert-text: #9a6700;
+  --color-alert-bg: #fff8c5;
+  --color-alert-border: #eac54f;
+  --color-info-text: #0969da;
+  /* 字号（14–16px 基准，三档层级 + 辅助两档） */
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-body: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 20px;
+  /* 间距（4px 基，6 档） */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  /* 圆角与阴影 */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow-card: 0 1px 3px rgba(31, 35, 40, 0.06), 0 8px 24px rgba(31, 35, 40, 0.06);
+  --shadow-pop: 0 8px 24px rgba(31, 35, 40, 0.18);
 }
 
+/* ---------- 2. 基底与页面布局 ---------- */
 * {
   box-sizing: border-box;
 }
@@ -24,333 +62,456 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--bg-gradient);
-  background-attachment: fixed;
+  background: var(--color-canvas);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Roboto, Helvetica, Arial, sans-serif;
-  color: var(--text-primary);
+  font-size: var(--font-size-body);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
 }
 
+a {
+  color: var(--color-accent);
+}
+
+/* 信任面单卡居中（B2b 看板壳出现前，各页独立成页） */
 .page {
+  min-height: 100vh;
   display: flex;
-  flex-wrap: wrap;
-  gap: 32px;
   align-items: flex-start;
   justify-content: center;
-  padding: 48px 16px;
+  padding: 8vh 16px 48px;
 }
 
-/* 白色圆角卡片（主内容） */
+/* ---------- 3. 卡片/面板 ---------- */
 .card {
-  background: var(--card-bg);
-  border-radius: 16px;
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.38);
-  padding: 32px 28px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-muted);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-6) var(--space-5);
   width: 100%;
   max-width: 400px;
 }
 
+/* 信息密度更高的页（如 consent 的 scope 清单）放宽一档 */
+.card-wide {
+  max-width: 480px;
+}
+
+/* 嵌套子面板（卡片内的身份区/分组） */
+.panel {
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border-muted);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+}
+
+/* ---------- 4. 排版 ---------- */
 .card .brand {
-  margin: 0 0 4px;
-  font-size: 13px;
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-size-xs);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--color-accent);
 }
 
 .card h1 {
-  margin: 0 0 16px;
-  font-size: 24px;
-}
-
-/* 侧边教学面板（流程图 + HTTP 日志位） */
-.sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  width: 300px;
-  max-width: 100%;
-}
-
-.panel {
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 12px;
-  padding: 16px;
-  color: var(--panel-text);
-}
-
-.panel h2 {
-  margin: 0 0 10px;
-  font-size: 13px;
+  margin: 0 0 var(--space-5);
+  font-size: var(--font-size-xl);
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #8fa3cf;
+  line-height: 1.3;
 }
 
-/* 纯 CSS 步骤条：counter 生成序号，active 高亮当前步 */
-.steps ol {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  counter-reset: step;
-}
-
-.steps li {
-  position: relative;
-  counter-increment: step;
-  padding: 5px 0 5px 30px;
-  font-size: 14px;
-  color: var(--panel-text);
-}
-
-.steps li::before {
-  position: absolute;
-  left: 0;
-  top: 4px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--panel-text);
-  font-size: 12px;
-  line-height: 20px;
-  text-align: center;
-  content: counter(step);
-}
-
-.steps li.active {
-  color: #ffffff;
+.card h2 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-lg);
   font-weight: 600;
 }
 
-.steps li.active::before {
-  background: var(--accent);
-  color: #ffffff;
+.hint {
+  margin: 0 0 var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
 }
 
-.httplog .placeholder {
-  margin: 0;
-  font-size: 13px;
-  color: #8fa3cf;
-  border: 1px dashed var(--panel-border);
-  border-radius: 8px;
-  padding: 12px 10px;
-  text-align: center;
-}
-
-/* 可折叠教学块（原生 details，无 JS） */
-.teach {
-  margin: 0 0 16px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: #f6f8fd;
-}
-
-.teach summary {
-  cursor: pointer;
-  padding: 10px 12px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.teach p {
-  margin: 0;
-  padding: 0 12px 12px;
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--text-secondary);
-}
-
-/* 表单 */
+/* ---------- 5. 表单控件 ---------- */
 .form {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--space-4);
 }
 
+/* label 整体可点击关联控件；控件获得焦点时环+描边双反馈 */
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 14px;
+  gap: var(--space-1);
 }
 
-.field span {
-  color: var(--text-secondary);
+.field > span {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
 }
 
 .field input {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 15px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  font-size: var(--font-size-body);
+  font-family: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
 }
 
 .field input:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-  border-color: var(--accent);
+  border-color: var(--color-accent);
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 0;
+}
+
+/* 校验错误位（B2b 自助面表单拼装用） */
+.field.invalid input {
+  border-color: var(--color-danger);
+}
+
+.field-error {
+  font-size: var(--font-size-xs);
+  color: var(--color-danger);
 }
 
 .code-input {
   text-transform: uppercase;
   letter-spacing: 0.12em;
   text-align: center;
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 
+/* ---------- 6. 按钮（primary/secondary/danger 三型 + disabled） ---------- */
 .btn {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 16px;
-  font-size: 15px;
-  background: #ffffff;
-  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 7px 16px;
+  font-size: var(--font-size-body);
+  font-weight: 500;
+  font-family: inherit;
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
   cursor: pointer;
 }
 
+.btn:hover {
+  background: var(--color-border-muted);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+
+.btn.secondary {
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
+}
+
 .btn.primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
   color: #ffffff;
-  font-weight: 600;
 }
 
 .btn.primary:hover {
-  background: var(--accent-dark);
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.btn.danger {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: #ffffff;
+}
+
+.btn.danger:hover {
+  background: #b61523;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.btn-block {
+  width: 100%;
 }
 
 .actions {
   display: flex;
-  gap: 12px;
+  gap: var(--space-2);
 }
 
-/* 提示与错误 */
+/* ---------- 7. 警示条（error/success/info/alert） ---------- */
 .alert {
-  margin: 0 0 16px;
-  border-radius: 8px;
-  background: var(--danger-bg);
-  color: var(--danger-text);
+  margin: 0 0 var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
   padding: 10px 12px;
-  font-size: 14px;
+  font-size: var(--font-size-body);
+  line-height: 1.5;
 }
 
-.hint,
-.client-line {
-  margin: 0 0 16px;
-  font-size: 14px;
-  color: var(--text-secondary);
+.alert.error {
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger-border);
+  color: var(--color-danger);
+}
+
+.alert.success {
+  background: var(--color-success-bg);
+  border-color: var(--color-success-border);
+  color: var(--color-success);
+}
+
+.alert.info {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-border-muted);
+  color: var(--color-info-text);
+}
+
+.alert.warn {
+  background: var(--color-alert-bg);
+  border-color: var(--color-alert-border);
+  color: var(--color-alert-text);
+}
+
+/* ---------- 8. 状态徽标（pill） ---------- */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 10px;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  line-height: 20px;
+  border: 1px solid transparent;
+  vertical-align: middle;
+}
+
+.pill-success {
+  background: var(--color-success-bg);
+  border-color: var(--color-success-border);
+  color: var(--color-success);
+}
+
+.pill-accent {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-border-muted);
+  color: var(--color-accent);
+}
+
+.pill-muted {
+  background: var(--color-surface-subtle);
+  border-color: var(--color-border-muted);
+  color: var(--color-text-secondary);
+}
+
+/* ---------- 9. 数据表（列表行，B2b 自助面拼装用） ---------- */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-body);
+}
+
+.data-table th {
+  text-align: left;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-subtle);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.data-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border-muted);
+  color: var(--color-text);
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* ---------- 10. consent 专用件 ---------- */
+/* 客户端身份区（名称 + org 徽标同置一个子面板） */
+.client-block {
+  margin: 0 0 var(--space-4);
+}
+
+.client-block .client-line {
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-size-body);
+  color: var(--color-text-secondary);
 }
 
 .client-line strong {
-  color: var(--text-primary);
+  color: var(--color-text);
+  font-weight: 600;
 }
 
-/* consent scope 勾选列表 */
+.org-badge {
+  margin: 0;
+  font-size: var(--font-size-body);
+  color: var(--color-text-secondary);
+}
+
+.org-badge strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+/* scope 勾选清单：整块描边、行间发丝线（设置页列表形态） */
 .scopes-label {
-  margin: 0 0 8px;
-  font-size: 14px;
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-body);
+  font-weight: 500;
 }
 
 .scopes {
   list-style: none;
-  margin: 0 0 16px;
+  margin: 0 0 var(--space-4);
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.scopes li {
+  border-bottom: 1px solid var(--color-border-muted);
+}
+
+.scopes li:last-child {
+  border-bottom: 0;
 }
 
 .scope-item {
   display: grid;
   grid-template-columns: auto auto 1fr;
-  gap: 8px;
+  gap: var(--space-2);
   align-items: baseline;
-  border: 1px solid var(--border);
-  border-radius: 8px;
   padding: 10px 12px;
-  font-size: 14px;
+  font-size: var(--font-size-body);
 }
 
 .scope-item input {
-  accent-color: var(--accent);
+  accent-color: var(--color-accent);
 }
 
-.scope-name {
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 13px;
-}
-
-.scope-desc {
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-/* 组织客户端三态：徽标 / 链接式选择器 / 引导态；超 ceiling 的禁用 scope 项降透明度 */
-.org-badge {
-  margin: 0 0 16px;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.org-badge strong {
-  color: var(--text-primary);
-}
-
-.org-select .org-choices {
-  list-style: none;
-  margin: 0 0 16px;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.org-choice {
-  display: block;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 14px;
-  text-decoration: none;
-  color: var(--text-primary);
-}
-
-.org-choice:hover {
-  border-color: var(--accent);
-}
-
-.org-guide {
-  margin: 0 0 16px;
-  border-radius: 8px;
-  background: var(--danger-bg);
-  color: var(--danger-text);
-  padding: 10px 12px;
-  font-size: 14px;
-  line-height: 1.6;
-}
-
+/* 超 ceiling 的禁用 scope 项降透明度（控件本身 disabled） */
 .scope-item.disabled {
   opacity: 0.55;
 }
 
-/* 既有授权徽标（consent 页）：与 scope 名同行的小标签 */
-.scope-granted {
-  display: inline-block;
-  margin-left: 6px;
-  border-radius: 6px;
-  padding: 1px 8px;
-  font-size: 12px;
-  background: #eef7ee;
-  color: #2f6b3a;
+.scope-name {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: var(--font-size-sm);
 }
 
-/* 登录页 passkey 分隔线（SSR login.html 内联样式收拢至此） */
+.scope-name .pill {
+  margin-left: var(--space-1);
+}
+
+.scope-desc {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+/* org 三态：徽标（上方）/ 链接式选择器 / 引导条 */
+.org-select .org-choices {
+  list-style: none;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.org-choice {
+  display: block;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: var(--font-size-body);
+  text-decoration: none;
+  color: var(--color-text);
+}
+
+.org-choice:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* ---------- 11. 空态 ---------- */
+.empty {
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-body);
+}
+
+.empty .empty-title {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* ---------- 12. 确认对话框（危险操作前，B2b 拼装用） ---------- */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: rgba(31, 35, 40, 0.4);
+}
+
+.dialog {
+  width: 100%;
+  max-width: 440px;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pop);
+  padding: var(--space-5);
+}
+
+.dialog h2 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+}
+
+.dialog p {
+  margin: 0 0 var(--space-5);
+  font-size: var(--font-size-body);
+  color: var(--color-text-secondary);
+}
+
+.dialog .actions {
+  justify-content: flex-end;
+}
+
+/* ---------- 13. 登录页 passkey 分隔线 ---------- */
 .pk-divider {
   border: 0;
-  border-top: 1px solid #dfe3ef;
-  margin: 18px 0 14px;
+  border-top: 1px solid var(--color-border-muted);
+  margin: var(--space-4) 0 var(--space-3);
 }

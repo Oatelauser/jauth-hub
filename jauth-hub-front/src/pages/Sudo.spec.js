@@ -32,8 +32,13 @@ describe('Sudo 页', () => {
     await flushPromises();
 
     expect(fetchMock.mock.calls[0][0]).toBe('/api/sudo?returnTo=%2Fselfservice%2Fapps');
-    expect(wrapper.find('button').text()).toBe(t('sudo.verify'));
+    expect(wrapper.find('button.btn.primary').text()).toBe(t('sudo.verify'));
     expect(wrapper.find('a').attributes('href')).toBe('/selfservice/apps');
     expect(wrapper.find('a').text()).toBe(t('sudo.back'));
+
+    // 企业级换皮结构：单卡居中 + 升权说明；教学块退场
+    expect(wrapper.find('.card').exists()).toBe(true);
+    expect(wrapper.text()).toContain(t('sudo.intro'));
+    expect(wrapper.find('details').exists()).toBe(false);
   });
 });
