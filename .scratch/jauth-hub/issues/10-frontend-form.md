@@ -26,3 +26,13 @@ Blocked by: —
 **成本底账(2026-10-01 探查实测)**:19 模板 / 2103 行 HTML / 15 GET 页面路由;内联 vanilla JS 约 800 行;无构建链;th:each ~15、th:if ~100、sec:authorize 0(页面逻辑浅);真渲染断言集中在 app 模块 6 个集成测试,core/selfservice 页面测试全 standalone;headless 局部先例 = PatController / AuthorizedAppsController 已有 produces=JSON 的 list 接口。
 
 **issue 05 三前提清算**:教学定位 → 降级保留(决议 4a);零外链 → 升格宪法(决议 4b);宿主嵌入白得 UI → 仍成立(内置皮即白得),headless 为其补 API 面。**三前提无一失效,SSR 皮不动。**
+
+## 翻转记录（2026-10-02，v1.4 发布当日用户拍板）
+
+**v1.5 前端归一**，本票决议 1/2 的"SSR 永远默认/内置皮原样保留"作废：
+1. resources 目录全部 SSR 模板页迁入 `jauth-hub-front`，内置 SSR 皮退场拆除；
+2. front 双形态发行：同域名分离部署照常 + dist 打 jar 上 Maven Central（嵌入宿主加依赖白得 UI，"白得 UI"前提以新形态存续）；
+3. 页面完整窜连（导航壳 + 流程链），非零散页面集合；自助面页面依赖 selfservice JSON API（front README 写明部署前提）；
+4. 设计语言：主页面企业级认证中心形态，教学形态收缩 /demo 专区（票 05 教学定位同步修宪）。
+
+Status: superseded-in-part（界线宪法第 1 条"内置皮默认保留"由本翻转记录取代；信任面自家所有权不变）

@@ -17,7 +17,7 @@
 | 家族件 | spring-plus **1.1.0**（web/security/boot 三件套），仅 app 模块必选 | [08](../.scratch/jauth-hub/issues/08-grilling-spring-plus-integration.md) |
 | 数据库 | H2（PostgreSQL 兼容模式）+ PostgreSQL **双兼容 SQL**，不承诺 MySQL；memory\|jdbc 双实现条件注册（`jauth-hub.storage`） | [03](../.scratch/jauth-hub/issues/03-grilling-dual-mode-architecture.md) |
 | 会话 | Spring Session：JDBC 默认（零新增基建）、Redis 可选（引依赖即切） | [04](../.scratch/jauth-hub/issues/04-grilling-v1-scope.md) |
-| 前端 | **双皮**（[10](../.scratch/jauth-hub/issues/10-frontend-form.md)）：默认 = Thymeleaf SSR + 手写单文件 CSS（无框架）；v1.4 已落地 headless 皮 = 信任面四页 JSON API + 根目录 `jauth-hub-front`（Vue 3 + Vite，产物随制品、认证中心同域名 `/front/**`，`jauth-hub.trust-skin=front` 经 302 路由切换，SSR 永远默认）。信任面页面永远是 jauth-hub 自家的；自助面可换可缺；接入方前端形态无关。教学三层保留但不绑架架构；**运行时零外链永守**（框架须打包进制品）。UI 中文 + i18n 资源结构（messages_en 骨架） | [05](../.scratch/jauth-hub/issues/05-grilling-learning-frontend.md) · [10](../.scratch/jauth-hub/issues/10-frontend-form.md) |
+| 前端 | **双皮**（[10](../.scratch/jauth-hub/issues/10-frontend-form.md)）：默认 = Thymeleaf SSR + 手写单文件 CSS（无框架）；v1.4 已落地 headless 皮 = 信任面四页 JSON API + 根目录 `jauth-hub-front`（Vue 3 + Vite，产物随制品、认证中心同域名 `/front/**`，`jauth-hub.trust-skin=front` 经 302 路由切换，SSR 永远默认）。信任面页面永远是 jauth-hub 自家的；自助面可换可缺；接入方前端形态无关。教学三层保留但不绑架架构；**运行时零外链永守**（框架须打包进制品）。UI 中文 + i18n 资源结构（messages_en 骨架）。**v1.5 前端归一（2026-10-02 用户拍板）**：SSR 皮退场，`jauth-hub-front` 成为唯一官方前端；同一份 front 代码双形态发行——①同域名分离部署照常，②构建产物 dist 打 jar 发布 Maven Central（嵌入宿主加依赖即白得整套 UI，静态资源形态）；主页面（信任/自助/管理）一律企业级认证中心形态，教学形态收缩进 /demo 专区 | [05](../.scratch/jauth-hub/issues/05-grilling-learning-frontend.md) · [10](../.scratch/jauth-hub/issues/10-frontend-form.md) |
 | 运行时 | v1 仅 JVM；代码守 AOT 友好习惯；**GraalVM 原生二进制不做**（2026-10-02 用户拍板除名，原 v1.x 实验目标取消） | [10](../.scratch/jauth-hub/issues/10-frontend-form.md) |
 | 协议 | 强制 PKCE；implicit/password 不存在；client_credentials 与 DPoP 框架能力在、**默认关**（配置可开不宣传） | [06](../.scratch/jauth-hub/issues/06-final-tech-details.md) |
 | License | **MIT** | [06](../.scratch/jauth-hub/issues/06-final-tech-details.md) |
@@ -109,6 +109,7 @@ public interface ResponseRenderer {
 | **v1.2 强化层** | Passkey（开关，默认关）、sudo mode（开关，依赖 Passkey） |
 | **v1.3 滑账清剿**（1.3.0，2026-10-02 完成） | 老账 ①–⑧全清（⑤ 经查证由 B9 架构性覆盖）+ v1.2 新账 2/3/6 收口 + D0 真渲染测试网；批次 T0+D0–D6；随批拍板：GraalVM 除名、OWASP 继续豁免、credentialId 限流转 v2+、Maven Central 随 1.3.0 发布 |
 | **v1.4 headless 皮**（1.4.0，2026-10-02 完成） | 信任面四页 JSON API 化 + 根目录 `jauth-hub-front`（Vue 3 + Vite 分离前端，产物随制品、同域名）——[10](../.scratch/jauth-hub/issues/10-frontend-form.md)。批次 B1（consent/device/sudo 状态面，consent 装配单点提取含 org 会话暂存副作用）+ B2（登录 GET 状态 + POST 认证桥，复刻 formLogin 成功编舞，CSRF 契约探针钉死原始 token 头/表单双路可用）+ B3（front 工程，表单契约逐行照 SSR，运行时零外链）+ B4（trust-skin 旗标 302 路由 + /front/** 静态与深链回退 + front-skin Maven profile（enforcer 兜 copy-resources 静默缺口）+ CI front job）+ B5（交付门禁评审 0C/0H/1M 修毕：webauthn 助手双份拷贝提取）。随批事实：AuthenticationManager 不可经 AuthenticationConfiguration 暴露为 bean（全局构建器自递归 StackOverflow，自组装 Dao ProviderManager 规避，javap 实证）；登录成功后 CSRF token 换发（headless 皮每页重取状态面） |
+| **v1.5 前端归一**（定案 2026-10-02，进行中） | resources 全部 SSR 模板页迁入 `jauth-hub-front`、SSR 皮拆除；front 双形态发行（同域名分离部署 + dist jar 上 Maven Central 供嵌入宿主白得 UI）；页面完整窜连（导航壳 + 流程链）；主页面企业级形态，教学收缩 /demo 专区 | 
 | 横切 | 按用户合并限流 + X-RateLimit-*、授权看板 + 一键 Revoke + RP-initiated logout + 基础审计、UserDetails→claims 映射 |
 
 v2+：webhook、secret scanning、多 Secret 轮转、token exchange（配置可开）、redirect 通配 per-URI、back-channel logout（等框架 issue #18296）、fine-grained PAT、邮箱流（注册验证/找回密码）、passkey 登录限流 credentialId 维度（2026-10-02 拍板自 v1.3 转入）。出局：phantom token、请求头降权、"严格无 OIDC"模式。附决：存量用户不导入。
@@ -137,7 +138,7 @@ v2+：webhook、secret scanning、多 Secret 轮转、token exchange（配置可
 
 **`/demo` 真实联调教学区**（app 内置）：对真实端点完整走授权码 + PKCE（code_verifier/state 存 sessionStorage、callback 手工 code→token 交换），实时展示 HTTP 请求/响应日志，最后持 token 调受保护接口——蓝本即参考 demo 的 `front/callback.html`，"解码 payload"环节替换为**内省结果展示**。
 
-三层教学：折叠"发生了什么"说明块（默认开、`jauth-hub.educational=false` 关）/ demo HTTP 日志 / 流程图高亮当前步骤。视觉基调沿袭参考 demo：中文、暗色渐变 + 白卡片、零依赖。
+三层教学：折叠"发生了什么"说明块 / demo HTTP 日志 / 流程图高亮当前步骤。**v1.5 修宪（2026-10-02 用户拍板）**：教学形态整体收缩进 `/demo` 专区——主页面（信任面/自助面/管理面）企业级认证中心设计语言，不再携带 demo 味教学元素；demo 区内三层教学全量保留（Vue 承载）。`jauth-hub.educational` 开关随 SSR 拆除一并退场。
 
 ## 8. 工程约定
 
