@@ -64,8 +64,8 @@ public class AdminUsersController {
      */
     static final int PASSWORD_MAX_LENGTH = 72;
 
-    /** 用户列表默认页大小（v1.3 D5 老账⑦）。 */
-    static final int USERS_PAGE_DEFAULT_SIZE = 20;
+    /** 用户列表默认页大小（v1.3 D5 老账⑦；注解 defaultValue 需编译期常量，取 String 形态）。 */
+    static final String USERS_PAGE_DEFAULT_SIZE = "20";
 
     /** 用户列表页大小上限（防 ?size=100000 全表直出）。 */
     static final int USERS_PAGE_MAX_SIZE = 100;
@@ -107,7 +107,7 @@ public class AdminUsersController {
     @GetMapping("/admin/users")
     public String page(
             @RequestParam(value = "page", defaultValue = "1") int page,
-            @RequestParam(value = "size", defaultValue = "20") int size,
+            @RequestParam(value = "size", defaultValue = USERS_PAGE_DEFAULT_SIZE) int size,
             Model model) {
         model.addAttribute("educational", this.educational.enabled());
         // 分页参数规整（v1.3 D5 老账⑦,家族 PageResponse 契约口径 item/total/pageNum/pageSize/totalPage）

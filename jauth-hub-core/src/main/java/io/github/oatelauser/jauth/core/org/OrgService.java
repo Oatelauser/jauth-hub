@@ -142,7 +142,12 @@ public class OrgService {
             throw new JauthException(JauthErrorCode.A0516);
         }
         OrgMember member = new OrgMember(orgId, newMemberUserId, OrgRole.MEMBER, this.clock.instant());
-        this.orgRepository.saveMember(member);
+        try {
+            this.orgRepository.saveMember(member);
+        } catch (DataIntegrityViolationException ex) {
+            // check-then-insert 的并发窗口由主键约束兜底（create 的 A0506 同款翻译），撞约束即"已是成员"
+            throw new JauthException(JauthErrorCode.A0516);
+        }
         this.auditPublisher.publish(
                 AuditEvent.of(AuditEventType.MEMBER_ADDED, actingUserId, "org", orgId, "member=" + newMemberUserId));
         return member;

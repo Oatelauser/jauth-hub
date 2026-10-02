@@ -13,9 +13,7 @@ import io.github.oatelauser.jauth.core.web.EducationalFlag;
 import io.github.oatelauser.jauth.core.web.RequiresSudo;
 import java.security.Principal;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
@@ -132,10 +130,10 @@ public class MyAppsController {
         requireCreationQuota(user.id());
         OwnedAppService.Registration registration = service.register(
                 user.id(),
-                requireName(request.name()),
-                parseRedirects(request.redirectUris()),
+                OwnedAppService.requireName(request.name()),
+                OwnedAppService.parseRedirects(request.redirectUris()),
                 Boolean.TRUE.equals(request.confidential()));
-        Map<String, Object> data = appData(registration.app());
+        Map<String, Object> data = OwnedAppService.appData(registration.app());
         if (registration.app().confidential()) {
             data.put("clientSecret", registration.plaintextSecret());
         }
@@ -170,7 +168,7 @@ public class MyAppsController {
         OwnedAppService service = requireService();
         JauthUser user = requireUser(principal);
         OwnedAppService.Registration registration = service.rotateSecret(ClientOwner.ofUser(user.id()), id);
-        Map<String, Object> data = appData(registration.app());
+        Map<String, Object> data = OwnedAppService.appData(registration.app());
         data.put("clientSecret", registration.plaintextSecret());
         return this.responseRenderer.renderSuccess(data);
     }
@@ -193,8 +191,11 @@ public class MyAppsController {
         OwnedAppService service = requireService();
         JauthUser user = requireUser(principal);
         OwnedAppService.OwnedApp app = service.update(
-                ClientOwner.ofUser(user.id()), id, requireName(request.name()), parseRedirects(request.redirectUris()));
-        return this.responseRenderer.renderSuccess(appData(app));
+                ClientOwner.ofUser(user.id()),
+                id,
+                OwnedAppService.requireName(request.name()),
+                OwnedAppService.parseRedirects(request.redirectUris()));
+        return this.responseRenderer.renderSuccess(OwnedAppService.appData(app));
     }
 
     /**
@@ -221,40 +222,6 @@ public class MyAppsController {
         Map<String, Object> data = new LinkedHashMap<>(4);
         data.put("id", id);
         return this.responseRenderer.renderSuccess(data);
-    }
-
-    /** 应用摘要 data（注册/轮转/编辑共用形状）。 */
-    private static Map<String, Object> appData(OwnedAppService.OwnedApp app) {
-        Map<String, Object> data = new LinkedHashMap<>(8);
-        data.put("id", app.id());
-        data.put("name", app.name());
-        data.put("clientId", app.clientId());
-        data.put("confidential", app.confidential());
-        data.put("redirectUris", app.redirectUris());
-        return data;
-    }
-
-    /** 名称校验（A0509，与注册同口径）。 */
-    private static String requireName(@Nullable String raw) {
-        String name = raw == null ? "" : raw.trim();
-        if (name.isEmpty() || name.length() > OwnedAppService.NAME_MAX_LENGTH) {
-            throw new JauthException(SelfServiceErrorCode.A0509);
-        }
-        return name;
-    }
-
-    /** redirect 多行文本校验（A0510，与注册同口径）。 */
-    private static Set<String> parseRedirects(@Nullable String raw) {
-        List<String> redirectUris;
-        try {
-            redirectUris = OwnedAppService.parseRedirectUris(raw);
-        } catch (IllegalArgumentException ex) {
-            throw new JauthException(SelfServiceErrorCode.A0510);
-        }
-        if (redirectUris.isEmpty()) {
-            throw new JauthException(SelfServiceErrorCode.A0510);
-        }
-        return Set.copyOf(redirectUris);
     }
 
     private OwnedAppService requireService() {

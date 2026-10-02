@@ -1,6 +1,7 @@
 package io.github.oatelauser.jauth.selfservice.web;
 
 import io.github.oatelauser.jauth.core.client.ClientOwner;
+import io.github.oatelauser.jauth.core.response.JauthException;
 import io.github.oatelauser.jauth.core.scope.ScopeCatalog;
 import io.github.oatelauser.jauth.core.scope.ScopeDefinition;
 import io.github.oatelauser.jauth.core.util.UuidV7;
@@ -11,7 +12,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -195,6 +198,50 @@ public abstract class OwnedAppService {
         Assert.notNull(owner, "owner cannot be null");
         Assert.hasText(appId, "appId cannot be empty");
         persistDelete(owner, appId);
+    }
+
+    /**
+     * 名称校验（A0509，注册/编辑共用口径；v1.3 D5 从两控制器收敛至此）。
+     *
+     * @param raw 原始名（null 视为空）
+     * @return 规整名
+     */
+    static String requireName(@Nullable String raw) {
+        String name = raw == null ? "" : raw.trim();
+        if (name.isEmpty() || name.length() > NAME_MAX_LENGTH) {
+            throw new JauthException(SelfServiceErrorCode.A0509);
+        }
+        return name;
+    }
+
+    /**
+     * redirect 多行文本校验（A0510，注册/编辑共用口径；解析单源于 {@link #parseRedirectUris}）。
+     *
+     * @param raw 多行文本
+     * @return 校验通过的 URI 集
+     */
+    static Set<String> parseRedirects(@Nullable String raw) {
+        List<String> redirectUris;
+        try {
+            redirectUris = parseRedirectUris(raw);
+        } catch (IllegalArgumentException ex) {
+            throw new JauthException(SelfServiceErrorCode.A0510);
+        }
+        if (redirectUris.isEmpty()) {
+            throw new JauthException(SelfServiceErrorCode.A0510);
+        }
+        return Set.copyOf(redirectUris);
+    }
+
+    /** 应用摘要 data（注册/轮转/编辑共用形状；v1.3 D5 从两控制器收敛至此）。 */
+    static Map<String, Object> appData(OwnedApp app) {
+        Map<String, Object> data = new LinkedHashMap<>(8);
+        data.put("id", app.id());
+        data.put("name", app.name());
+        data.put("clientId", app.clientId());
+        data.put("confidential", app.confidential());
+        data.put("redirectUris", app.redirectUris());
+        return data;
     }
 
     /** 轮转落位：写新 secret 哈希并回读视图（miss/公开应用 → B0502）。 */

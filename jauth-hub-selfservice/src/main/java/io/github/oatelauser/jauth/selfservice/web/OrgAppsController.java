@@ -192,7 +192,7 @@ public class OrgAppsController {
         JauthUser user = requireUser(principal);
         requireOwner(orgId, user);
         OwnedAppService.Registration registration = this.ownedAppService.rotateSecret(ClientOwner.ofOrg(orgId), id);
-        Map<String, Object> data = appData(registration.app());
+        Map<String, Object> data = OwnedAppService.appData(registration.app());
         data.put("clientSecret", registration.plaintextSecret());
         return this.responseRenderer.renderSuccess(data);
     }
@@ -220,8 +220,11 @@ public class OrgAppsController {
         JauthUser user = requireUser(principal);
         requireOwner(orgId, user);
         OwnedAppService.OwnedApp app = this.ownedAppService.update(
-                ClientOwner.ofOrg(orgId), id, requireName(request.name()), parseRedirects(request.redirectUris()));
-        return this.responseRenderer.renderSuccess(appData(app));
+                ClientOwner.ofOrg(orgId),
+                id,
+                OwnedAppService.requireName(request.name()),
+                OwnedAppService.parseRedirects(request.redirectUris()));
+        return this.responseRenderer.renderSuccess(OwnedAppService.appData(app));
     }
 
     /**
@@ -250,40 +253,6 @@ public class OrgAppsController {
         Map<String, Object> data = new LinkedHashMap<>(4);
         data.put("id", id);
         return this.responseRenderer.renderSuccess(data);
-    }
-
-    /** 应用摘要 data（注册/轮转/编辑共用形状，与个人面同款）。 */
-    private static Map<String, Object> appData(OwnedAppService.OwnedApp app) {
-        Map<String, Object> data = new LinkedHashMap<>(8);
-        data.put("id", app.id());
-        data.put("name", app.name());
-        data.put("clientId", app.clientId());
-        data.put("confidential", app.confidential());
-        data.put("redirectUris", app.redirectUris());
-        return data;
-    }
-
-    /** 名称校验（A0509，与注册同口径）。 */
-    private static String requireName(@Nullable String raw) {
-        String name = raw == null ? "" : raw.trim();
-        if (name.isEmpty() || name.length() > OwnedAppService.NAME_MAX_LENGTH) {
-            throw new JauthException(SelfServiceErrorCode.A0509);
-        }
-        return name;
-    }
-
-    /** redirect 多行文本校验（A0510，与注册同口径）。 */
-    private static Set<String> parseRedirects(@Nullable String raw) {
-        List<String> redirectUris;
-        try {
-            redirectUris = OwnedAppService.parseRedirectUris(raw);
-        } catch (IllegalArgumentException ex) {
-            throw new JauthException(SelfServiceErrorCode.A0510);
-        }
-        if (redirectUris.isEmpty()) {
-            throw new JauthException(SelfServiceErrorCode.A0510);
-        }
-        return Set.copyOf(redirectUris);
     }
 
     private OwnedAppService requireAppsService() {
