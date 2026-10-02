@@ -29,8 +29,11 @@ import io.github.oatelauser.jauth.selfservice.web.MyAppsStateController;
 import io.github.oatelauser.jauth.selfservice.web.MyOrgsController;
 import io.github.oatelauser.jauth.selfservice.web.MyOrgsStateController;
 import io.github.oatelauser.jauth.selfservice.web.OrgAppsController;
+import io.github.oatelauser.jauth.selfservice.web.OrgAppsStateController;
 import io.github.oatelauser.jauth.selfservice.web.OrgInstallationsController;
+import io.github.oatelauser.jauth.selfservice.web.OrgInstallationsStateController;
 import io.github.oatelauser.jauth.selfservice.web.OrgMembersController;
+import io.github.oatelauser.jauth.selfservice.web.OrgMembersStateController;
 import io.github.oatelauser.jauth.selfservice.web.OwnedAppService;
 import io.github.oatelauser.jauth.selfservice.web.PasskeyController;
 import io.github.oatelauser.jauth.selfservice.web.PatController;
@@ -263,6 +266,69 @@ public class JauthSelfServiceAutoConfiguration {
                 ResponseRenderer responseRenderer) {
             return new MyOrgsStateController(
                     orgService.getIfAvailable(), userRepository, educational, responseRenderer);
+        }
+
+        /** org 应用页 JSON 状态面（v1.5 B1b）：依赖与 OWNER 门形态照 jauthOrgAppsController。 */
+        @Bean
+        @ConditionalOnMissingBean
+        OrgAppsStateController jauthOrgAppsStateController(
+                ObjectProvider<OwnedAppService> ownedAppService,
+                ObjectProvider<OrgService> orgService,
+                ObjectProvider<OrgRepository> orgRepository,
+                UserRepository userRepository,
+                EducationalFlag educational,
+                ResponseRenderer responseRenderer) {
+            return new OrgAppsStateController(
+                    ownedAppService.getIfAvailable(),
+                    orgService.getIfAvailable(),
+                    orgRepository.getIfAvailable(),
+                    userRepository,
+                    educational,
+                    responseRenderer);
+        }
+
+        /** 安装审批页 JSON 状态面（v1.5 B1b）：行装配/scope 目录复用 SSR 控制器的包内 statics。 */
+        @Bean
+        @ConditionalOnMissingBean
+        OrgInstallationsStateController jauthOrgInstallationsStateController(
+                ObjectProvider<OrgService> orgService,
+                ObjectProvider<InstallationService> installationService,
+                ObjectProvider<InstallationRepository> installationRepository,
+                ObjectProvider<OrgRepository> orgRepository,
+                UserRepository userRepository,
+                RegisteredClientRepository clientRepository,
+                ScopeCatalog scopeCatalog,
+                MessageSource messageSource,
+                EducationalFlag educational,
+                ResponseRenderer responseRenderer) {
+            return new OrgInstallationsStateController(
+                    orgService.getIfAvailable(),
+                    installationService.getIfAvailable(),
+                    installationRepository.getIfAvailable(),
+                    orgRepository.getIfAvailable(),
+                    userRepository,
+                    clientRepository,
+                    scopeCatalog,
+                    messageSource,
+                    educational,
+                    responseRenderer);
+        }
+
+        /** org 成员管理页 JSON 状态面（v1.5 B1b）：org 投影需 OrgRepository（supported 含其在场性）。 */
+        @Bean
+        @ConditionalOnMissingBean
+        OrgMembersStateController jauthOrgMembersStateController(
+                ObjectProvider<OrgService> orgService,
+                ObjectProvider<OrgRepository> orgRepository,
+                UserRepository userRepository,
+                EducationalFlag educational,
+                ResponseRenderer responseRenderer) {
+            return new OrgMembersStateController(
+                    orgService.getIfAvailable(),
+                    orgRepository.getIfAvailable(),
+                    userRepository,
+                    educational,
+                    responseRenderer);
         }
 
         /**

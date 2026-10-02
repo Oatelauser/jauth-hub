@@ -26,7 +26,10 @@ import io.github.oatelauser.jauth.selfservice.web.MyAppsStateController;
 import io.github.oatelauser.jauth.selfservice.web.MyOrgsController;
 import io.github.oatelauser.jauth.selfservice.web.MyOrgsStateController;
 import io.github.oatelauser.jauth.selfservice.web.OrgAppsController;
+import io.github.oatelauser.jauth.selfservice.web.OrgAppsStateController;
 import io.github.oatelauser.jauth.selfservice.web.OrgInstallationsController;
+import io.github.oatelauser.jauth.selfservice.web.OrgInstallationsStateController;
+import io.github.oatelauser.jauth.selfservice.web.OrgMembersStateController;
 import io.github.oatelauser.jauth.selfservice.web.OwnedAppService;
 import io.github.oatelauser.jauth.selfservice.web.PasskeyController;
 import io.github.oatelauser.jauth.selfservice.web.PatController;
@@ -108,6 +111,10 @@ class JauthSelfServiceAutoConfigurationTest {
                     assertThat(context).hasSingleBean(PatStateController.class);
                     assertThat(context).hasSingleBean(MyAppsStateController.class);
                     assertThat(context).hasSingleBean(MyOrgsStateController.class);
+                    // v1.5 B1b org 族三状态面：同场注册（领域 bean 缺席即 supported=false 状态体）
+                    assertThat(context).hasSingleBean(OrgAppsStateController.class);
+                    assertThat(context).hasSingleBean(OrgInstallationsStateController.class);
+                    assertThat(context).hasSingleBean(OrgMembersStateController.class);
                     assertThat(context).hasBean("jauthSelfServiceViewResolver");
                 });
     }
@@ -134,6 +141,9 @@ class JauthSelfServiceAutoConfigurationTest {
                     assertThat(context).hasSingleBean(PatStateController.class);
                     assertThat(context).hasSingleBean(MyAppsStateController.class);
                     assertThat(context).hasSingleBean(MyOrgsStateController.class);
+                    assertThat(context).hasSingleBean(OrgAppsStateController.class);
+                    assertThat(context).hasSingleBean(OrgInstallationsStateController.class);
+                    assertThat(context).hasSingleBean(OrgMembersStateController.class);
                 });
     }
 

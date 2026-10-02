@@ -128,7 +128,8 @@ public class OrgInstallationsController {
         JauthUser user = requireUser(principal);
         requireOwner(orgId, user);
         Org org = requireOrg(orgId);
-        List<InstallationRow> rows = installationRows(orgId);
+        List<InstallationRow> rows =
+                installationRows(orgId, this.installationRepository, this.clientRepository, this.userRepository);
         model.addAttribute("org", org);
         model.addAttribute(
                 "pending",
@@ -136,7 +137,8 @@ public class OrgInstallationsController {
                         .filter(row -> row.status() == InstallationStatus.PENDING)
                         .toList());
         model.addAttribute("installations", rows);
-        model.addAttribute("scopes", scopeItems(LocaleContextHolder.getLocale()));
+        model.addAttribute(
+                "scopes", scopeItems(LocaleContextHolder.getLocale(), this.scopeCatalog, this.messageSource));
         return VIEW_ORG_INSTALLATIONS;
     }
 
@@ -245,18 +247,22 @@ public class OrgInstallationsController {
         return this.responseRenderer.renderSuccess(null);
     }
 
-    /** 审批页行视图：两分区（PENDING 待批/全量）共用一形状，模板按 status 过滤。 */
-    private List<InstallationRow> installationRows(String orgId) {
+    /** 行装配包内共径（v1.5 B1b：SSR 页与 JSON 状态面同源，提为 static——不复制行装配逻辑）。 */
+    static List<InstallationRow> installationRows(
+            String orgId,
+            InstallationRepository installationRepository,
+            RegisteredClientRepository clientRepository,
+            UserRepository userRepository) {
         // 逐行反查 client/用户是循环内 DB 查询（p3c 强制项，B9 OrgScopeGate 同款口径）：
         // 按页记忆化——审批页行数是单 org 安装量，不值得为它引入批量查询面
         Map<String, RegisteredClient> clientsById = new HashMap<>();
         Map<String, JauthUser> usersById = new HashMap<>();
         List<InstallationRow> rows = new ArrayList<>();
-        for (Installation installation : this.installationRepository.findByOrg(orgId)) {
+        for (Installation installation : installationRepository.findByOrg(orgId)) {
             RegisteredClient client =
-                    clientsById.computeIfAbsent(installation.registeredClientId(), this.clientRepository::findById);
-            JauthUser requester = resolveUser(installation.requestedBy(), usersById);
-            JauthUser approver = resolveUser(installation.approvedBy(), usersById);
+                    clientsById.computeIfAbsent(installation.registeredClientId(), clientRepository::findById);
+            JauthUser requester = resolveUser(installation.requestedBy(), usersById, userRepository);
+            JauthUser approver = resolveUser(installation.approvedBy(), usersById, userRepository);
             rows.add(new InstallationRow(
                     installation.id(),
                     client != null ? client.getClientName() : installation.registeredClientId(),
@@ -272,15 +278,16 @@ public class OrgInstallationsController {
         return List.copyOf(rows);
     }
 
-    private @Nullable JauthUser resolveUser(@Nullable String userId, Map<String, JauthUser> usersById) {
-        return userId == null ? null : usersById.computeIfAbsent(userId, this.userRepository::findById);
+    private static @Nullable JauthUser resolveUser(
+            @Nullable String userId, Map<String, JauthUser> usersById, UserRepository userRepository) {
+        return userId == null ? null : usersById.computeIfAbsent(userId, userRepository::findById);
     }
 
-    /** scope 表单项（名称 + i18n 描述），照 PatController 的目录展示契约。 */
-    private List<ScopeItem> scopeItems(Locale locale) {
+    /** scope 目录装配包内共径（v1.5 B1b；参数序照 {@code PatController.scopeItems}）。 */
+    static List<ScopeItem> scopeItems(Locale locale, ScopeCatalog scopeCatalog, MessageSource messageSource) {
         List<ScopeItem> items = new ArrayList<>();
-        for (ScopeDefinition definition : this.scopeCatalog.all()) {
-            String description = this.messageSource.getMessage(definition.i18nKey(), null, definition.name(), locale);
+        for (ScopeDefinition definition : scopeCatalog.all()) {
+            String description = messageSource.getMessage(definition.i18nKey(), null, definition.name(), locale);
             items.add(new ScopeItem(definition.name(), description));
         }
         return List.copyOf(items);
@@ -341,7 +348,7 @@ public class OrgInstallationsController {
     }
 
     /** 展示名：displayName 优先，缺省回落 username；用户已删/不在池回退 id 片段，页面不炸。 */
-    private @Nullable String displayNameOf(@Nullable String userId, @Nullable JauthUser user) {
+    private static @Nullable String displayNameOf(@Nullable String userId, @Nullable JauthUser user) {
         if (userId == null) {
             return null;
         }

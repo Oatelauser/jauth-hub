@@ -79,7 +79,7 @@ public class OrgMembersController {
         }
         JauthUser user = requireUser(principal);
         model.addAttribute("orgId", orgId);
-        model.addAttribute("members", memberRows(orgId, user));
+        model.addAttribute("members", memberRows(orgId, user, this.orgService, this.userRepository));
         return VIEW_ORG_MEMBERS;
     }
 
@@ -154,12 +154,13 @@ public class OrgMembersController {
         return this.responseRenderer.renderSuccess(data);
     }
 
-    /** 页面行模型：用户名回显（user 域联查）+ 角色 + 加入时间。 */
-    private List<Map<String, Object>> memberRows(String orgId, JauthUser actingUser) {
-        return this.orgService.listMembers(orgId, actingUser.id()).stream()
+    /** 行装配包内共径（v1.5 B1b：SSR 页与 JSON 状态面同源，提为 static——不复制行装配逻辑）。 */
+    static List<Map<String, Object>> memberRows(
+            String orgId, JauthUser actingUser, OrgService orgService, UserRepository userRepository) {
+        return orgService.listMembers(orgId, actingUser.id()).stream()
                 .map(member -> {
                     Map<String, Object> row = new LinkedHashMap<>(8);
-                    JauthUser memberUser = this.userRepository.findById(member.userId());
+                    JauthUser memberUser = userRepository.findById(member.userId());
                     row.put("userId", member.userId());
                     row.put("username", memberUser == null ? member.userId() : memberUser.username());
                     row.put("role", member.role().name());
