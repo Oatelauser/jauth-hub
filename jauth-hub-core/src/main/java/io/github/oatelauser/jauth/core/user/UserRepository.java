@@ -79,6 +79,22 @@ public interface UserRepository {
     List<JauthUser> findAll();
 
     /**
+     * 用户总数（v1.3 D5 老账⑦ 用户列表分页的 total 源）。
+     *
+     * @return 用户行数
+     */
+    long countAll();
+
+    /**
+     * 分页取用户（username ASC 定序与 findAll 一致；v1.3 D5 老账⑦）。
+     *
+     * @param offset 起始偏移（0 起）
+     * @param limit 页大小
+     * @return 当前页用户行
+     */
+    List<JauthUser> findPage(int offset, int limit);
+
+    /**
      * 更新最近强认证时间（sudo 位）。
      *
      * @param id 用户 id

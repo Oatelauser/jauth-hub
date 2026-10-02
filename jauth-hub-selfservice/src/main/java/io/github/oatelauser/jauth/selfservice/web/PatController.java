@@ -1,5 +1,6 @@
 package io.github.oatelauser.jauth.selfservice.web;
 
+import io.github.oatelauser.jauth.core.ratelimit.RateLimiter;
 import io.github.oatelauser.jauth.core.response.JauthErrorCode;
 import io.github.oatelauser.jauth.core.response.JauthException;
 import io.github.oatelauser.jauth.core.response.ResponseRenderer;
@@ -76,6 +77,9 @@ public class PatController {
 
     private final Clock clock;
 
+    /** 创建节流（v1.3 D5 老账④）。 */
+    private final RateLimiter rateLimiter;
+
     public PatController(
             @Nullable PatService patService,
             ScopeCatalog scopeCatalog,
@@ -83,7 +87,8 @@ public class PatController {
             MessageSource messageSource,
             EducationalFlag educational,
             ResponseRenderer responseRenderer,
-            Clock clock) {
+            Clock clock,
+            RateLimiter rateLimiter) {
         this.patService = patService;
         this.scopeCatalog = scopeCatalog;
         this.userRepository = userRepository;
@@ -91,6 +96,7 @@ public class PatController {
         this.educational = educational;
         this.responseRenderer = responseRenderer;
         this.clock = clock;
+        this.rateLimiter = rateLimiter;
     }
 
     /**
@@ -147,6 +153,10 @@ public class PatController {
     public Object create(@RequestBody CreateRequest request, @Nullable Principal principal) {
         PatService service = requireService();
         JauthUser user = requireUser(principal);
+        if (!this.rateLimiter.consume("create-pat:" + user.id()).allowed()) {
+            // 创建节流（v1.3 D5 老账④）：每主体小时窗（共享限流器配额，键前缀区分 PAT 面）
+            throw new JauthException(SelfServiceErrorCode.A0519);
+        }
         String name = request.name() == null ? "" : request.name().trim();
         if (name.isEmpty() || name.length() > NAME_MAX_LENGTH) {
             // 名称必填（V7 列，B10 起创建面强制）；缺参走 A0501

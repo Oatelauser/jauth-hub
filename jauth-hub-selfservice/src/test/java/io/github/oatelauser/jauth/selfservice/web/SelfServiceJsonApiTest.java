@@ -70,9 +70,43 @@ class SelfServiceJsonApiTest {
                         messageSource(),
                         EducationalFlag.ON,
                         new DefaultResponseRenderer(),
-                        Clock.fixed(T0, ZoneOffset.UTC)))
+                        Clock.fixed(T0, ZoneOffset.UTC),
+                        new io.github.oatelauser.jauth.core.ratelimit.RateLimiter(
+                                1_000, 5, java.time.Duration.ofMinutes(15), java.time.Clock.systemUTC())))
                 .setControllerAdvice(jauthAdvice())
                 .build();
+    }
+
+    @Test
+    @DisplayName("创建节流（老账④）：小时窗耗尽 → A0519（limit=1 限流器，第二次创建即拒）")
+    void patCreateThrottledAfterQuotaExhausted() throws Exception {
+        io.github.oatelauser.jauth.core.ratelimit.RateLimiter tight =
+                new io.github.oatelauser.jauth.core.ratelimit.RateLimiter(
+                        1, 5, java.time.Duration.ofMinutes(15), java.time.Clock.systemUTC());
+        MockMvc throttled = MockMvcBuilders.standaloneSetup(new PatController(
+                        this.patService,
+                        new InMemoryScopeCatalog(),
+                        this.users,
+                        messageSource(),
+                        EducationalFlag.ON,
+                        new DefaultResponseRenderer(),
+                        Clock.fixed(T0, ZoneOffset.UTC),
+                        tight))
+                .setControllerAdvice(jauthAdvice())
+                .build();
+        String body = "{\"name\":\"CI 部署\",\"scopes\":[\"openid\"],\"validityDays\":90}";
+        throttled
+                .perform(post("/selfservice/pat")
+                        .principal(() -> ALICE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(jsonPath("$.code").value("00000"));
+        throttled
+                .perform(post("/selfservice/pat")
+                        .principal(() -> ALICE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(jsonPath("$.code").value("A0519"));
     }
 
     /** standalone MockMvc 不带自动配置，JauthException → SPI 失败体的 advice 须手挂（生产由 starter 装配）。 */
@@ -169,7 +203,9 @@ class SelfServiceJsonApiTest {
                         messageSource(),
                         EducationalFlag.ON,
                         new DefaultResponseRenderer(),
-                        Clock.fixed(T0, ZoneOffset.UTC)))
+                        Clock.fixed(T0, ZoneOffset.UTC),
+                        new io.github.oatelauser.jauth.core.ratelimit.RateLimiter(
+                                1_000, 5, java.time.Duration.ofMinutes(15), java.time.Clock.systemUTC())))
                 .setControllerAdvice(jauthAdvice())
                 .build();
         memoryMode

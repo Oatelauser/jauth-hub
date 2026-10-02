@@ -86,6 +86,14 @@
           </tr>
         </tbody>
       </table>
+      <!--/* 分页导航(v1.3 D5 老账⑦,家族 PageResponse 口径:total/pageNum/pageSize/totalPage) */-->
+      <p class="hint">
+        <span th:text="#{jauth.admin.users.page-summary(${total}, ${pageNum}, ${totalPage})}">共 0 条 / 第 1 页 / 共 1 页</span>
+        <a th:if="${pageNum > 1}" th:href="@{/admin/users(page=${pageNum - 1}, size=${pageSize})}"
+           th:text="#{jauth.admin.users.page-prev}">上一页</a>
+        <a th:if="${pageNum < totalPage}" th:href="@{/admin/users(page=${pageNum + 1}, size=${pageSize})}"
+           th:text="#{jauth.admin.users.page-next}">下一页</a>
+      </p>
     </main>
   </div>
   <script th:inline="javascript">

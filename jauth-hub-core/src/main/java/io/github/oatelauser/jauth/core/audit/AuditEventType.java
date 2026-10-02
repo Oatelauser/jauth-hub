@@ -73,7 +73,25 @@ public enum AuditEventType {
     MEMBER_REMOVED("member.removed"),
 
     /** org 成员角色变更（OWNER↔MEMBER；v1.3 D3，OrgService 路径）。 */
-    MEMBER_ROLE_CHANGED("member.role_changed");
+    MEMBER_ROLE_CHANGED("member.role_changed"),
+
+    /**
+     * 应用注册（个人/org 两面，v1.3 D5 老账⑧补缺——注册曾是生命周期审计盲点，轮转故意不打（非销毁、
+     * 明文一次性））。控制器面发布。
+     */
+    CLIENT_REGISTERED("client.registered"),
+
+    /** 管理员建号（v1.3 D5 老账⑧，AdminUsersController 路径；响应不含凭据材料）。 */
+    USER_CREATED("user.created"),
+
+    /** 管理员改角色（v1.3 D5 老账⑧；清剿/授权面的事件各自独立，本事件只记角色翻转动作）。 */
+    USER_ROLE_CHANGED("user.role_changed"),
+
+    /**
+     * 管理员停用/启用（v1.3 D5 老账⑧；停用触发的清剿已有 CREDENTIALS_REVOKED，本事件只记状态翻转动作）。
+     * 管理员重置密码不另设事件——CREDENTIALS_REVOKED(reason=password_changed, actor=管理员) 已完整承载。
+     */
+    USER_STATUS_CHANGED("user.status_changed");
 
     private final String wireName;
 

@@ -31,7 +31,10 @@ public enum SelfServiceErrorCode implements ErrorCode {
     A0511("A0511", "安装审批的 ceiling 勾选为空"),
 
     /** 需要强验证（sudo）：敏感操作前最近一次 passkey 强认证已过期或缺失，先去 /selfservice/sudo 验证（v1.2 C3）。 */
-    A0515("A0515", "需要强验证（sudo）");
+    A0515("A0515", "需要强验证（sudo）"),
+
+    /** 创建频率超限（v1.3 D5 老账④）：应用注册/PAT 创建的每主体小时窗配额耗尽，共享限流器小时窗。 */
+    A0519("A0519", "创建频率超限，稍后再试");
 
     private final String code;
 

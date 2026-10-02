@@ -1,6 +1,9 @@
 package io.github.oatelauser.jauth.app.web;
 
 import io.github.oatelauser.jauth.app.user.AccountSecurityService;
+import io.github.oatelauser.jauth.core.audit.AuditEvent;
+import io.github.oatelauser.jauth.core.audit.AuditEventPublisher;
+import io.github.oatelauser.jauth.core.audit.AuditEventType;
 import io.github.oatelauser.jauth.core.response.JauthErrorCode;
 import io.github.oatelauser.jauth.core.response.JauthException;
 import io.github.oatelauser.jauth.core.response.ResponseRenderer;
@@ -26,6 +29,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
@@ -60,6 +64,12 @@ public class AdminUsersController {
      */
     static final int PASSWORD_MAX_LENGTH = 72;
 
+    /** 用户列表默认页大小（v1.3 D5 老账⑦）。 */
+    static final int USERS_PAGE_DEFAULT_SIZE = 20;
+
+    /** 用户列表页大小上限（防 ?size=100000 全表直出）。 */
+    static final int USERS_PAGE_MAX_SIZE = 100;
+
     private final UserRepository userRepository;
 
     private final PasswordEncoder passwordEncoder;
@@ -70,17 +80,21 @@ public class AdminUsersController {
 
     private final AccountSecurityService accountSecurityService;
 
+    private final AuditEventPublisher auditPublisher;
+
     public AdminUsersController(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
             EducationalFlag educational,
             ResponseRenderer responseRenderer,
-            AccountSecurityService accountSecurityService) {
+            AccountSecurityService accountSecurityService,
+            AuditEventPublisher auditPublisher) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.educational = educational;
         this.responseRenderer = responseRenderer;
         this.accountSecurityService = accountSecurityService;
+        this.auditPublisher = auditPublisher;
     }
 
     /**
@@ -91,9 +105,21 @@ public class AdminUsersController {
      */
     @RequiresRole(role = RequiresRole.ROLE_SUPER_ADMIN)
     @GetMapping("/admin/users")
-    public String page(Model model) {
+    public String page(
+            @RequestParam(value = "page", defaultValue = "1") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size,
+            Model model) {
         model.addAttribute("educational", this.educational.enabled());
-        model.addAttribute("users", this.userRepository.findAll());
+        // 分页参数规整（v1.3 D5 老账⑦,家族 PageResponse 契约口径 item/total/pageNum/pageSize/totalPage）
+        int pageSize = Math.min(Math.max(size, 1), USERS_PAGE_MAX_SIZE);
+        long total = this.userRepository.countAll();
+        int totalPage = (int) ((total + pageSize - 1) / pageSize);
+        int pageNum = Math.min(Math.max(page, 1), Math.max(totalPage, 1));
+        model.addAttribute("users", this.userRepository.findPage((pageNum - 1) * pageSize, pageSize));
+        model.addAttribute("pageNum", pageNum);
+        model.addAttribute("pageSize", pageSize);
+        model.addAttribute("total", total);
+        model.addAttribute("totalPage", totalPage);
         return VIEW_ADMIN_USERS;
     }
 
@@ -109,7 +135,7 @@ public class AdminUsersController {
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
-    public Object create(@RequestBody CreateRequest request) {
+    public Object create(@RequestBody CreateRequest request, @Principal UserDetails admin) {
         String username = requireUsername(request.username());
         String password = requireValidNewPassword(request.password());
         String displayName = normalizeDisplayName(request.displayName());
@@ -132,6 +158,12 @@ public class AdminUsersController {
             // check-then-insert 的并发窗口由唯一约束兜底（B8 OrgService 同款翻译）
             throw new JauthException(AppErrorCode.A0512);
         }
+        this.auditPublisher.publish(AuditEvent.of(
+                AuditEventType.USER_CREATED,
+                requireActingAdmin(admin).id(),
+                "user",
+                user.id(),
+                "username=" + username));
         return this.responseRenderer.renderSuccess(summary(user));
     }
 
@@ -155,6 +187,12 @@ public class AdminUsersController {
         String newRole =
                 JauthUser.ROLE_SUPERADMIN.equals(target.role()) ? JauthUser.ROLE_USER : JauthUser.ROLE_SUPERADMIN;
         this.userRepository.updateRole(target.id(), newRole);
+        this.auditPublisher.publish(AuditEvent.of(
+                AuditEventType.USER_ROLE_CHANGED,
+                requireActingAdmin(admin).id(),
+                "user",
+                target.id(),
+                "role=" + newRole));
         Map<String, Object> data = new LinkedHashMap<>(4);
         data.put("id", target.id());
         data.put("username", target.username());
@@ -184,6 +222,12 @@ public class AdminUsersController {
         String newStatus =
                 JauthUser.STATUS_ACTIVE.equals(target.status()) ? JauthUser.STATUS_DISABLED : JauthUser.STATUS_ACTIVE;
         this.userRepository.updateStatus(target.id(), newStatus);
+        this.auditPublisher.publish(AuditEvent.of(
+                AuditEventType.USER_STATUS_CHANGED,
+                requireActingAdmin(admin).id(),
+                "user",
+                target.id(),
+                "status=" + newStatus));
         if (JauthUser.STATUS_DISABLED.equals(newStatus)) {
             this.accountSecurityService.onUserDisabled(
                     target.username(), target.id(), requireActingAdmin(admin).id());

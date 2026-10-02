@@ -7,6 +7,7 @@ import io.github.oatelauser.jauth.core.client.ClientOwner;
 import io.github.oatelauser.jauth.core.org.Org;
 import io.github.oatelauser.jauth.core.org.OrgRepository;
 import io.github.oatelauser.jauth.core.org.OrgService;
+import io.github.oatelauser.jauth.core.ratelimit.RateLimiter;
 import io.github.oatelauser.jauth.core.response.JauthErrorCode;
 import io.github.oatelauser.jauth.core.response.JauthException;
 import io.github.oatelauser.jauth.core.response.ResponseRenderer;
@@ -63,6 +64,8 @@ public class OrgAppsController {
 
     private final AuditEventPublisher auditPublisher;
 
+    private final RateLimiter rateLimiter;
+
     /**
      * EI_EXPOSE_REP2 定向豁免：OwnedAppService 是抽象类（SpotBugs 视可变表示），实为容器单例服务门面
      * （Spring 注入通行形态，构造后无可变面暴露——与 PatController 存接口不豁免的差异仅在类型形状）。
@@ -75,7 +78,8 @@ public class OrgAppsController {
             UserRepository userRepository,
             EducationalFlag educational,
             ResponseRenderer responseRenderer,
-            AuditEventPublisher auditPublisher) {
+            AuditEventPublisher auditPublisher,
+            RateLimiter rateLimiter) {
         this.ownedAppService = ownedAppService;
         this.orgService = orgService;
         this.orgRepository = orgRepository;
@@ -83,6 +87,7 @@ public class OrgAppsController {
         this.educational = educational;
         this.responseRenderer = responseRenderer;
         this.auditPublisher = auditPublisher;
+        this.rateLimiter = rateLimiter;
     }
 
     /**
@@ -129,6 +134,7 @@ public class OrgAppsController {
         }
         JauthUser user = requireUser(principal);
         requireOwner(orgId, user);
+        requireCreationQuota(user.id());
         String name = request.name() == null ? "" : request.name().trim();
         if (name.isEmpty() || name.length() > OwnedAppService.NAME_MAX_LENGTH) {
             throw new JauthException(SelfServiceErrorCode.A0509);
@@ -152,7 +158,20 @@ public class OrgAppsController {
         if (registration.app().confidential()) {
             data.put("clientSecret", registration.plaintextSecret());
         }
+        this.auditPublisher.publish(AuditEvent.of(
+                AuditEventType.CLIENT_REGISTERED,
+                user.id(),
+                "client",
+                registration.app().id(),
+                "owner=org org=" + orgId + " name=" + registration.app().name()));
         return this.responseRenderer.renderSuccess(data);
+    }
+
+    /** 创建节流（v1.3 D5 老账④）：与个人面同款（个人/org 两键前缀分开计）。 */
+    private void requireCreationQuota(String userId) {
+        if (!this.rateLimiter.consume("create-org-app:" + userId).allowed()) {
+            throw new JauthException(SelfServiceErrorCode.A0519);
+        }
     }
 
     /**

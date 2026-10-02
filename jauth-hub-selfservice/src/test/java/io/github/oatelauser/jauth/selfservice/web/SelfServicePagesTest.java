@@ -264,7 +264,9 @@ class SelfServicePagesTest {
                 messageSource(),
                 educational,
                 new DefaultResponseRenderer(),
-                viewClock);
+                viewClock,
+                new io.github.oatelauser.jauth.core.ratelimit.RateLimiter(
+                        1_000, 5, java.time.Duration.ofMinutes(15), java.time.Clock.systemUTC()));
         return buildMockMvc(controller, null, null);
     }
 

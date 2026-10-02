@@ -66,6 +66,10 @@ class JauthSelfServiceAutoConfigurationTest {
             .withBean(MessageSource.class, JauthSelfServiceAutoConfigurationTest::messageSource)
             .withBean(Clock.class, () -> Clock.fixed(Instant.EPOCH, ZoneOffset.UTC))
             .withBean(io.github.oatelauser.jauth.core.audit.AuditEventPublisher.class, () -> event -> {})
+            .withBean(
+                    io.github.oatelauser.jauth.core.ratelimit.RateLimiter.class,
+                    () -> new io.github.oatelauser.jauth.core.ratelimit.RateLimiter(
+                            1_000, 5, java.time.Duration.ofMinutes(15), java.time.Clock.systemUTC()))
             .withBean(InMemoryTokenFamilyService.class, InMemoryTokenFamilyService::new);
 
     @Test

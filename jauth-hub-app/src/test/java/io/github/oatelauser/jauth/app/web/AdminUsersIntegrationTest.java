@@ -270,4 +270,34 @@ class AdminUsersIntegrationTest {
             assertThat(result.getResponse().getHeader("Location")).contains("error");
         };
     }
+
+    @Test
+    @DisplayName("用户列表分页（老账⑦）：size=2 三用户 → 两页，导航与合计渲染")
+    void usersListPaginated() throws Exception {
+        for (int i = 1; i <= 3; i++) {
+            this.mockMvc
+                    .perform(post("/api/admin/users")
+                            .with(user(ADMIN_USERNAME).roles("SUPER_ADMIN"))
+                            .with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"username\":\"page-user-" + i + "\",\"password\":\"paged-pass-placeholder\"}"))
+                    .andExpect(status().isOk());
+        }
+        this.mockMvc
+                .perform(get("/admin/users")
+                        .queryParam("size", "2")
+                        .locale(java.util.Locale.SIMPLIFIED_CHINESE)
+                        .with(user(ADMIN_USERNAME).roles("SUPER_ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("page-user")))
+                .andExpect(content().string(containsString("下一页")));
+        this.mockMvc
+                .perform(get("/admin/users")
+                        .queryParam("size", "2")
+                        .queryParam("page", "2")
+                        .locale(java.util.Locale.SIMPLIFIED_CHINESE)
+                        .with(user(ADMIN_USERNAME).roles("SUPER_ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("上一页")));
+    }
 }

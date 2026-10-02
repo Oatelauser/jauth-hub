@@ -7,6 +7,7 @@ import io.github.oatelauser.jauth.core.org.InstallationRepository;
 import io.github.oatelauser.jauth.core.org.InstallationService;
 import io.github.oatelauser.jauth.core.org.OrgRepository;
 import io.github.oatelauser.jauth.core.org.OrgService;
+import io.github.oatelauser.jauth.core.ratelimit.RateLimiter;
 import io.github.oatelauser.jauth.core.response.ResponseRenderer;
 import io.github.oatelauser.jauth.core.scope.ScopeCatalog;
 import io.github.oatelauser.jauth.core.token.InMemoryTokenFamilyService;
@@ -110,7 +111,8 @@ public class JauthSelfServiceAutoConfiguration {
                 MessageSource messageSource,
                 EducationalFlag educational,
                 ResponseRenderer responseRenderer,
-                ObjectProvider<Clock> clock) {
+                ObjectProvider<Clock> clock,
+                RateLimiter rateLimiter) {
             return new PatController(
                     patService.getIfAvailable(),
                     scopeCatalog,
@@ -118,7 +120,8 @@ public class JauthSelfServiceAutoConfiguration {
                     messageSource,
                     educational,
                     responseRenderer,
-                    clock.getIfAvailable(Clock::systemUTC));
+                    clock.getIfAvailable(Clock::systemUTC),
+                    rateLimiter);
         }
 
         @Bean
@@ -195,9 +198,15 @@ public class JauthSelfServiceAutoConfiguration {
                 UserRepository userRepository,
                 EducationalFlag educational,
                 ResponseRenderer responseRenderer,
-                AuditEventPublisher auditPublisher) {
+                AuditEventPublisher auditPublisher,
+                RateLimiter rateLimiter) {
             return new MyAppsController(
-                    ownedAppService.getIfAvailable(), userRepository, educational, responseRenderer, auditPublisher);
+                    ownedAppService.getIfAvailable(),
+                    userRepository,
+                    educational,
+                    responseRenderer,
+                    auditPublisher,
+                    rateLimiter);
         }
 
         /**
@@ -263,7 +272,8 @@ public class JauthSelfServiceAutoConfiguration {
                 UserRepository userRepository,
                 EducationalFlag educational,
                 ResponseRenderer responseRenderer,
-                AuditEventPublisher auditPublisher) {
+                AuditEventPublisher auditPublisher,
+                RateLimiter rateLimiter) {
             return new OrgAppsController(
                     ownedAppService.getIfAvailable(),
                     orgService.getIfAvailable(),
@@ -271,7 +281,8 @@ public class JauthSelfServiceAutoConfiguration {
                     userRepository,
                     educational,
                     responseRenderer,
-                    auditPublisher);
+                    auditPublisher,
+                    rateLimiter);
         }
 
         /**

@@ -111,7 +111,13 @@ class MyAppsControllerTest {
     @DisplayName("服务缺席门控：两页渲染不支持提示（200，不 500），表单不渲染")
     void pagesRenderNoticeWhenServiceMissing() throws Exception {
         MockMvc missing = MockMvcBuilders.standaloneSetup(new MyAppsController(
-                        null, this.users, EducationalFlag.ON, new DefaultResponseRenderer(), event -> {}))
+                        null,
+                        this.users,
+                        EducationalFlag.ON,
+                        new DefaultResponseRenderer(),
+                        event -> {},
+                        new io.github.oatelauser.jauth.core.ratelimit.RateLimiter(
+                                1_000, 5, java.time.Duration.ofMinutes(15), java.time.Clock.systemUTC())))
                 .setViewResolvers(viewResolver())
                 .setLocaleResolver(new FixedLocaleResolver(Locale.SIMPLIFIED_CHINESE))
                 .addFilters((request, response, chain) -> {
@@ -193,7 +199,13 @@ class MyAppsControllerTest {
                         .content("{\"name\":\"x\",\"redirectUris\":\"https://a.example.com/cb\"}"))
                 .andExpect(jsonPath("$.code").value("A0503"));
         MockMvc missing = MockMvcBuilders.standaloneSetup(new MyAppsController(
-                        null, this.users, EducationalFlag.ON, new DefaultResponseRenderer(), event -> {}))
+                        null,
+                        this.users,
+                        EducationalFlag.ON,
+                        new DefaultResponseRenderer(),
+                        event -> {},
+                        new io.github.oatelauser.jauth.core.ratelimit.RateLimiter(
+                                1_000, 5, java.time.Duration.ofMinutes(15), java.time.Clock.systemUTC())))
                 .setControllerAdvice(jauthAdvice())
                 .build();
         missing.perform(post("/selfservice/my-apps")
@@ -210,7 +222,9 @@ class MyAppsControllerTest {
                         this.users,
                         EducationalFlag.ON,
                         new DefaultResponseRenderer(),
-                        event -> {}))
+                        event -> {},
+                        new io.github.oatelauser.jauth.core.ratelimit.RateLimiter(
+                                1_000, 5, java.time.Duration.ofMinutes(15), java.time.Clock.systemUTC())))
                 .setViewResolvers(viewResolver())
                 .setLocaleResolver(new FixedLocaleResolver(Locale.SIMPLIFIED_CHINESE))
                 .addFilters((request, response, chain) -> {
@@ -227,7 +241,9 @@ class MyAppsControllerTest {
                         this.users,
                         EducationalFlag.ON,
                         new DefaultResponseRenderer(),
-                        event -> {}))
+                        event -> {},
+                        new io.github.oatelauser.jauth.core.ratelimit.RateLimiter(
+                                1_000, 5, java.time.Duration.ofMinutes(15), java.time.Clock.systemUTC())))
                 .setControllerAdvice(jauthAdvice())
                 .build();
     }

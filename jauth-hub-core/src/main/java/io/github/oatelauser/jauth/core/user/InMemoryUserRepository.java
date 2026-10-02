@@ -140,6 +140,18 @@ public class InMemoryUserRepository implements UserRepository {
                 .toList();
     }
 
+    @Override
+    public long countAll() {
+        return this.usersById.size();
+    }
+
+    @Override
+    public List<JauthUser> findPage(int offset, int limit) {
+        Assert.isTrue(offset >= 0, "offset must be >= 0");
+        Assert.isTrue(limit > 0, "limit must be > 0");
+        return findAll().stream().skip(offset).limit(limit).toList();
+    }
+
     private void update(String id, UnaryOperator<JauthUser> mapper) {
         this.usersById.computeIfPresent(id, (key, user) -> mapper.apply(user));
     }

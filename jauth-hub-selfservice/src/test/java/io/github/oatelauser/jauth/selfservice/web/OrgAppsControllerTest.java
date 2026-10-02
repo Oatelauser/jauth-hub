@@ -172,7 +172,15 @@ class OrgAppsControllerTest {
                         .content("{\"name\":\"x\",\"redirectUris\":\"https://a.example.com/cb\"}"))
                 .andExpect(jsonPath("$.code").value("A0503"));
         MockMvc missing = MockMvcBuilders.standaloneSetup(new OrgAppsController(
-                        null, null, null, this.users, EducationalFlag.ON, new DefaultResponseRenderer(), event -> {}))
+                        null,
+                        null,
+                        null,
+                        this.users,
+                        EducationalFlag.ON,
+                        new DefaultResponseRenderer(),
+                        event -> {},
+                        new io.github.oatelauser.jauth.core.ratelimit.RateLimiter(
+                                1_000, 5, java.time.Duration.ofMinutes(15), java.time.Clock.systemUTC())))
                 .setControllerAdvice(jauthAdvice())
                 .build();
         missing.perform(post(appsPath())
@@ -213,7 +221,9 @@ class OrgAppsControllerTest {
                 this.users,
                 EducationalFlag.ON,
                 new DefaultResponseRenderer(),
-                event -> {});
+                event -> {},
+                new io.github.oatelauser.jauth.core.ratelimit.RateLimiter(
+                        1_000, 5, java.time.Duration.ofMinutes(15), java.time.Clock.systemUTC()));
     }
 
     private static JauthResponseAdvice jauthAdvice() {

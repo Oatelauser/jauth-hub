@@ -4,6 +4,7 @@ import io.github.oatelauser.jauth.core.audit.AuditEvent;
 import io.github.oatelauser.jauth.core.audit.AuditEventPublisher;
 import io.github.oatelauser.jauth.core.audit.AuditEventType;
 import io.github.oatelauser.jauth.core.client.ClientOwner;
+import io.github.oatelauser.jauth.core.ratelimit.RateLimiter;
 import io.github.oatelauser.jauth.core.response.JauthException;
 import io.github.oatelauser.jauth.core.response.ResponseRenderer;
 import io.github.oatelauser.jauth.core.user.JauthUser;
@@ -59,6 +60,8 @@ public class MyAppsController {
 
     private final AuditEventPublisher auditPublisher;
 
+    private final RateLimiter rateLimiter;
+
     /**
      * EI_EXPOSE_REP2 定向豁免：OwnedAppService 是抽象类（SpotBugs 视可变表示），实为容器单例服务门面
      * （Spring 注入通行形态，构造后无可变面暴露——与 PatController 存接口不豁免的差异仅在类型形状）。
@@ -69,12 +72,14 @@ public class MyAppsController {
             UserRepository userRepository,
             EducationalFlag educational,
             ResponseRenderer responseRenderer,
-            AuditEventPublisher auditPublisher) {
+            AuditEventPublisher auditPublisher,
+            RateLimiter rateLimiter) {
         this.ownedAppService = ownedAppService;
         this.userRepository = userRepository;
         this.educational = educational;
         this.responseRenderer = responseRenderer;
         this.auditPublisher = auditPublisher;
+        this.rateLimiter = rateLimiter;
     }
 
     /**
@@ -124,6 +129,7 @@ public class MyAppsController {
     public Object register(@RequestBody RegisterRequest request, @Nullable Principal principal) {
         OwnedAppService service = requireService();
         JauthUser user = requireUser(principal);
+        requireCreationQuota(user.id());
         OwnedAppService.Registration registration = service.register(
                 user.id(),
                 requireName(request.name()),
@@ -133,7 +139,20 @@ public class MyAppsController {
         if (registration.app().confidential()) {
             data.put("clientSecret", registration.plaintextSecret());
         }
+        this.auditPublisher.publish(AuditEvent.of(
+                AuditEventType.CLIENT_REGISTERED,
+                user.id(),
+                "client",
+                registration.app().id(),
+                "owner=user name=" + registration.app().name()));
         return this.responseRenderer.renderSuccess(data);
+    }
+
+    /** 创建节流（v1.3 D5 老账④）：每主体小时窗（共享限流器配额，键前缀区分创建面）。 */
+    private void requireCreationQuota(String userId) {
+        if (!this.rateLimiter.consume("create-app:" + userId).allowed()) {
+            throw new JauthException(SelfServiceErrorCode.A0519);
+        }
     }
 
     /**

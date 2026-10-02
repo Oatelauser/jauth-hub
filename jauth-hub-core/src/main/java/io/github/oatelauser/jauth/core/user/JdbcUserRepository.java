@@ -119,6 +119,21 @@ public class JdbcUserRepository implements UserRepository {
     }
 
     @Override
+    public long countAll() {
+        // 同表单列聚合,双库兼容(不做 COUNT(*) OVER 窗口技巧)
+        Long count = this.jdbcOperations.queryForObject("SELECT COUNT(*) FROM jauth_user", Long.class);
+        return count == null ? 0 : count;
+    }
+
+    @Override
+    public List<JauthUser> findPage(int offset, int limit) {
+        Assert.isTrue(offset >= 0, "offset must be >= 0");
+        Assert.isTrue(limit > 0, "limit must be > 0");
+        // username ASC 定序与 findAll 同源(FIND_ALL_SQL 即 ORDER BY username)
+        return this.jdbcOperations.query(FIND_ALL_SQL + " LIMIT ? OFFSET ?", USER_ROW_MAPPER, limit, offset);
+    }
+
+    @Override
     public void updateStrongAuthAt(String id, @Nullable Instant strongAuthAt) {
         Assert.hasText(id, "id cannot be empty");
         this.jdbcOperations.update(
