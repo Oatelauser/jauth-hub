@@ -4,7 +4,7 @@
 
 English | [中文](README.md)
 
-![Version](https://img.shields.io/badge/version-1.3.0-blue) ![Java](https://img.shields.io/badge/Java-21-orange) ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.x-brightgreen) ![License](https://img.shields.io/badge/License-MIT-yellow) ![CI](https://github.com/Oatelauser/jauth-hub/actions/workflows/ci.yml/badge.svg)
+![Version](https://img.shields.io/badge/version-1.4.0-blue) ![Java](https://img.shields.io/badge/Java-21-orange) ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.x-brightgreen) ![License](https://img.shields.io/badge/License-MIT-yellow) ![CI](https://github.com/Oatelauser/jauth-hub/actions/workflows/ci.yml/badge.svg)
 
 ---
 
@@ -22,7 +22,7 @@ English | [中文](README.md)
 | 🎓 **Built to teach** | The bundled `/demo` walkthrough drives a real authorization-code + PKCE flow against real endpoints, showing every HTTP request/response live — frontend engineers get OAuth in one sitting |
 | 🧩 **Family ecosystem** | Plays out of the box with the [spring-plus](https://central.sonatype.com/search?q=io.github.oatelauser) family (unified responses / declarative authorization / config encryption), yet works fully standalone |
 | 🗄️ **Zero-ceremony start** | Defaults to an H2 file database (clone and run), switches to PostgreSQL with one line of config; SQL is written for both dialects |
-| 🧪 **Quality gates** | 460 tests + Alibaba p3c rules + Spotless + SpotBugs/FindSecBugs + full end-to-end flow tests, all enforced green in CI |
+| 🧪 **Quality gates** | 488 tests + 13 front-end vitest + Alibaba p3c rules + Spotless + SpotBugs/FindSecBugs + full end-to-end flow tests, all enforced green in CI |
 
 ## 📦 Modules
 
@@ -57,7 +57,7 @@ mvn verify   # build + full test suite + quality gates
 
 ```bash
 mvn -pl jauth-hub-app -am package -DskipTests
-java -jar jauth-hub-app/target/jauth-hub-app-1.3.0.jar
+java -jar jauth-hub-app/target/jauth-hub-app-1.4.0.jar
 ```
 
 Open <http://localhost:8080/demo> — the teaching zone walks you through the full **login → consent → token exchange → introspection → API call** loop, with live HTTP details at every step.
@@ -80,7 +80,7 @@ jauth-hub:
 <dependency>
     <groupId>io.github.oatelauser</groupId>
     <artifactId>jauth-hub-starter</artifactId>
-    <version>1.3.0</version>
+    <version>1.4.0</version>
 </dependency>
 ```
 
@@ -97,7 +97,7 @@ UserDetailsService userDetailsService() {
 <dependency>
     <groupId>io.github.oatelauser</groupId>
     <artifactId>jauth-hub-resource-server-starter</artifactId>
-    <version>1.3.0</version>
+    <version>1.4.0</version>
 </dependency>
 ```
 
@@ -126,7 +126,7 @@ Deployment (same domain; SSR remains the default, front is an optional skin):
 ```bash
 cd jauth-hub-front && npm ci && npm run build     # produces dist/
 cd .. && mvn -Pfront-skin -pl jauth-hub-app -am package   # copies dist into the jar at classpath:/static/front/
-java -jar jauth-hub-app/target/jauth-hub-app-1.3.0.jar --jauth-hub.trust-skin=front
+java -jar jauth-hub-app/target/jauth-hub-app-1.4.0.jar --jauth-hub.trust-skin=front
 ```
 
 With `jauth-hub.trust-skin=front`, the four page GETs 302 to `/front/<route>` (query string forwarded verbatim); static assets are served under `/front/**` with history deep-link fallback. Local no-repackage iteration (start from `jauth-hub-app/`): `--spring.web.resources.static-locations=file:../jauth-hub-front/dist` (note the property replaces the default static locations entirely — append `,classpath:/static/` to keep the `/demo` assets).
@@ -209,10 +209,10 @@ OIDC discovery endpoint: <http://localhost:8080/.well-known/openid-configuration
 ## 🗺️ Roadmap
 
 - **v1.1 (platform layer)**: organizations, app-installation approval with scope ceilings, app/user management pages ✅
-- **v1.2 (hardening, this release)**: Passkey passwordless sign-in, sudo mode for sensitive operations, @RequiresScope declarative scope checks ✅
+- **v1.2 (hardening layer)**: Passkey passwordless sign-in, sudo mode for sensitive operations, @RequiresScope declarative scope checks ✅
 - **v2+**: webhook events, secret scanning, email flows, ...
-- **v1.3 (hardening sweep, this release)**: credential-state mass revocation, app rotation/edit/delete-with-cascade, org member management, consent already-granted badge, creation throttling, user pagination, audit vocabulary completion ✅
-- **v1.4 (headless skin)**: trust-surface JSON APIs + `jauth-hub-front` (Vue 3 separated-frontend reference)
+- **v1.3 (hardening sweep)**: credential-state mass revocation, app rotation/edit/delete-with-cascade, org member management, consent already-granted badge, creation throttling, user pagination, audit vocabulary completion ✅
+- **v1.4 (headless skin, this release)**: trust-surface JSON APIs + `jauth-hub-front` (Vue 3 separated-frontend reference) ✅
 
 ## 📚 More docs
 

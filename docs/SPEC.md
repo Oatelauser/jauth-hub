@@ -108,7 +108,7 @@ public interface ResponseRenderer {
 | **v1.1 平台层** | org 归属 + 安装审批 + 权限封顶（org 角色模型） |
 | **v1.2 强化层** | Passkey（开关，默认关）、sudo mode（开关，依赖 Passkey） |
 | **v1.3 滑账清剿**（1.3.0，2026-10-02 完成） | 老账 ①–⑧全清（⑤ 经查证由 B9 架构性覆盖）+ v1.2 新账 2/3/6 收口 + D0 真渲染测试网；批次 T0+D0–D6；随批拍板：GraalVM 除名、OWASP 继续豁免、credentialId 限流转 v2+、Maven Central 随 1.3.0 发布 |
-| **v1.4 headless 皮**（进行中，完成翻转归 B5） | 信任面四页（登录/consent/设备/sudo）JSON API 化 + 根目录 `jauth-hub-front`（Vue 3 + Vite 分离前端，产物随制品、同域名）——[10](../.scratch/jauth-hub/issues/10-frontend-form.md)；B1（consent/device/sudo 状态面）–B4（同域名装配：trust-skin 旗标 302 路由 + /front/** 静态与深链回退 + CI front job）已落地 |
+| **v1.4 headless 皮**（1.4.0，2026-10-02 完成） | 信任面四页 JSON API 化 + 根目录 `jauth-hub-front`（Vue 3 + Vite 分离前端，产物随制品、同域名）——[10](../.scratch/jauth-hub/issues/10-frontend-form.md)。批次 B1（consent/device/sudo 状态面，consent 装配单点提取含 org 会话暂存副作用）+ B2（登录 GET 状态 + POST 认证桥，复刻 formLogin 成功编舞，CSRF 契约探针钉死原始 token 头/表单双路可用）+ B3（front 工程，表单契约逐行照 SSR，运行时零外链）+ B4（trust-skin 旗标 302 路由 + /front/** 静态与深链回退 + front-skin Maven profile（enforcer 兜 copy-resources 静默缺口）+ CI front job）+ B5（交付门禁评审 0C/0H/1M 修毕：webauthn 助手双份拷贝提取）。随批事实：AuthenticationManager 不可经 AuthenticationConfiguration 暴露为 bean（全局构建器自递归 StackOverflow，自组装 Dao ProviderManager 规避，javap 实证）；登录成功后 CSRF token 换发（headless 皮每页重取状态面） |
 | 横切 | 按用户合并限流 + X-RateLimit-*、授权看板 + 一键 Revoke + RP-initiated logout + 基础审计、UserDetails→claims 映射 |
 
 v2+：webhook、secret scanning、多 Secret 轮转、token exchange（配置可开）、redirect 通配 per-URI、back-channel logout（等框架 issue #18296）、fine-grained PAT、邮箱流（注册验证/找回密码）、passkey 登录限流 credentialId 维度（2026-10-02 拍板自 v1.3 转入）。出局：phantom token、请求头降权、"严格无 OIDC"模式。附决：存量用户不导入。
