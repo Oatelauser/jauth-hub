@@ -26,7 +26,7 @@ describe('ShellLayout 导航壳', () => {
     expect(form.find('input[name="_csrf"]').attributes('value')).toBe('tok-7');
   });
 
-  it('导航只挂本批五页，路由与 i18n 键对齐', async () => {
+  it('导航挂自助五页 + B3 app 两页（admin 项不做角色显隐），路由与 i18n 键对齐', async () => {
     vi.stubGlobal('fetch', vi.fn(() => stateResponse({ username: 'alice', displayName: null, csrfToken: null, csrfHeaderName: null })));
     const wrapper = mount(ShellLayout, { global: { stubs: { RouterLink: RouterLinkStub, RouterView: true } } });
     await flushPromises();
@@ -38,6 +38,8 @@ describe('ShellLayout 导航壳', () => {
       '/selfservice/my-apps',
       '/selfservice/my-orgs',
       '/selfservice/passkey',
+      '/profile',
+      '/admin/users',
     ]);
   });
 

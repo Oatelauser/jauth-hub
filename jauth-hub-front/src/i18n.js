@@ -1,6 +1,6 @@
 // 自写 zh/en 双字典（依赖红线：不引 vue-i18n）。文案逐条对齐后端 messages*.properties
 // （core: brand/login/consent/device；selfservice: sudo + B2b 七页 apps/pat/myapps/myorgs/
-// orgapps/orginst/orgmembers/passkey + 导航壳 nav）；zh 主填，en 骨架，
+// orgapps/orginst/orgmembers/passkey + 导航壳 nav；app: B3 两页 profile/adminusers）；zh 主填，en 骨架，
 // navigator.language 判 en、缺键回退 zh，其余语言一律 zh（与 SSR messageSource 行为同向）。
 // 动态族两处：pat.validity-{30|90|365}、orginst.status-{PENDING|APPROVED|REJECTED|REVOKED}
 // （枚举名直拼，B1b 决议：JSON 面出原始枚举名，i18n 键归前端字典）；scope 描述由服务端
@@ -44,6 +44,8 @@ const zh = {
   'nav.my-apps': '我的应用',
   'nav.my-orgs': '我的组织',
   'nav.passkey': '通行密钥',
+  'nav.profile': '个人资料',
+  'nav.admin-users': '用户管理',
   'nav.logout': '退出',
   'common.cancel': '取消',
   'common.back-my-orgs': '返回我的组织',
@@ -226,6 +228,53 @@ const zh = {
   'passkey.col-last-used': '最近使用',
   'passkey.delete': '删除',
   'passkey.delete-confirm': '确定删除该通行密钥吗？删除后该设备将无法再免密登录。',
+
+  // ---------- 个人资料（B3 app 面） ----------
+  'profile.title': '个人档案',
+  'profile.account-label': '账号：',
+  'profile.display-title': '显示名',
+  'profile.field-display-name': '显示名',
+  'profile.display-placeholder': '留空则显示用户名',
+  'profile.save-display-name': '保存显示名',
+  'profile.saved': '已保存',
+  'profile.password-title': '修改密码',
+  'profile.field-old-password': '旧密码',
+  'profile.field-new-password': '新密码',
+  'profile.change-password': '修改密码',
+  'profile.password-changed': '密码已修改',
+  'profile.relogin-hint': '建议重新登录',
+
+  // ---------- 用户管理（B3 app 面，SUPER_ADMIN） ----------
+  'adminusers.title': '用户管理',
+  'adminusers.create-title': '新建用户',
+  'adminusers.field-username': '用户名',
+  'adminusers.field-password': '密码',
+  'adminusers.password-hint': '至少 8 位',
+  'adminusers.field-display-name': '显示名（可选）',
+  'adminusers.create-submit': '建号',
+  'adminusers.list-title': '用户列表',
+  'adminusers.empty': '还没有用户',
+  'adminusers.col-username': '用户名',
+  'adminusers.col-display-name': '显示名',
+  'adminusers.col-role': '角色',
+  'adminusers.col-status': '状态',
+  'adminusers.col-actions': '操作',
+  'adminusers.role-superadmin': '超管',
+  'adminusers.role-user': '用户',
+  'adminusers.status-active': '启用',
+  'adminusers.status-disabled': '停用',
+  'adminusers.action-toggle-role': '改角色',
+  'adminusers.action-toggle-status': '停用/启用',
+  'adminusers.action-reset-password': '重置密码',
+  'adminusers.role-confirm': '确认切换该用户角色（超管↔用户）？',
+  'adminusers.status-confirm':
+    '确认停用/启用该用户？停用将即时拒绝其登录，其授权、会话与个人访问令牌一并失效。',
+  'adminusers.reset-field': '新密码',
+  'adminusers.reset-done': '密码已重置',
+  'adminusers.reset-once': '新密码只显示这一次，请立即转交该用户',
+  'adminusers.page-prev': '上一页',
+  'adminusers.page-next': '下一页',
+  'adminusers.page-summary': '共 {0} 条 / 第 {1} 页 / 共 {2} 页',
 };
 
 const en = {
@@ -267,6 +316,8 @@ const en = {
   'nav.my-apps': 'My applications',
   'nav.my-orgs': 'My organizations',
   'nav.passkey': 'Passkeys',
+  'nav.profile': 'Profile',
+  'nav.admin-users': 'User administration',
   'nav.logout': 'Sign out',
   'common.cancel': 'Cancel',
   'common.back-my-orgs': 'Back to my organizations',
@@ -452,6 +503,53 @@ const en = {
   'passkey.col-last-used': 'Last used',
   'passkey.delete': 'Delete',
   'passkey.delete-confirm': 'Delete this passkey? The device will no longer sign in without a password.',
+
+  // ---------- Profile (B3 app face) ----------
+  'profile.title': 'Profile',
+  'profile.account-label': 'Account:',
+  'profile.display-title': 'Display name',
+  'profile.field-display-name': 'Display name',
+  'profile.display-placeholder': 'Leave empty to show the username',
+  'profile.save-display-name': 'Save display name',
+  'profile.saved': 'Saved',
+  'profile.password-title': 'Change password',
+  'profile.field-old-password': 'Old password',
+  'profile.field-new-password': 'New password',
+  'profile.change-password': 'Change password',
+  'profile.password-changed': 'Password changed',
+  'profile.relogin-hint': 'signing in again is recommended',
+
+  // ---------- User administration (B3 app face, SUPER_ADMIN) ----------
+  'adminusers.title': 'User administration',
+  'adminusers.create-title': 'Create a user',
+  'adminusers.field-username': 'Username',
+  'adminusers.field-password': 'Password',
+  'adminusers.password-hint': 'At least 8 characters',
+  'adminusers.field-display-name': 'Display name (optional)',
+  'adminusers.create-submit': 'Create',
+  'adminusers.list-title': 'Users',
+  'adminusers.empty': 'No users yet',
+  'adminusers.col-username': 'Username',
+  'adminusers.col-display-name': 'Display name',
+  'adminusers.col-role': 'Role',
+  'adminusers.col-status': 'Status',
+  'adminusers.col-actions': 'Actions',
+  'adminusers.role-superadmin': 'Super admin',
+  'adminusers.role-user': 'User',
+  'adminusers.status-active': 'Active',
+  'adminusers.status-disabled': 'Disabled',
+  'adminusers.action-toggle-role': 'Toggle role',
+  'adminusers.action-toggle-status': 'Disable / enable',
+  'adminusers.action-reset-password': 'Reset password',
+  'adminusers.role-confirm': 'Toggle this user role (super admin ↔ user)?',
+  'adminusers.status-confirm':
+    'Disable/enable this user? Disabling blocks their sign-in immediately and invalidates their grants, sessions and personal access tokens.',
+  'adminusers.reset-field': 'New password',
+  'adminusers.reset-done': 'Password reset',
+  'adminusers.reset-once': 'The new password shows only once; hand it to the user now',
+  'adminusers.page-prev': 'Previous',
+  'adminusers.page-next': 'Next',
+  'adminusers.page-summary': '{0} users / page {1} of {2}',
 };
 
 const locale = String(navigator.language || 'zh').toLowerCase().startsWith('en') ? 'en' : 'zh';

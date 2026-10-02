@@ -12,6 +12,8 @@ import OrgApps from './pages/OrgApps.vue';
 import OrgInstallations from './pages/OrgInstallations.vue';
 import OrgMembers from './pages/OrgMembers.vue';
 import Passkey from './pages/Passkey.vue';
+import Profile from './pages/Profile.vue';
+import AdminUsers from './pages/AdminUsers.vue';
 
 // base /front/（B4 装配的服务路径）；consent/sudo 页参数从 location.search 自取，不入路由状态
 // （org 子页的 orgId 同理，从 pathname 自取——照 consent 页先例）。
@@ -37,6 +39,9 @@ export const router = createRouter({
         { path: 'selfservice/orgs/:orgId/installations', component: OrgInstallations },
         { path: 'selfservice/orgs/:orgId/members', component: OrgMembers },
         { path: 'selfservice/passkey', component: Passkey },
+        // app 面两页（B3）：路径族规约——状态 API = 页面路径加 /api 前缀（/api/profile、/api/admin/users）
+        { path: 'profile', component: Profile },
+        { path: 'admin/users', component: AdminUsers },
       ],
     },
   ],

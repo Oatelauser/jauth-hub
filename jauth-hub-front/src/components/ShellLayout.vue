@@ -1,5 +1,5 @@
 <!-- 自助面导航壳（B2b §1）：左侧导航（品牌区 + 导航项）+ 顶栏（用户名 + 退出），子路由渲染进
-     内容区。导航只挂本批存在的五页（profile/admin 归 B3，demo 归 B4，不预挂）。
+     内容区。导航挂自助五页（B2b）+ app 面两页（B3）；demo 归 B4 不预挂。
      认证守卫不自建：挂载即 GET /api/profile，未认证 401 由 api.js 分流整页跳登录（YAGNI）。 -->
 <script setup>
 import { onMounted, ref } from 'vue';
@@ -15,6 +15,10 @@ const navItems = [
   { to: '/selfservice/my-apps', key: 'nav.my-apps' },
   { to: '/selfservice/my-orgs', key: 'nav.my-orgs' },
   { to: '/selfservice/passkey', key: 'nav.passkey' },
+  // B3 app 面两项。admin 项不做角色条件显隐：SPA 无角色数据（/api/profile 不带角色），
+  // 非超管点入由 AdminUsers 页的 403 错误态兜底，不白屏
+  { to: '/profile', key: 'nav.profile' },
+  { to: '/admin/users', key: 'nav.admin-users' },
 ];
 
 onMounted(async () => {
