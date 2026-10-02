@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { getJson } from '../api';
 import { t } from '../i18n';
+import { assertionBody, toArrayBuffer, webauthnRawPost } from '../webauthn';
 
 const state = ref(null);
 const error = ref('');
@@ -36,7 +37,7 @@ async function verify() {
   }
   try {
     // 每次尝试都取新 options：challenge 存 session，断言按 session 配对
-    const options = await rawPost('/webauthn/authenticate/options');
+    const options = await webauthnRawPost('/webauthn/authenticate/options', null, csrf.value);
     const credential = await navigator.credentials.get({
       publicKey: {
         challenge: toArrayBuffer(options.challenge),
@@ -47,56 +48,11 @@ async function verify() {
       },
     });
     // 断言成功即 strong_auth_at 打点；redirectUrl 是框架默认登录后页，无视——回 returnTo（服务端已消毒）
-    await rawPost('/login/webauthn', assertionBody(credential));
+    await webauthnRawPost('/login/webauthn', assertionBody(credential), csrf.value);
     window.location.href = state.value.returnTo;
   } catch {
     sudoError.value = true;
   }
-}
-
-// /webauthn/* 与 /login/webauthn 是框架原生端点，裸 JSON（非 ResponseRenderer），不走 api.js 包装
-async function rawPost(path, body) {
-  const headers = { 'Content-Type': 'application/json' };
-  if (csrf.value.csrfToken && csrf.value.csrfHeaderName) headers[csrf.value.csrfHeaderName] = csrf.value.csrfToken;
-  const response = await fetch(path, {
-    method: 'POST',
-    headers,
-    credentials: 'same-origin',
-    body: JSON.stringify(body || {}),
-  });
-  if (!response.ok) throw new Error(path + ' ' + response.status);
-  return response.json();
-}
-
-function assertionBody(credential) {
-  return {
-    id: credential.id,
-    rawId: toBase64Url(credential.rawId),
-    type: credential.type,
-    response: {
-      clientDataJSON: toBase64Url(credential.response.clientDataJSON),
-      authenticatorData: toBase64Url(credential.response.authenticatorData),
-      signature: toBase64Url(credential.response.signature),
-      userHandle: credential.response.userHandle ? toBase64Url(credential.response.userHandle) : null,
-    },
-    clientExtensionResults: {},
-    authenticatorAttachment: credential.authenticatorAttachment,
-  };
-}
-
-// base64url（无 padding，对齐 SS7 Bytes 序列化）↔ ArrayBuffer：WebAuthn 二进制字段的 JSON 线格式
-function toArrayBuffer(value) {
-  const binary = window.atob(value.replace(/-/g, '+').replace(/_/g, '/'));
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes.buffer;
-}
-
-function toBase64Url(buffer) {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-  return window.btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 </script>
 
