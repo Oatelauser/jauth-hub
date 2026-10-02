@@ -27,6 +27,12 @@ onMounted(async () => {
   }
 });
 
+// 登录落点（B2b）：redirectUrl === '/' 是框架默认落点——改落 SPA 看板；
+// saved request（/oauth2/authorize...）原样导航（协议流程必须服务端走）
+function landing(redirectUrl) {
+  return !redirectUrl || redirectUrl === '/' ? '/front/selfservice/apps' : redirectUrl;
+}
+
 async function submit() {
   if (submitting.value) return;
   submitting.value = true;
@@ -34,7 +40,7 @@ async function submit() {
   try {
     const data = await postJson('/api/login', { username: form.username, password: form.password }, csrf.value);
     // 登录成功即 CSRF token 换发（B2 现场事实）：此页不再发任何请求，直接整页导航离开
-    window.location.href = data.redirectUrl;
+    window.location.href = landing(data.redirectUrl);
   } catch (e) {
     error.value = e.message; // A0520/A0521 的 message 即 SSR ?error 同款文案
     submitting.value = false;
@@ -63,7 +69,7 @@ async function passkeyLogin() {
       },
     });
     const body = await webauthnRawPost('/login/webauthn', assertionBody(credential), csrf.value);
-    window.location.href = body.redirectUrl || '/';
+    window.location.href = landing(body.redirectUrl);
   } catch {
     passkeyError.value = true;
   }

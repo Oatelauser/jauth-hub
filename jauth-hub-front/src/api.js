@@ -26,9 +26,10 @@ async function request(path, init) {
     throw new Error('unauthenticated');
   }
   // A0515 分支（sudo 过期，survey §4.2 六页先例的 SPA 版）：整页跳强验证页。
-  // returnTo 取当前 SPA 路径+查询串，去 /front 前缀还原服务端路径——sudo 消毒回看板/原页都安全
+  // returnTo 直接取 SPA 路径+查询串（/front/...）：服务端 safeReturnTo 只认本站单斜杠路径，
+  // /front/** 天然合法——sudo 验证成功后整页回 SPA 原页，闭环不再落 SSR
   if (payload && payload.code === 'A0515') {
-    const returnTo = (window.location.pathname + window.location.search).replace(/^\/front/, '') || '/';
+    const returnTo = window.location.pathname + window.location.search;
     window.location.href = SUDO_PATH + '?returnTo=' + encodeURIComponent(returnTo);
     throw new Error('sudo-required');
   }

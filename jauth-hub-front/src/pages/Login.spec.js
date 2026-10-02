@@ -61,6 +61,25 @@ describe('Login 页', () => {
     expect(window.location.href).toBe('/ok');
   });
 
+  it('登录落点（B2b）：POST 成功且 redirectUrl === "/" 落 SPA 看板', async () => {
+    const fetchMock = vi.fn((path, init) =>
+      init && init.method === 'POST'
+        ? stateResponse({ redirectUrl: '/' })
+        : stateResponse({ educational: false, passkeyEnabled: false, error: false, csrfToken: null, csrfHeaderName: null })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('location', { search: '', href: '' });
+    const wrapper = mount(Login);
+    await flushPromises();
+
+    await wrapper.find('input[type="text"]').setValue('alice');
+    await wrapper.find('input[type="password"]').setValue('secret');
+    await wrapper.find('form').trigger('submit');
+    await flushPromises();
+
+    expect(window.location.href).toBe('/front/selfservice/apps');
+  });
+
   it('提交失败（401 A0520）渲染后端 message，不跳转', async () => {
     const fetchMock = vi.fn((path, init) =>
       init && init.method === 'POST'

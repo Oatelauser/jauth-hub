@@ -515,3 +515,183 @@ a {
   border-top: 1px solid var(--color-border-muted);
   margin: var(--space-4) 0 var(--space-3);
 }
+
+/* =============================================================
+   B2b 自助面拼装件（导航壳 + 数据页卡片），全部为新增分节；
+   既有分节 1–13 逐字节不动（design.spec.js 守护其类名）。
+   ============================================================= */
+
+/* ---------- 14. 导航壳：左侧导航 + 顶栏，子路由渲染进内容区 ---------- */
+.shell {
+  min-height: 100vh;
+  display: flex;
+}
+
+.shell-side {
+  width: 232px;
+  flex: none;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border-muted);
+  padding: var(--space-5) var(--space-4);
+}
+
+.shell-brand {
+  margin: 0 0 var(--space-5);
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--color-accent);
+}
+
+.shell-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.shell-nav a {
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-body);
+}
+
+.shell-nav a:hover {
+  background: var(--color-surface-subtle);
+  color: var(--color-accent);
+}
+
+.shell-nav a.router-link-active {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  font-weight: 500;
+}
+
+.shell-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell-top {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border-muted);
+  padding: var(--space-2) var(--space-5);
+}
+
+.shell-user {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.shell-top form {
+  margin: 0;
+}
+
+.shell-body {
+  flex: 1;
+  padding: var(--space-5) var(--space-4);
+}
+
+/* 窄屏收成单列：导航横排，内容满宽 */
+@media (max-width: 860px) {
+  .shell {
+    flex-direction: column;
+  }
+
+  .shell-side {
+    width: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border-muted);
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .shell-brand {
+    margin-bottom: var(--space-2);
+  }
+
+  .shell-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .shell-body {
+    padding: var(--space-4) var(--space-4);
+  }
+}
+
+/* ---------- 15. 数据页卡片与单元格拼装件 ---------- */
+/* 壳内数据页：卡片放宽一档（对齐 SSR 自助页 760–880px 宽卡） */
+.card-fluid {
+  max-width: 880px;
+}
+
+/* 卡内分区间隔（列表区/表单区多段共卡时） */
+.section-gap {
+  margin-top: var(--space-6);
+}
+
+/* 等宽单元格（client_id / scope 串 / 凭据短号） */
+.cell-mono {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: var(--font-size-sm);
+  word-break: break-all;
+}
+
+/* 表格行内动作列：小号按钮并排 */
+.table-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.table-actions .btn {
+  padding: 3px 10px;
+  font-size: var(--font-size-sm);
+}
+
+/* shown-once 凭据（token/secret）展示行 */
+.code-line {
+  display: block;
+  margin-top: var(--space-1);
+  word-break: break-all;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: var(--font-size-sm);
+}
+
+/* 危险态徽标（REJECTED/REVOKED 安装态、已过期令牌） */
+.pill-danger {
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger-border);
+  color: var(--color-danger);
+}
+
+/* 表单控件补齐：B2a 只定义了 .field input，自助面的 textarea/select 就位同款观感 */
+.field textarea,
+.field select {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  font-size: var(--font-size-body);
+  font-family: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+
+.field textarea {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  min-height: 96px;
+}
+
+.field textarea:focus,
+.field select:focus {
+  border-color: var(--color-accent);
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 0;
+}

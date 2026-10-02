@@ -1,5 +1,6 @@
 // WebAuthn 流程件（Login/Sudo 两页共享，v1.4 B5 评审提取）：流程与线格式逐行照 SSR login.html /
 // sudo.html 的内联 JS（options → credentials.get → /login/webauthn）——SSR 模板改动时此处是唯一对齐点。
+// B2b 增注册 ceremony（照 SSR passkey.html 内联 JS）与凭据删除（框架端点，204 无体）。
 
 // /webauthn/* 与 /login/webauthn 是框架原生端点，裸 JSON（非 ResponseRenderer），不走 api.js 包装
 export async function webauthnRawPost(path, body, csrf) {
@@ -44,4 +45,39 @@ export function toBase64Url(buffer) {
   let binary = '';
   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
   return window.btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// 注册 ceremony 的 POST /webauthn/register 请求体（逐行照 SSR passkey.html 内联 JS）：label 随
+// publicKey.credential 同行，attestation/clientData 双二进制走 base64url 线格式
+export function registrationBody(credential, label) {
+  return {
+    publicKey: {
+      credential: {
+        id: credential.id,
+        rawId: toBase64Url(credential.rawId),
+        type: credential.type,
+        response: {
+          attestationObject: toBase64Url(credential.response.attestationObject),
+          clientDataJSON: toBase64Url(credential.response.clientDataJSON),
+          transports: credential.response.getTransports ? credential.response.getTransports() : [],
+        },
+        clientExtensionResults: {},
+        authenticatorAttachment: credential.authenticatorAttachment,
+      },
+      label: label,
+    },
+  };
+}
+
+// 框架删除端点 DELETE /webauthn/register/{credentialId}：204 成功（无体）、403 非本人凭据
+// （ownership 由框架把关）；非 204 一律抛错交页面渲染
+export async function webauthnDelete(credentialId, csrf) {
+  const headers = {};
+  if (csrf && csrf.csrfToken && csrf.csrfHeaderName) headers[csrf.csrfHeaderName] = csrf.csrfToken;
+  const response = await fetch('/webauthn/register/' + encodeURIComponent(credentialId), {
+    method: 'DELETE',
+    headers,
+    credentials: 'same-origin',
+  });
+  if (response.status !== 204) throw new Error('delete ' + response.status);
 }
