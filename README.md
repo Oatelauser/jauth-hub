@@ -4,7 +4,7 @@
 
 [English](README_en.md) | 中文
 
-![Version](https://img.shields.io/badge/version-1.2.1-blue) ![Java](https://img.shields.io/badge/Java-21-orange) ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.x-brightgreen) ![License](https://img.shields.io/badge/License-MIT-yellow) ![CI](https://github.com/Oatelauser/jauth-hub/actions/workflows/ci.yml/badge.svg)
+![Version](https://img.shields.io/badge/version-1.3.0-blue) ![Java](https://img.shields.io/badge/Java-21-orange) ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.x-brightgreen) ![License](https://img.shields.io/badge/License-MIT-yellow) ![CI](https://github.com/Oatelauser/jauth-hub/actions/workflows/ci.yml/badge.svg)
 
 ---
 
@@ -15,12 +15,13 @@
 | 🐙 **GitHub 式体验** | 授权确认页可勾选 scope、已授权应用看板一键撤销、PAT 个人访问令牌、`/me` 平台接口——用过的都说熟 |
 | 🏢 **v1.1 平台层** | 组织自助创建、应用安装两步制审批（org OWNER 封顶 scope ceiling）、发行范围=请求∩consent∩ceiling 运行时取交、`orgs` claim 富化（id/name/role）、我的应用注册（个人 + org）、用户管理与自助改密 |
 | 🔑 **v1.2 Passkey** | WebAuthn 通行密钥：登录页免密按钮 + 自助管理页（注册/删除），私钥不出设备；默认关，一个开关开启 |
+| 🧹 **v1.3 滑账清剿** | 账号安全闭环：改密/停用即全量失效令牌与会话（fail-secure）、应用全生命周期（轮转/编辑/删除级联）、org 成员管理（OWNER 面）、敏感 scope 自动联动 sudo、创建面节流、审计词表补全 |
 | 🔀 **双模式，一套代码** | **独立部署**：起一个服务，所有项目接入它；**内嵌**：引一个 starter，认证能力长在你自己的服务里（宿主只欠一个 `UserDetailsService`） |
 | 🔐 **安全内核先行** | 令牌落库只有 SHA-256 哈希（数据库泄露≠令牌泄露）、刷新令牌轮转 + **重放整族熔断**、强制 PKCE、签名密钥 90 天自动轮转 |
 | 🎓 **天生教学** | 自带 `/demo` 教学区：对着**真实端点**完整走一遍授权码 + PKCE，每一步的 HTTP 请求/响应实时可见——前端同学看一遍就懂 OAuth 在干什么 |
 | 🧩 **家族生态** | 与 [spring-plus](https://central.sonatype.com/search?q=io.github.oatelauser) 家族（统一响应/声明式鉴权/配置加密）开箱即用，也可完全脱离家族独立使用 |
 | 🗄️ **零门槛起步** | 默认 H2 文件库（拉下来就能跑），生产切 PostgreSQL 一行配置，SQL 双方言兼容 |
-| 🧪 **质量门禁** | 397 个测试 + 阿里 p3c 规约 + Spotless + SpotBugs/FindSecBugs + 端到端全流程测试，CI 强制全绿 |
+| 🧪 **质量门禁** | 460 个测试 + 阿里 p3c 规约 + Spotless + SpotBugs/FindSecBugs + 端到端全流程测试，CI 强制全绿 |
 
 ## 📦 模块一览
 
@@ -54,7 +55,7 @@ mvn verify   # 构建 + 全部测试 + 质量门禁
 
 ```bash
 mvn -pl jauth-hub-app -am package -DskipTests
-java -jar jauth-hub-app/target/jauth-hub-app-1.2.1.jar
+java -jar jauth-hub-app/target/jauth-hub-app-1.3.0.jar
 ```
 
 打开 <http://localhost:8080/demo> —— 教学区会带你走完 **登录 → 授权确认 → 换令牌 → 内省 → 调 API** 的完整闭环，每步 HTTP 明细实时可见。
@@ -77,7 +78,7 @@ jauth-hub:
 <dependency>
     <groupId>io.github.oatelauser</groupId>
     <artifactId>jauth-hub-starter</artifactId>
-    <version>1.2.1</version>
+    <version>1.3.0</version>
 </dependency>
 ```
 
@@ -94,7 +95,7 @@ UserDetailsService userDetailsService() {
 <dependency>
     <groupId>io.github.oatelauser</groupId>
     <artifactId>jauth-hub-resource-server-starter</artifactId>
-    <version>1.2.1</version>
+    <version>1.3.0</version>
 </dependency>
 ```
 
@@ -183,8 +184,10 @@ OIDC 发现端点：<http://localhost:8080/.well-known/openid-configuration> （
 ## 🗺️ 路线图
 
 - **v1.1（平台层）**：组织 org、应用安装审批与权限封顶、应用/用户管理页 ✅
-- **v1.2（强化层，本版）**：Passkey 无密码登录、sudo mode 敏感操作二次认证、@RequiresScope 声明式 scope 校验 ✅
-- **v2+**：webhook 事件、secret scanning、邮箱流……
+- **v1.2（强化层）**：Passkey 无密码登录、sudo mode 敏感操作二次认证、@RequiresScope 声明式 scope 校验 ✅
+- **v1.3（滑账清剿，本版）**：凭据状态变更全量清剿、应用轮转/编辑/删除级联、org 成员管理、consent 已授权徽标、创建面节流、用户分页、审计词表补全 ✅
+- **v1.4（headless 皮）**：信任面四页 JSON API 化 + `jauth-hub-front`（Vue 3 分离前端示范）
+- **v2+**：webhook 事件、secret scanning、邮箱流、passkey 限流 credentialId 维度……
 
 ## 📚 更多文档
 

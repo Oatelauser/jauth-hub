@@ -4,7 +4,7 @@
 
 English | [中文](README.md)
 
-![Version](https://img.shields.io/badge/version-1.2.1-blue) ![Java](https://img.shields.io/badge/Java-21-orange) ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.x-brightgreen) ![License](https://img.shields.io/badge/License-MIT-yellow) ![CI](https://github.com/Oatelauser/jauth-hub/actions/workflows/ci.yml/badge.svg)
+![Version](https://img.shields.io/badge/version-1.3.0-blue) ![Java](https://img.shields.io/badge/Java-21-orange) ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.x-brightgreen) ![License](https://img.shields.io/badge/License-MIT-yellow) ![CI](https://github.com/Oatelauser/jauth-hub/actions/workflows/ci.yml/badge.svg)
 
 ---
 
@@ -15,12 +15,13 @@ English | [中文](README.md)
 | 🐙 **GitHub-grade UX** | Scope checkboxes on the consent page, an authorized-apps dashboard with one-click revoke, personal access tokens, a `/me` platform endpoint — familiar to anyone who has wired up a GitHub App |
 | 🏢 **v1.1 platform layer** | Self-service organizations, two-step app-installation approval with OWNER-set scope ceilings, issued scopes = requested ∩ consented ∩ ceiling (intersected at runtime), an enriched `orgs` claim (id/name/role), app registration for personal and org apps, user management and self-service password change |
 | 🔑 **v1.2 Passkey** | WebAuthn passkeys: a passwordless button on the login page plus a self-service management page (register/delete); the private key never leaves the device — off by default, one switch to enable |
+| 🧹 **v1.3 hardening sweep** | Account-security closed loop: password change / disable revokes every token and session (fail-secure); full app lifecycle (secret rotation / edit / delete-with-cascade); org member management (OWNER surface); sensitive scopes auto-imply sudo; creation throttling; audit vocabulary completion |
 | 🔀 **Dual mode, one codebase** | **Standalone**: run one service and point every project at it. **Embedded**: drop in a starter and auth grows inside your own service (the host only supplies a `UserDetailsService`) |
 | 🔐 **Security-first core** | Only SHA-256 hashes of tokens ever hit the database (a DB leak ≠ a token leak), refresh token rotation with **whole-family revocation on replay**, mandatory PKCE, signing keys auto-rotated every 90 days |
 | 🎓 **Built to teach** | The bundled `/demo` walkthrough drives a real authorization-code + PKCE flow against real endpoints, showing every HTTP request/response live — frontend engineers get OAuth in one sitting |
 | 🧩 **Family ecosystem** | Plays out of the box with the [spring-plus](https://central.sonatype.com/search?q=io.github.oatelauser) family (unified responses / declarative authorization / config encryption), yet works fully standalone |
 | 🗄️ **Zero-ceremony start** | Defaults to an H2 file database (clone and run), switches to PostgreSQL with one line of config; SQL is written for both dialects |
-| 🧪 **Quality gates** | 397 tests + Alibaba p3c rules + Spotless + SpotBugs/FindSecBugs + full end-to-end flow tests, all enforced green in CI |
+| 🧪 **Quality gates** | 460 tests + Alibaba p3c rules + Spotless + SpotBugs/FindSecBugs + full end-to-end flow tests, all enforced green in CI |
 
 ## 📦 Modules
 
@@ -54,7 +55,7 @@ mvn verify   # build + full test suite + quality gates
 
 ```bash
 mvn -pl jauth-hub-app -am package -DskipTests
-java -jar jauth-hub-app/target/jauth-hub-app-1.2.1.jar
+java -jar jauth-hub-app/target/jauth-hub-app-1.3.0.jar
 ```
 
 Open <http://localhost:8080/demo> — the teaching zone walks you through the full **login → consent → token exchange → introspection → API call** loop, with live HTTP details at every step.
@@ -77,7 +78,7 @@ jauth-hub:
 <dependency>
     <groupId>io.github.oatelauser</groupId>
     <artifactId>jauth-hub-starter</artifactId>
-    <version>1.2.1</version>
+    <version>1.3.0</version>
 </dependency>
 ```
 
@@ -94,7 +95,7 @@ UserDetailsService userDetailsService() {
 <dependency>
     <groupId>io.github.oatelauser</groupId>
     <artifactId>jauth-hub-resource-server-starter</artifactId>
-    <version>1.2.1</version>
+    <version>1.3.0</version>
 </dependency>
 ```
 
@@ -186,6 +187,8 @@ OIDC discovery endpoint: <http://localhost:8080/.well-known/openid-configuration
 - **v1.1 (platform layer)**: organizations, app-installation approval with scope ceilings, app/user management pages ✅
 - **v1.2 (hardening, this release)**: Passkey passwordless sign-in, sudo mode for sensitive operations, @RequiresScope declarative scope checks ✅
 - **v2+**: webhook events, secret scanning, email flows, ...
+- **v1.3 (hardening sweep, this release)**: credential-state mass revocation, app rotation/edit/delete-with-cascade, org member management, consent already-granted badge, creation throttling, user pagination, audit vocabulary completion ✅
+- **v1.4 (headless skin)**: trust-surface JSON APIs + `jauth-hub-front` (Vue 3 separated-frontend reference)
 
 ## 📚 More docs
 

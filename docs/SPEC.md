@@ -18,7 +18,7 @@
 | 数据库 | H2（PostgreSQL 兼容模式）+ PostgreSQL **双兼容 SQL**，不承诺 MySQL；memory\|jdbc 双实现条件注册（`jauth-hub.storage`） | [03](../.scratch/jauth-hub/issues/03-grilling-dual-mode-architecture.md) |
 | 会话 | Spring Session：JDBC 默认（零新增基建）、Redis 可选（引依赖即切） | [04](../.scratch/jauth-hub/issues/04-grilling-v1-scope.md) |
 | 前端 | **双皮**（[10](../.scratch/jauth-hub/issues/10-frontend-form.md)）：默认 = Thymeleaf SSR + 手写单文件 CSS（无框架）；v1.4 增 headless 皮 = 信任面四页 JSON API + 根目录 `jauth-hub-front`（Vue 3 + Vite，产物随制品、认证中心同域名）。信任面页面永远是 jauth-hub 自家的；自助面可换可缺；接入方前端形态无关。教学三层保留但不绑架架构；**运行时零外链永守**（框架须打包进制品）。UI 中文 + i18n 资源结构（messages_en 骨架） | [05](../.scratch/jauth-hub/issues/05-grilling-learning-frontend.md) · [10](../.scratch/jauth-hub/issues/10-frontend-form.md) |
-| 运行时 | v1 仅 JVM；代码守 AOT 友好（少运行时反射）；GraalVM 原生 = v1.x 实验目标 | 地图 Notes |
+| 运行时 | v1 仅 JVM；代码守 AOT 友好习惯；**GraalVM 原生二进制不做**（2026-10-02 用户拍板除名，原 v1.x 实验目标取消） | [10](../.scratch/jauth-hub/issues/10-frontend-form.md) |
 | 协议 | 强制 PKCE；implicit/password 不存在；client_credentials 与 DPoP 框架能力在、**默认关**（配置可开不宣传） | [06](../.scratch/jauth-hub/issues/06-final-tech-details.md) |
 | License | **MIT** | [06](../.scratch/jauth-hub/issues/06-final-tech-details.md) |
 | 错误码 | spring-plus 家族分段惯例，jauth-hub 占 **`A05xx`（客户端/授权请求错）+ `B05xx`（内部错）**；默认实现字段名照抄 SimpleResponse（code/message/data） | [09](../.scratch/jauth-hub/issues/09-grilling-unified-response.md) |
@@ -104,11 +104,11 @@ public interface ResponseRenderer {
 | **v1.0 认证核心** | 密码登录、OIDC 全套（discovery/JWKS+轮转/id_token/userinfo）、梯级 scope + consent 勾选交集 + 增量授权、机密/公开客户端 + 精确 redirect 白名单 + 强制 PKCE、opaque + 内省 + RTR 熔断 + /revoke、PAT + Device Flow + /me、claims 映射扩展点 |
 | **v1.1 平台层** | org 归属 + 安装审批 + 权限封顶（org 角色模型） |
 | **v1.2 强化层** | Passkey（开关，默认关）、sudo mode（开关，依赖 Passkey） |
-| **v1.3 滑账清剿**（进行中） | 老账 ①–⑧ + v1.2 新账 2/3/6 收口；批次 T0+D0–D6 见 [v1.3-kickoff](../.scratch/jauth-hub/v1.3-kickoff.md) |
+| **v1.3 滑账清剿**（1.3.0，2026-10-02 完成） | 老账 ①–⑧全清（⑤ 经查证由 B9 架构性覆盖）+ v1.2 新账 2/3/6 收口 + D0 真渲染测试网；批次 T0+D0–D6；随批拍板：GraalVM 除名、OWASP 继续豁免、credentialId 限流转 v2+、Maven Central 随 1.3.0 发布 |
 | **v1.4 headless 皮** | 信任面四页（登录/consent/设备/sudo）JSON API 化 + 根目录 `jauth-hub-front`（Vue 3 + Vite 分离前端，产物随制品、同域名）——[10](../.scratch/jauth-hub/issues/10-frontend-form.md) |
 | 横切 | 按用户合并限流 + X-RateLimit-*、授权看板 + 一键 Revoke + RP-initiated logout + 基础审计、UserDetails→claims 映射 |
 
-v2+：webhook、secret scanning、多 Secret 轮转、token exchange（配置可开）、redirect 通配 per-URI、back-channel logout（等框架 issue #18296）、fine-grained PAT、邮箱流（注册验证/找回密码）。出局：phantom token、请求头降权、"严格无 OIDC"模式。附决：存量用户不导入。
+v2+：webhook、secret scanning、多 Secret 轮转、token exchange（配置可开）、redirect 通配 per-URI、back-channel logout（等框架 issue #18296）、fine-grained PAT、邮箱流（注册验证/找回密码）、passkey 登录限流 credentialId 维度（2026-10-02 拍板自 v1.3 转入）。出局：phantom token、请求头降权、"严格无 OIDC"模式。附决：存量用户不导入。
 
 研究底稿：[GitHub 真实功能对比表](../.scratch/jauth-hub/research/02-github-features.md)（26 条：核心 11/平台 2/过时 6/虚构 7）。
 
