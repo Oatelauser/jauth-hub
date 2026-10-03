@@ -12,7 +12,7 @@
 
   <groupId>io.github.oatelauser</groupId>
   <artifactId>jauth-hub</artifactId>
-  <version>1.4.0</version>
+  <version>1.5.0</version>
   <packaging>pom</packaging>
   <name>jauth-hub</name>
   <description>OAuth 2.1 + OIDC authentication hub: dual-mode (standalone / embedded) open-source library plus reference app</description>

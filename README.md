@@ -4,7 +4,7 @@
 
 [English](README_en.md) | 中文
 
-![Version](https://img.shields.io/badge/version-1.4.0-blue) ![Java](https://img.shields.io/badge/Java-21-orange) ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.x-brightgreen) ![License](https://img.shields.io/badge/License-MIT-yellow) ![CI](https://github.com/Oatelauser/jauth-hub/actions/workflows/ci.yml/badge.svg)
+![Version](https://img.shields.io/badge/version-1.5.0-blue) ![Java](https://img.shields.io/badge/Java-21-orange) ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.x-brightgreen) ![License](https://img.shields.io/badge/License-MIT-yellow) ![CI](https://github.com/Oatelauser/jauth-hub/actions/workflows/ci.yml/badge.svg)
 
 ---
 
@@ -22,7 +22,7 @@
 | 🎓 **天生教学** | 自带 `/demo` 教学区：对着**真实端点**完整走一遍授权码 + PKCE，每一步的 HTTP 请求/响应实时可见——前端同学看一遍就懂 OAuth 在干什么 |
 | 🧩 **家族生态** | 与 [spring-plus](https://central.sonatype.com/search?q=io.github.oatelauser) 家族（统一响应/声明式鉴权/配置加密）开箱即用，也可完全脱离家族独立使用 |
 | 🗄️ **零门槛起步** | 默认 H2 文件库（拉下来就能跑），生产切 PostgreSQL 一行配置，SQL 双方言兼容 |
-| 🧪 **质量门禁** | 488 个测试 + 前端 vitest 13 + 阿里 p3c 规约 + Spotless + SpotBugs/FindSecBugs + 端到端全流程测试，CI 强制全绿 |
+| 🧪 **质量门禁** | 496 个测试 + 前端 vitest 80 + 阿里 p3c 规约 + Spotless + SpotBugs/FindSecBugs + 端到端全流程测试，CI 强制全绿 |
 
 ## 📦 模块一览
 
@@ -58,7 +58,7 @@ mvn verify   # 构建 + 全部测试 + 质量门禁
 
 ```bash
 mvn -pl jauth-hub-app -am package -DskipTests
-java -jar jauth-hub-app/target/jauth-hub-app-1.4.0.jar
+java -jar jauth-hub-app/target/jauth-hub-app-1.5.0.jar
 ```
 
 打开 <http://localhost:8080/demo> —— 教学区会带你走完 **登录 → 授权确认 → 换令牌 → 内省 → 调 API** 的完整闭环，每步 HTTP 明细实时可见。
@@ -81,7 +81,7 @@ jauth-hub:
 <dependency>
     <groupId>io.github.oatelauser</groupId>
     <artifactId>jauth-hub-starter</artifactId>
-    <version>1.4.0</version>
+    <version>1.5.0</version>
 </dependency>
 ```
 
@@ -98,7 +98,7 @@ UserDetailsService userDetailsService() {
 <dependency>
     <groupId>io.github.oatelauser</groupId>
     <artifactId>jauth-hub-resource-server-starter</artifactId>
-    <version>1.4.0</version>
+    <version>1.5.0</version>
 </dependency>
 ```
 
@@ -127,7 +127,7 @@ jauth-hub.rs:
 ```bash
 cd jauth-hub-front && npm ci && npm run build     # 产出 dist/
 cd .. && mvn -Pdist -pl jauth-hub-app -am package # dist 经 jauth-hub-front-dist 依赖打进制品
-java -jar jauth-hub-app/target/jauth-hub-app-1.4.0.jar
+java -jar jauth-hub-app/target/jauth-hub-app-1.5.0.jar
 ```
 
 app 对 dist jar 工件是 compile 依赖：`-Pdist` 全链构建时 `classpath:/static/front` 随可执行 jar 内嵌；不带
@@ -213,7 +213,8 @@ OIDC 发现端点：<http://localhost:8080/.well-known/openid-configuration> （
 - **v1.1（平台层）**：组织 org、应用安装审批与权限封顶、应用/用户管理页 ✅
 - **v1.2（强化层）**：Passkey 无密码登录、sudo mode 敏感操作二次认证、@RequiresScope 声明式 scope 校验 ✅
 - **v1.3（滑账清剿）**：凭据状态变更全量清剿、应用轮转/编辑/删除级联、org 成员管理、consent 已授权徽标、创建面节流、用户分页、审计词表补全 ✅
-- **v1.4（headless 皮，本版）**：信任面四页 JSON API 化 + `jauth-hub-front`（Vue 3 分离前端示范）✅
+- **v1.4（headless 皮）**：信任面四页 JSON API 化 + `jauth-hub-front`（Vue 3 分离前端示范）✅
+- **v1.5（前端归一，本版）**：SSR 皮退场、`jauth-hub-front` 唯一官方前端（企业级设计系统 + 导航壳窜连 + demo 教学区）、`jauth-hub-front-dist` jar 双形态发行（嵌入宿主白得 UI）✅
 - **v2+**：webhook 事件、secret scanning、邮箱流、passkey 限流 credentialId 维度……
 
 ## 📚 更多文档
