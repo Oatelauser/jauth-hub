@@ -29,7 +29,7 @@ jobs:
         run: |
           npm ci
           npm run build
-      - name: Verify with dist (-Pdist: tests + Spotless/p3c/SpotBugs gates + PG Testcontainers)
+      - name: "Verify with dist (-Pdist: tests + Spotless/p3c/SpotBugs gates + PG Testcontainers)"
         run: mvn -B verify -Pdist
 
   front:
