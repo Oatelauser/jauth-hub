@@ -23,6 +23,9 @@
    带 secret = 机密客户端。宿主 default 链按 `DemoSecurityConfiguration#demoDefaultSecurityFilterChain` 自配
    （denyAll + 显式白名单，jauth 链只认领协议端点，互不越界）。
 
+**白得 UI（v1.5）**：再引 `jauth-hub-front-dist` 依赖（见 pom）并放行 `/front/**`（本示例已做），
+`mvn -Pdist` 构建后 `/front/**` 即你的登录皮——嵌入契约的新形态示范（深链回退等宿主侧边界见该模块 README）。
+
 正式嵌入生产建议切 `jauth-hub.storage: jdbc` 并提供 DataSource（Flyway 私有历史表自动迁移，不撞宿主自己的
 Flyway）。memory 模式语义：PAT 禁用、审计降级内存缓冲、签名密钥重启即换（面向 demo）。
 

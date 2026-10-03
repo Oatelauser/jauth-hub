@@ -23,6 +23,7 @@
     <module>jauth-hub-selfservice</module>
     <module>jauth-hub-app</module>
     <module>jauth-hub-resource-server-starter</module>
+    <module>jauth-hub-front-dist</module>
     <module>examples</module>
   </modules>
 
@@ -63,6 +64,12 @@
       <dependency>
         <groupId>io.github.oatelauser</groupId>
         <artifactId>jauth-hub-selfservice</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <!-- v1.5 B5a：front dist 的 jar 工件（纯资源，无传递依赖），app 与嵌入宿主共用 -->
+      <dependency>
+        <groupId>io.github.oatelauser</groupId>
+        <artifactId>jauth-hub-front-dist</artifactId>
         <version>${project.version}</version>
       </dependency>
     </dependencies>

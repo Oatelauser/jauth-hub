@@ -17,12 +17,25 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - name: Verify (tests + Spotless/p3c/SpotBugs gates + PG Testcontainers)
-        run: mvn -B verify
+      # v1.5 B5a：verify 链先出真 dist 再 -Pdist——Java CI 全链含真 UI 资源（jauth-hub-front-dist
+      # 的 enforcer 活，app/embedded-demo 的 integration 测试看得见真 /front 静态皮）
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: jauth-hub-front/package-lock.json
+      - name: Front dist (npm ci + vite build)
+        working-directory: jauth-hub-front
+        run: |
+          npm ci
+          npm run build
+      - name: Verify with dist (-Pdist: tests + Spotless/p3c/SpotBugs gates + PG Testcontainers)
+        run: mvn -B verify -Pdist
 
   front:
-    # B3 分离前端（jauth-hub-front，Maven reactor 外）：与 verify 并行——普通 Java CI 不被 node
-    # 阻塞；dist 是否上传 artifact 不做（YAGNI，发布携带 front 皮肤的方式见 RELEASE_PROCESS 阶段 4）
+    # B3 分离前端（jauth-hub-front，Maven reactor 外）：与 verify 并行。v1.5 B5a 起 verify 链自带
+    # node + -Pdist（真 dist 进 jar），本 job 独立跑 vitest 与 vite build——双保险；dist 是否上传
+    # artifact 不做（YAGNI，发布携带 front 皮肤的方式见 RELEASE_PROCESS 阶段 4）
     runs-on: ubuntu-latest
     defaults:
       run:

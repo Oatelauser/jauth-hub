@@ -33,6 +33,7 @@ jauth-hub-selfservice            User self-service pages (authorized apps, PAT, 
 jauth-hub-resource-server-starter Resource-server integration (introspection + 30s cache + scope→authority mapping)
 jauth-hub-app                    Standalone deployment shell (own user store + /demo teaching zone)
 jauth-hub-front                  Separated frontend project (Vue 3 + Vite, outside the Maven reactor; optional skin for the trust-surface pages)
+jauth-hub-front-dist             Jar artifact packaging the front dist (in the reactor; add the dep and the /front/** static skin is yours)
 examples/embedded-demo           Embedded-integration example project
 ```
 
@@ -121,13 +122,15 @@ The four trust-surface pages (login / consent / device verification / sudo) expo
 | `/api/device/verify` | GET state | Device verification |
 | `/api/sudo` | GET state | sudo re-verification |
 
-Deployment (same domain; SSR remains the default, front is an optional skin):
+Deployment (same domain; SSR remains the default, front is an optional skin; as of v1.5 the UI is **bundled via the `jauth-hub-front-dist` module**):
 
 ```bash
 cd jauth-hub-front && npm ci && npm run build     # produces dist/
-cd .. && mvn -Pfront-skin -pl jauth-hub-app -am package   # copies dist into the jar at classpath:/static/front/
+cd .. && mvn -Pdist -pl jauth-hub-app -am package # dist enters the jar via the jauth-hub-front-dist dependency
 java -jar jauth-hub-app/target/jauth-hub-app-1.4.0.jar --jauth-hub.trust-skin=front
 ```
+
+The app takes the dist jar artifact as a compile dependency: a `-Pdist` full-chain build embeds `classpath:/static/front` in the executable jar; a plain build without the profile resolves an empty jar (no UI embedded — the reactor is never hijacked by npm). The v1.4 `-Pfront-skin` profile remains for compatibility.
 
 With `jauth-hub.trust-skin=front`, the four page GETs 302 to `/front/<route>` (query string forwarded verbatim); static assets are served under `/front/**` with history deep-link fallback. Local no-repackage iteration (start from `jauth-hub-app/`): `--spring.web.resources.static-locations=file:../jauth-hub-front/dist` (note the property replaces the default static locations entirely — append `,classpath:/static/` to keep the `/demo` assets).
 

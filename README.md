@@ -33,6 +33,7 @@ jauth-hub-selfservice             用户自助页（已授权看板、PAT、通�
 jauth-hub-resource-server-starter 资源服务器接入（内省校验 + 30s 缓存 + scope→权限映射）
 jauth-hub-app                     独立部署壳（自带用户库 + /demo 教学区）
 jauth-hub-front                   分离前端工程（Vue 3 + Vite，不在 Maven reactor；信任面四页备选皮）
+jauth-hub-front-dist              front dist 的 jar 工件（reactor 内；引依赖即得 /front/** 静态皮）
 examples/embedded-demo            内嵌接入示例工程
 ```
 
@@ -121,13 +122,16 @@ jauth-hub.rs:
 | `/api/device/verify` | GET 状态 | 设备验证 |
 | `/api/sudo` | GET 状态 | sudo 强验证 |
 
-部署（同域名，SSR 永远默认，front 只是备选皮）：
+部署（同域名，SSR 永远默认，front 只是备选皮；v1.5 起 UI 经 `jauth-hub-front-dist` 模块**打包自带**）：
 
 ```bash
 cd jauth-hub-front && npm ci && npm run build     # 产出 dist/
-cd .. && mvn -Pfront-skin -pl jauth-hub-app -am package   # dist 拷进制品 classpath:/static/front/
+cd .. && mvn -Pdist -pl jauth-hub-app -am package # dist 经 jauth-hub-front-dist 依赖打进制品
 java -jar jauth-hub-app/target/jauth-hub-app-1.4.0.jar --jauth-hub.trust-skin=front
 ```
+
+app 对 dist jar 工件是 compile 依赖：`-Pdist` 全链构建时 `classpath:/static/front` 随可执行 jar 内嵌；不带
+profile 的常规构建拿到空 jar（UI 不内嵌，reactor 不被 npm 绑架）。v1.4 的 `-Pfront-skin` profile 保留兼容。
 
 `jauth-hub.trust-skin=front` 后四页 GET 一律 302 到 `/front/<路由>`（查询串原样转发），静态资源经 `/front/**` 出网并带 history 深链回退。本地免打包联调（在 `jauth-hub-app/` 目录启动）：`--spring.web.resources.static-locations=file:../jauth-hub-front/dist`（注意该属性整体替换默认静态位，需保 `/demo` 资源时追加 `,classpath:/static/`）。
 

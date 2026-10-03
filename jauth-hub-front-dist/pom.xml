@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.github.oatelauser</groupId>
+    <artifactId>jauth-hub</artifactId>
+    <version>1.4.0</version>
+  </parent>
+
+  <artifactId>jauth-hub-front-dist</artifactId>
+  <name>jauth-hub-front-dist</name>
+  <description>Frontend dist as a jar artifact: classpath:/static/front/** served by any Boot host's default static mapping (v1.5 B5a)</description>
+
+  <build>
+    <plugins>
+      <!-- 默认态（未激活 dist profile）只有这一个插件在跑：dist 缺席时 WARN 不 fail，产出空 jar——
+           reactor 常规构建不被 npm 绑架（CI 与本地无 node 也能全绿）。fail=false 把 requireFilesExist
+           降级为警告；空 jar 恰好利用 v1.4 B4 实测教训的反面——copy-resources 对缺失源目录静默跳过，
+           但本模块默认态根本不挂 copy（见 dist profile），空 jar 是确定性行为而非静默缺口。 -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>warn-front-dist-absent</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <fail>false</fail>
+              <rules>
+                <requireFilesExist>
+                  <files>
+                    <file>${maven.multiModuleProjectDirectory}/jauth-hub-front/dist/index.html</file>
+                  </files>
+                  <message>jauth-hub-front/dist absent: producing an EMPTY jar (UI not embedded). To embed the real UI: cd jauth-hub-front &amp;&amp; npm ci &amp;&amp; npm run build, then build with -Pdist</message>
+                </requireFilesExist>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+  <profiles>
+    <!-- dist 装配（默认关）：形态照抄 app 的 front-skin profile（v1.4 B4 先例）——enforcer 先行
+         fail-fast，兜住 resources-plugin 对缺失源目录静默跳过的缺口（实测教训：不拦即静默出空皮制品，
+         发布场景等同事故）；copy-resources 再把 dist 拷成 classpath:/static/front。
+         须从仓库根目录执行（${maven.multiModuleProjectDirectory} 随调用目录变化）。
+         两插件版本均随 Boot parent BOM 管，非新增依赖。 -->
+    <profile>
+      <id>dist</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-enforcer-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>dist-must-exist</id>
+                <goals>
+                  <goal>enforce</goal>
+                </goals>
+                <configuration>
+                  <rules>
+                    <requireFilesExist>
+                      <files>
+                        <file>${maven.multiModuleProjectDirectory}/jauth-hub-front/dist/index.html</file>
+                      </files>
+                      <message>dist profile requires jauth-hub-front/dist: run "npm ci &amp;&amp; npm run build" in jauth-hub-front/ first</message>
+                    </requireFilesExist>
+                  </rules>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-resources-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>copy-front-dist</id>
+                <phase>generate-resources</phase>
+                <goals>
+                  <goal>copy-resources</goal>
+                </goals>
+                <configuration>
+                  <outputDirectory>${project.build.outputDirectory}/static/front</outputDirectory>
+                  <resources>
+                    <resource>
+                      <directory>${maven.multiModuleProjectDirectory}/jauth-hub-front/dist</directory>
+                    </resource>
+                  </resources>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+</project>

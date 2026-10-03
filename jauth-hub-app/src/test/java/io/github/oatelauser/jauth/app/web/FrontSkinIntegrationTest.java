@@ -26,6 +26,10 @@ import org.springframework.test.web.servlet.MvcResult;
  * 装配（本测试与皮肤旗标无关，同一上下文顺带钉死）——物理文件 200、history 深链回退 index.html、
  * 带扩展名的 miss 照常 404 不回 index。默认 ssr 的零行为变化由既有页面测试全绿自证。
  *
+ * <p>v1.5 B5a 起 app 经 jauth-hub-front-dist 依赖携带 /front 静态（compile；默认态空 jar、-Pdist 带真
+ * dist）。上述静态断言即 dist jar 形态的既覆盖：夹具位于 test-classes，classpath 解析先于依赖 jar，把
+ * 同名 static/front/index.html 完全遮蔽——两态构建下断言语义不变，测试与 npm 构建序解耦（不硬凑新用例）。
+ *
  * @author oatelauser
  */
 @SpringBootTest(classes = JauthHubAppApplication.class, webEnvironment = SpringBootTest.WebEnvironment.MOCK)

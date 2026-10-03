@@ -43,6 +43,20 @@ class EmbeddedDemoApplicationTests {
     }
 
     @Test
+    @DisplayName("白得 UI 契约：/front/index.html 不被宿主 default 链拒（两态同测）")
+    void frontSkinNeverDeniedByHostChain() throws Exception {
+        // v1.5 B5a：jauth-hub-front-dist 依赖在 -Pdist 构建时带真 dist（此处 200），默认态为空 jar
+        // （无静态资源，NoResourceFoundException 渲染 404）。不断言具体一态——两种构建序下都
+        // 必须成立的契约只有一条：静态皮前缀已放行，绝无 401/403（denyAll 宿主的典型踩坑）
+        int status = this.mockMvc
+                .perform(get("/front/index.html"))
+                .andReturn()
+                .getResponse()
+                .getStatus();
+        assertThat(status).isIn(200, 404);
+    }
+
+    @Test
     @DisplayName("受保护接口 /api/orders 无 token 401（rs-starter 内省接线就位）")
     void ordersWithoutTokenRejected() throws Exception {
         this.mockMvc.perform(get("/api/orders")).andExpect(status().isUnauthorized());

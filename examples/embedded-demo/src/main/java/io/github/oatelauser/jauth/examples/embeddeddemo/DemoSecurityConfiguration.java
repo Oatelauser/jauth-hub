@@ -46,14 +46,20 @@ public class DemoSecurityConfiguration {
     }
 
     /**
-     * 宿主 default 链：/public/** 放行、/api/** 经内省验 opaque token、其余 denyAll。jauth 协议链
-     * （starter 装配，序位 100）认领协议端点与 /login，与本链互不越界。
+     * 宿主 default 链：/public/** 与 /front/** 放行、/api/** 经内省验 opaque token、其余 denyAll。
+     * jauth 协议链（starter 装配，序位 100）认领协议端点与 /login，与本链互不越界。
+     *
+     * <p>/front/** 是 v1.5 B5a 的"白得 UI"示范：宿主引 {@code jauth-hub-front-dist} 依赖后，Boot
+     * 默认静态映射把皮从 classpath 出网——但静态资源不豁免安全链，denyAll 宿主必须显式放行该前缀，
+     * 否则皮在 classpath 也被 401 拦在门前。宿主侧已知边界：嵌入宿主没有 jauth-hub-app 的
+     * AppWebConfiguration，history 深链（如 /front/login）不回退 index.html，须宿主自配
+     * {@code PathResourceResolver}（参考 AppWebConfiguration）。
      */
     @Bean
     SecurityFilterChain demoDefaultSecurityFilterChain(HttpSecurity http, JauthResourceServerConfigurer resourceServer)
             throws Exception {
         http.authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/public/**", "/error")
+                        .requestMatchers("/public/**", "/front/**", "/error")
                         .permitAll()
                         .requestMatchers("/api/**")
                         .authenticated()

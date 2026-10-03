@@ -29,6 +29,13 @@
       <artifactId>jauth-hub-resource-server-starter</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- v1.5 B5a：front dist jar 工件（compile——java -jar 制品内嵌 UI；默认态为空 jar，
+         -Pdist 全链构建时经它把 classpath:/static/front 打进可执行 jar）。旧 front-skin
+         profile 保留（v1.4 兼容口径，B5b 清理） -->
+    <dependency>
+      <groupId>io.github.oatelauser</groupId>
+      <artifactId>jauth-hub-front-dist</artifactId>
+    </dependency>
     <!-- spring-plus 三件套（SPEC §2：app 全必选） -->
     <dependency>
       <groupId>io.github.oatelauser</groupId>

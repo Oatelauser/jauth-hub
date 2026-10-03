@@ -25,6 +25,12 @@
       <artifactId>jauth-hub-resource-server-starter</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- v1.5 B5a 白得 UI：front dist jar 工件在 classpath 即得 /front/** 静态登录皮
+         （Boot 默认静态映射出网；本示例 default 链已放行 /front/**） -->
+    <dependency>
+      <groupId>io.github.oatelauser</groupId>
+      <artifactId>jauth-hub-front-dist</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>
