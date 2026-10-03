@@ -1,12 +1,13 @@
 <!-- 用户管理（B3，app 面，SUPER_ADMIN 专属）：建号 + 用户表（分页）+ 改角色/停用启用（确认对话
      框，sudo 面 A0515 由请求包装自动跳验证）+ 重置密码（对话框内给定新值，成功后 shown-once 回显
      ——服务端只存哈希不回显明文，回显的是管理员刚输入的值，供转交用户）。非超管访问状态面被
-     @RequiresRole 拦（403）→ 页面错误态兜底不白屏（照 A0508 错误态先例）。行数据无创建时间列：
-     B1a 状态面行即建号摘要同形（id/username/displayName/role/status），后端零改动不扩列。 -->
+     @RequiresRole 拦（403）→ 页面错误态兜底不白屏（照 A0508 错误态先例）。createdAt 列为 B5b
+     滑账回收：状态行/建号摘要补 createdAt 字段（此前 SSR 同款列在 B1a 摘要化时丢失）。 -->
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
 import { getJson, postJson } from '../api';
 import { t } from '../i18n';
+import { fmtDateTime } from '../format';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 
 const PAGE_SIZE = 20; // 服务端默认页大小（SSR 同款固定值，不设页大小选择器）；clamp 服务端已做
@@ -160,6 +161,7 @@ async function runReset() {
             <th>{{ t('adminusers.col-display-name') }}</th>
             <th>{{ t('adminusers.col-role') }}</th>
             <th>{{ t('adminusers.col-status') }}</th>
+            <th>{{ t('adminusers.col-created-at') }}</th>
             <th>{{ t('adminusers.col-actions') }}</th>
           </tr>
         </thead>
@@ -178,6 +180,7 @@ async function runReset() {
                 {{ user.status === 'ACTIVE' ? t('adminusers.status-active') : t('adminusers.status-disabled') }}
               </span>
             </td>
+            <td>{{ fmtDateTime(user.createdAt) }}</td>
             <td>
               <div class="table-actions">
                 <button class="btn secondary" type="button" @click="confirming = { kind: 'role', user }">

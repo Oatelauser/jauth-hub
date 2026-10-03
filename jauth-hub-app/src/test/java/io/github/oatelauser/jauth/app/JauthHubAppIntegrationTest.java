@@ -115,13 +115,13 @@ class JauthHubAppIntegrationTest {
     }
 
     @Test
-    @DisplayName("登录页与 /demo 四页 200：协议链出页面、教学区经 default 链 permitAll")
-    void pagesReachable() throws Exception {
-        this.mockMvc.perform(get("/login")).andExpect(status().isOk());
-        this.mockMvc.perform(get("/demo")).andExpect(status().isOk());
-        this.mockMvc.perform(get("/demo/callback")).andExpect(status().isOk());
-        this.mockMvc.perform(get("/demo/token")).andExpect(status().isOk());
-        this.mockMvc.perform(get("/demo/api-call")).andExpect(status().isOk());
+    @DisplayName("登录页与 /demo 四页路由 302 到 /front（v1.5 B5b；教学区经 default 链 permitAll）")
+    void pagesRedirectToFront() throws Exception {
+        this.mockMvc.perform(get("/login")).andExpect(status().is3xxRedirection());
+        this.mockMvc.perform(get("/demo")).andExpect(status().is3xxRedirection());
+        this.mockMvc.perform(get("/demo/callback")).andExpect(status().is3xxRedirection());
+        this.mockMvc.perform(get("/demo/token")).andExpect(status().is3xxRedirection());
+        this.mockMvc.perform(get("/demo/api-call")).andExpect(status().is3xxRedirection());
     }
 
     @Test

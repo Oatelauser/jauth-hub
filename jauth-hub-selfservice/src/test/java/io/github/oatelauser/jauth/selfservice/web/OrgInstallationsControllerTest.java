@@ -1,14 +1,12 @@
 package io.github.oatelauser.jauth.selfservice.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.not;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.github.oatelauser.jauth.core.audit.AuditEvent;
@@ -26,20 +24,15 @@ import io.github.oatelauser.jauth.core.response.JauthResponseAdvice;
 import io.github.oatelauser.jauth.core.scope.InMemoryScopeCatalog;
 import io.github.oatelauser.jauth.core.user.JauthUser;
 import io.github.oatelauser.jauth.core.user.UserRepository;
-import io.github.oatelauser.jauth.core.web.EducationalFlag;
-import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.context.MessageSource;
-import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
@@ -47,23 +40,15 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.servlet.i18n.FixedLocaleResolver;
-import org.thymeleaf.spring6.SpringTemplateEngine;
-import org.thymeleaf.spring6.view.ThymeleafViewResolver;
-import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 
 /**
- * 安装审批页（B11）：DOM 三态断言（PENDING 待批勾选默认全选/全量表状态徽标与撤销钮/发起表单，照
- * MyAppsControllerTest 手装 Thymeleaf 模式）+ JSON 动作面（approve 收窄/空勾选 A0511、request 任何人可发、
- * reject/revoke、越权 A0508）。受测域件全用 core 内存真路径（InMemory* 仓储 + 两服务）。
+ * 安装审批面（B11；v1.5 B5b 重写）：
+ * 页面路由 302 到 SPA 皮 + JSON 动作面（approve 收窄/空勾选 A0511、request 任何人可发、
+ * reject/revoke、越权 A0508；v1.5 B5b 重写）。受测域件全用 core 内存真路径（InMemory* 仓储 + 两服务）。
  *
  * @author oatelauser
  */
 class OrgInstallationsControllerTest {
-
-    private static final String SELF_SERVICE_TEMPLATES = "io/github/oatelauser/jauth/selfservice/web/templates/";
-
-    private static final String CORE_TEMPLATES = "io/github/oatelauser/jauth/core/web/templates/";
 
     private static final Instant T0 = Instant.parse("2026-09-30T10:00:00Z");
 
@@ -125,66 +110,11 @@ class OrgInstallationsControllerTest {
     }
 
     @Test
-    @DisplayName("PENDING 态（OWNER 视角）：待批区含发起人名/请求范围勾选默认全选/批准与驳回钮，全量表含状态徽标；发起表单含目录勾选")
-    void pendingPageRendersRequesterCheckboxesAndActions() throws Exception {
-        this.installationService.request("client-1", this.org.id(), Set.of("openid", "profile"), "user-bob");
-        Installation installation = this.installationRepository.findByClientAndOrg("client-1", this.org.id());
-
-        pages().perform(get(installationsPath()).principal(() -> ALICE))
-                .andExpect(status().isOk())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML))
-                .andExpect(content().string(containsString("安装审批")))
-                .andExpect(content().string(containsString("acme")))
-                .andExpect(content().string(containsString("组织门户")))
-                .andExpect(content().string(containsString("app_orgportal")))
-                .andExpect(content().string(containsString("bob")))
-                .andExpect(content()
-                        .string(containsString("type=\"checkbox\" name=\"ceilingScope\" value=\"openid\" checked")))
-                .andExpect(content()
-                        .string(containsString("type=\"checkbox\" name=\"ceilingScope\" value=\"profile\" checked")))
-                .andExpect(content()
-                        .string(containsString("data-approve-url=\"/selfservice/orgs/" + this.org.id()
-                                + "/installations/" + installation.id() + "/approve\"")))
-                .andExpect(content()
-                        .string(containsString("data-reject-url=\"/selfservice/orgs/" + this.org.id()
-                                + "/installations/" + installation.id() + "/reject\"")))
-                .andExpect(content().string(containsString("name=\"clientId\"")))
-                .andExpect(content().string(containsString("type=\"checkbox\" name=\"scope\" value=\"openid\"")))
-                .andExpect(content().string(containsString("确认你的身份标识（openid）")))
-                .andExpect(content().string(containsString("待批")))
-                .andExpect(content().string(containsString("发生了什么")));
-    }
-
-    @Test
-    @DisplayName("APPROVED 态：全量表含已生效徽标/ceiling/审批人名与撤销钮；PENDING 区清空")
-    void approvedPageRendersCeilingAndRevokeButton() throws Exception {
-        Installation installation =
-                this.installationService.request("client-1", this.org.id(), Set.of("openid", "profile"), "user-bob");
-        this.installationService.approve(installation.id(), "user-alice", Set.of("openid"));
-
-        pages().perform(get(installationsPath()).principal(() -> ALICE))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("已生效")))
-                .andExpect(content().string(containsString(">openid</td>")))
-                .andExpect(content().string(containsString("alice")))
-                .andExpect(content()
-                        .string(containsString("data-revoke-url=\"/selfservice/orgs/" + this.org.id()
-                                + "/installations/" + installation.id() + "/revoke\"")))
-                // 负断言盯按钮属性形态：JS 选择器字符串里的 [data-approve-url] 不受此约束
-                .andExpect(content().string(not(containsString("data-approve-url=\""))));
-    }
-
-    @Test
-    @DisplayName("REJECTED/REVOKED 徽标与撤销钮语义：驳回后无撤销钮（仅 APPROVED 可撤）")
-    void rejectedPageRendersBadgeWithoutRevoke() throws Exception {
-        Installation installation =
-                this.installationService.request("client-1", this.org.id(), Set.of("openid"), "user-bob");
-        this.installationService.reject(installation.id(), "user-alice");
-
-        pages().perform(get(installationsPath()).principal(() -> ALICE))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("已驳回")))
-                .andExpect(content().string(not(containsString("data-revoke-url=\""))));
+    @DisplayName("页面路由：/selfservice/orgs/{orgId}/installations 无条件 302 到 SPA 皮（orgId 入目标路径）")
+    void pageRouteRedirectsToFront() throws Exception {
+        api().perform(get(installationsPath()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/front/selfservice/orgs/" + this.org.id() + "/installations"));
     }
 
     @Test
@@ -192,10 +122,8 @@ class OrgInstallationsControllerTest {
     void nonOwnerGetsA0508() throws Exception {
         Installation installation =
                 this.installationService.request("client-1", this.org.id(), Set.of("openid"), "user-bob");
-        api().perform(get(installationsPath()).principal(() -> BOB))
-                .andExpect(jsonPath("$.code").value("A0508"));
-        api().perform(get(installationsPath()).principal(() -> "carol"))
-                .andExpect(jsonPath("$.code").value("A0508"));
+        // 页面路由 v1.5 B5b 起无条件 302（控制器入口 OWNER 门退场）；门语义在 JSON 动作/状态面
+        api().perform(get(installationsPath()).principal(() -> BOB)).andExpect(status().is3xxRedirection());
         api().perform(post(approvePath(installation.id()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"scopes\":[\"openid\"]}")
@@ -299,7 +227,7 @@ class OrgInstallationsControllerTest {
     }
 
     @Test
-    @DisplayName("未认证 A0503；未知 org 的页面入口同走 A0508（OWNER 门先于 org 存在性）")
+    @DisplayName("未认证 A0503；未知 org 的页面路由同样 302（orgId 只是路径段）")
     void gatesUnauthenticatedAndUnknownOrg() throws Exception {
         api().perform(post(installationsPath())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -307,7 +235,8 @@ class OrgInstallationsControllerTest {
                 .andExpect(jsonPath("$.code").value("A0503"));
         api().perform(get("/selfservice/orgs/00000000-0000-7000-8000-0000000000ff/installations")
                         .principal(() -> ALICE))
-                .andExpect(jsonPath("$.code").value("A0508"));
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/front/selfservice/orgs/00000000-0000-7000-8000-0000000000ff/installations"));
     }
 
     private String installationsPath() {
@@ -326,22 +255,11 @@ class OrgInstallationsControllerTest {
         return installationsPath() + "/" + installationId + "/revoke";
     }
 
-    /** DOM 面（手装 Thymeleaf 双解析器 + 双 basename + advice 越权 JSON 断言）。 */
-    private MockMvc pages() {
-        return MockMvcBuilders.standaloneSetup(newController())
-                .setViewResolvers(viewResolver())
-                .setLocaleResolver(new FixedLocaleResolver(Locale.SIMPLIFIED_CHINESE))
-                .addFilters((request, response, chain) -> {
-                    response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-                    chain.doFilter(request, response);
-                })
-                .build();
-    }
-
     /** JSON 面（advice 手挂：JauthException → SPI 失败体，生产由 starter 装配）。 */
     private MockMvc api() {
         return MockMvcBuilders.standaloneSetup(newController())
                 .setControllerAdvice(jauthAdvice())
+                .setViewResolvers(new org.springframework.web.servlet.view.InternalResourceViewResolver())
                 .build();
     }
 
@@ -354,43 +272,11 @@ class OrgInstallationsControllerTest {
                 this.users,
                 this.clients,
                 new InMemoryScopeCatalog(),
-                messageSource(),
-                EducationalFlag.ON,
                 new DefaultResponseRenderer());
     }
 
     private static JauthResponseAdvice jauthAdvice() {
         return new JauthResponseAdvice(new DefaultResponseRenderer());
-    }
-
-    private ThymeleafViewResolver viewResolver() {
-        SpringTemplateEngine engine = new SpringTemplateEngine();
-        engine.setTemplateResolver(templateResolver(SELF_SERVICE_TEMPLATES));
-        engine.addTemplateResolver(templateResolver(CORE_TEMPLATES));
-        engine.setMessageSource(messageSource());
-        ThymeleafViewResolver viewResolver = new ThymeleafViewResolver();
-        viewResolver.setTemplateEngine(engine);
-        viewResolver.setContentType("text/html;charset=UTF-8");
-        viewResolver.setForceContentType(true);
-        return viewResolver;
-    }
-
-    private ClassLoaderTemplateResolver templateResolver(String prefix) {
-        ClassLoaderTemplateResolver resolver = new ClassLoaderTemplateResolver();
-        resolver.setPrefix(prefix);
-        resolver.setSuffix(".html");
-        resolver.setCacheable(false);
-        resolver.setCheckExistence(true);
-        return resolver;
-    }
-
-    private MessageSource messageSource() {
-        ResourceBundleMessageSource source = new ResourceBundleMessageSource();
-        source.setBasenames(
-                "io/github/oatelauser/jauth/selfservice/i18n/messages",
-                "io/github/oatelauser/jauth/core/i18n/messages");
-        source.setDefaultEncoding(StandardCharsets.UTF_8.name());
-        return source;
     }
 
     private static JauthUser user(String id, String username) {

@@ -16,7 +16,6 @@ import io.github.oatelauser.jauth.core.user.SudoGate;
 import io.github.oatelauser.jauth.core.user.UserRepository;
 import io.github.oatelauser.jauth.core.web.EducationalFlag;
 import io.github.oatelauser.jauth.core.web.PasskeyFlag;
-import io.github.oatelauser.jauth.core.web.TrustSkinFlag;
 import io.github.oatelauser.jauth.selfservice.pat.JdbcPatService;
 import io.github.oatelauser.jauth.selfservice.pat.PatService;
 import io.github.oatelauser.jauth.selfservice.web.AppsStateController;
@@ -43,7 +42,6 @@ import io.github.oatelauser.jauth.selfservice.web.SensitiveScopeSudoInterceptor;
 import io.github.oatelauser.jauth.selfservice.web.SudoController;
 import io.github.oatelauser.jauth.selfservice.web.SudoInterceptor;
 import io.github.oatelauser.jauth.selfservice.web.SudoStateController;
-import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import javax.sql.DataSource;
 import org.springframework.beans.factory.ObjectProvider;
@@ -51,12 +49,9 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.ApplicationContext;
 import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.support.ResourceBundleMessageSource;
-import org.springframework.core.Ordered;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
@@ -64,13 +59,8 @@ import org.springframework.security.oauth2.server.authorization.OAuth2Authorizat
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.web.webauthn.management.UserCredentialRepository;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.web.servlet.ViewResolver;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
-import org.thymeleaf.spring6.SpringTemplateEngine;
-import org.thymeleaf.spring6.templateresolver.SpringResourceTemplateResolver;
-import org.thymeleaf.spring6.view.ThymeleafViewResolver;
-import org.thymeleaf.templatemode.TemplateMode;
 
 /**
  * selfservice 自带装配（SPEC §2：模块独立于 starter 提供页面，app 依赖、宿主可选依赖）。
@@ -84,30 +74,15 @@ import org.thymeleaf.templatemode.TemplateMode;
  * 控制器仍在（渲染"当前存储模式不支持"提示，不 500）。<b>我的应用（B10）例外</b>：memory 模式可用（框架内存
  * 仓库 + owner 登记表，MemorySelfServiceConfiguration），只有 PAT/看板维持 jdbc-only 门控。
  *
- * <p><b>视图与 i18n 命名空间</b>：selfservice 自持一套模板解析器（前缀指向本模块命名空间，checkExistence +
- * 高序位，未命中穿透宿主默认解析器）与消息链（本模块 basename 优先，parent 挂上下文 messageSource——core 的
- * jauth.* 键与宿主覆盖均按 starter 复合源的同一解析顺序生效）。模板引用 core 的 fragments/layout（教学块/视觉
- * 复用，B3），故解析器链尾再挂一个 core 命名空间的只读解析器。
+ * <p><b>视图退场</b>（v1.5 B5b）：SSR 模板与视图解析器链已拆除，页面路由一律 302 到 {@code /front/<路由>}
+ * 的 SPA 皮；本模块 i18n bundle 的页面 chrome 键随之成为死键（文件保留，修剪挂 v1.6 滑账）。
  *
  * @author oatelauser
  */
 @AutoConfiguration(afterName = "io.github.oatelauser.jauth.starter.JauthHubAutoConfiguration")
 public class JauthSelfServiceAutoConfiguration {
 
-    /** selfservice 资源命名空间根（模板/i18n 与 core 同款防撞宿主方案）。 */
-    static final String SELF_SERVICE_NAMESPACE = "io/github/oatelauser/jauth/selfservice";
-
-    static final String SELF_SERVICE_TEMPLATES_PREFIX = "classpath:" + SELF_SERVICE_NAMESPACE + "/web/templates/";
-
-    static final String SELF_SERVICE_I18N_BASENAME = SELF_SERVICE_NAMESPACE + "/i18n/messages";
-
-    /**
-     * core 命名空间串接（模板 fragments/layout 与 core 文案）：与 starter 的 CORE_* 常量取值相同，但不可跨模块引
-     * 用（本批模块边界只开放 core 的 ClientSeeder），此处按"core 命名空间是 SPEC 锁定的公开资源路径"复制。
-     */
-    static final String CORE_TEMPLATES_PREFIX = "classpath:io/github/oatelauser/jauth/core/web/templates/";
-
-    /** 页面控制器与视图基建（两存储模式都注册：memory 模式渲染不支持提示）。 */
+    /** 页面控制器与 JSON 状态面（两存储模式都注册：memory 模式状态体给 supported=false 提示态）。 */
     @Configuration(proxyBeanMethods = false)
     @ConditionalOnBean(RegisteredClientRepository.class)
     static class PageConfiguration {
@@ -118,8 +93,6 @@ public class JauthSelfServiceAutoConfiguration {
                 ObjectProvider<PatService> patService,
                 ScopeCatalog scopeCatalog,
                 UserRepository userRepository,
-                MessageSource messageSource,
-                EducationalFlag educational,
                 ResponseRenderer responseRenderer,
                 ObjectProvider<Clock> clock,
                 RateLimiter rateLimiter) {
@@ -127,8 +100,6 @@ public class JauthSelfServiceAutoConfiguration {
                     patService.getIfAvailable(),
                     scopeCatalog,
                     userRepository,
-                    messageSource,
-                    educational,
                     responseRenderer,
                     clock.getIfAvailable(Clock::systemUTC),
                     rateLimiter);
@@ -141,32 +112,23 @@ public class JauthSelfServiceAutoConfiguration {
                 ObjectProvider<OAuth2AuthorizationService> authorizationService,
                 ObjectProvider<OAuth2AuthorizationConsentService> consentService,
                 RegisteredClientRepository clientRepository,
-                EducationalFlag educational,
-                ObjectProvider<PasskeyFlag> passkey,
                 ResponseRenderer responseRenderer) {
-            // PasskeyFlag 由 starter 供给；宿主自带 bean 集而缺它时降级 OFF（看板不渲染 passkey 入口），
-            // 与本配置"个别 bean 缺席渲染提示态"的边角容忍一致
             return new AuthorizedAppsController(
                     appService.getIfAvailable(),
                     authorizationService,
                     consentService,
                     clientRepository,
-                    educational,
-                    passkey.getIfAvailable(() -> PasskeyFlag.OFF),
                     responseRenderer);
         }
 
         /**
-         * 通行密钥管理页（v1.2 C2）：凭据仓储 bean 仅 passkey 开启时由 starter 装配，缺席渲染"未启用"提示
-         * （与 PAT 的 memory 门控同构，页面不 500）。
+         * 通行密钥页路由（v1.2 C2；v1.5 B5b 起纯 302）：凭据仓储的门控语义移到 JSON 状态面
+         * （passkeyEnabled=false 状态体，页面不 500）。
          */
         @Bean
         @ConditionalOnMissingBean
-        PasskeyController jauthPasskeyController(
-                ObjectProvider<UserCredentialRepository> credentials,
-                UserRepository userRepository,
-                EducationalFlag educational) {
-            return new PasskeyController(credentials, userRepository, educational);
+        PasskeyController jauthPasskeyController() {
+            return new PasskeyController();
         }
 
         /**
@@ -183,23 +145,11 @@ public class JauthSelfServiceAutoConfiguration {
             return new PasskeyStateController(credentials, userRepository, educational, responseRenderer);
         }
 
-        /**
-         * sudo 验证页（v1.2 C3）：SudoGate 经 ObjectProvider 持有——缺席（sudo 关）即页面渲染"未启用"
-         * 提示态（照 PasskeyController 门控形态）；PasskeyFlag 宿主缺它时降级 OFF 同看板先例；
-         * TrustSkinFlag（v1.4 B4）同款降级 SSR（皮肤旗标由 starter 供给，缺它即 SSR 皮永远默认）。
-         */
+        /** sudo 验证页路由（v1.2 C3；v1.5 B5b 起纯 302 到 /front/sudo，无渲染依赖）。 */
         @Bean
         @ConditionalOnMissingBean
-        SudoController jauthSudoController(
-                ObjectProvider<SudoGate> sudoGate,
-                ObjectProvider<PasskeyFlag> passkey,
-                EducationalFlag educational,
-                ObjectProvider<TrustSkinFlag> trustSkin) {
-            return new SudoController(
-                    sudoGate,
-                    passkey.getIfAvailable(() -> PasskeyFlag.OFF),
-                    educational,
-                    trustSkin.getIfAvailable(() -> TrustSkinFlag.SSR));
+        SudoController jauthSudoController() {
+            return new SudoController();
         }
 
         /**
@@ -366,41 +316,34 @@ public class JauthSelfServiceAutoConfiguration {
             };
         }
 
-        /** 我的应用页（B10）：memory 模式也可用（与 PAT/看板不同），服务 bean 由两段存储配置按模式供给。 */
+        /** 我的应用面（B10）：memory 模式也可用（与 PAT/看板不同），服务 bean 由两段存储配置按模式供给。 */
         @Bean
         @ConditionalOnMissingBean
         MyAppsController jauthMyAppsController(
                 ObjectProvider<OwnedAppService> ownedAppService,
                 UserRepository userRepository,
-                EducationalFlag educational,
                 ResponseRenderer responseRenderer,
                 AuditEventPublisher auditPublisher,
                 RateLimiter rateLimiter) {
             return new MyAppsController(
-                    ownedAppService.getIfAvailable(),
-                    userRepository,
-                    educational,
-                    responseRenderer,
-                    auditPublisher,
-                    rateLimiter);
+                    ownedAppService.getIfAvailable(), userRepository, responseRenderer, auditPublisher, rateLimiter);
         }
 
         /**
-         * 我的组织/安装审批/org 应用页（B11）：领域 bean（OrgService/InstallationService/两仓储）由 starter
-         * 无条件供给，经 ObjectProvider 可缺省——宿主未引 starter 时整组已让位，个别 bean 缺席的装配边角渲染
-         * "不支持"提示态（页面不 500，JSON 回 A0504）。
+         * 我的组织/安装审批/org 应用面（B11）：领域 bean（OrgService/InstallationService/两仓储）由 starter
+         * 无条件供给，经 ObjectProvider 可缺省——宿主未引 starter 时整组已让位，个别 bean 缺席的装配边角
+         * JSON 回 A0504（SPA 按状态面 supported=false 渲染提示态）。
          */
         @Bean
         @ConditionalOnMissingBean
         MyOrgsController jauthMyOrgsController(
                 ObjectProvider<OrgService> orgService,
                 UserRepository userRepository,
-                EducationalFlag educational,
                 ResponseRenderer responseRenderer) {
-            return new MyOrgsController(orgService.getIfAvailable(), userRepository, educational, responseRenderer);
+            return new MyOrgsController(orgService.getIfAvailable(), userRepository, responseRenderer);
         }
 
-        /** 安装审批页（B11）：OWNER 面，scope 目录项经 MessageSource 出 i18n 描述（照 PatController）。 */
+        /** 安装审批面（B11）：行装配共径供 JSON 状态面复用。 */
         @Bean
         @ConditionalOnMissingBean
         OrgInstallationsController jauthOrgInstallationsController(
@@ -411,8 +354,6 @@ public class JauthSelfServiceAutoConfiguration {
                 UserRepository userRepository,
                 RegisteredClientRepository clientRepository,
                 ScopeCatalog scopeCatalog,
-                MessageSource messageSource,
-                EducationalFlag educational,
                 ResponseRenderer responseRenderer) {
             return new OrgInstallationsController(
                     orgService.getIfAvailable(),
@@ -422,103 +363,36 @@ public class JauthSelfServiceAutoConfiguration {
                     userRepository,
                     clientRepository,
                     scopeCatalog,
-                    messageSource,
-                    educational,
                     responseRenderer);
         }
 
-        /** org 应用页（B11）：注册/列表面，OWNER 门在控制器入口。 */
-        /** org 成员管理页（v1.3 D3，OWNER 面）：领域 bean 经 ObjectProvider 可缺省，缺席渲染提示态。 */
+        /** org 成员管理面（v1.3 D3，OWNER 面）：行装配共径供 JSON 状态面复用。 */
         @Bean
         @ConditionalOnMissingBean
         OrgMembersController jauthOrgMembersController(
                 ObjectProvider<OrgService> orgService,
                 UserRepository userRepository,
-                EducationalFlag educational,
                 ResponseRenderer responseRenderer) {
-            return new OrgMembersController(orgService.getIfAvailable(), userRepository, educational, responseRenderer);
+            return new OrgMembersController(orgService.getIfAvailable(), userRepository, responseRenderer);
         }
 
+        /** org 应用面（B11）：注册/编辑 JSON 面，OWNER 门在控制器入口。 */
         @Bean
         @ConditionalOnMissingBean
         OrgAppsController jauthOrgAppsController(
                 ObjectProvider<OwnedAppService> ownedAppService,
                 ObjectProvider<OrgService> orgService,
-                ObjectProvider<OrgRepository> orgRepository,
                 UserRepository userRepository,
-                EducationalFlag educational,
                 ResponseRenderer responseRenderer,
                 AuditEventPublisher auditPublisher,
                 RateLimiter rateLimiter) {
             return new OrgAppsController(
                     ownedAppService.getIfAvailable(),
                     orgService.getIfAvailable(),
-                    orgRepository.getIfAvailable(),
                     userRepository,
-                    educational,
                     responseRenderer,
                     auditPublisher,
                     rateLimiter);
-        }
-
-        /**
-         * selfservice 视图解析器：自带引擎 + 双解析器链（本模块命名空间优先，core 命名空间兜底供 fragments/layout
-         * 解析），消息源自持 basename 并挂 parent。viewNames 白名单钉死只认领本模块九个视图名
-         * （thymeleaf-spring6 的 ThymeleafViewResolver 无 checkExistence），其余视图穿透宿主/Boot 默认解析器；
-         * core 三页仍走共享引擎，两套视图名不相交。
-         */
-        @Bean
-        @ConditionalOnMissingBean(name = "jauthSelfServiceViewResolver")
-        ViewResolver jauthSelfServiceViewResolver(
-                ObjectProvider<MessageSource> messageSource, ApplicationContext applicationContext) {
-            SpringTemplateEngine engine = new SpringTemplateEngine();
-            engine.setTemplateResolver(
-                    templateResolver(SELF_SERVICE_TEMPLATES_PREFIX, Ordered.HIGHEST_PRECEDENCE, applicationContext));
-            engine.addTemplateResolver(
-                    templateResolver(CORE_TEMPLATES_PREFIX, Ordered.HIGHEST_PRECEDENCE + 1, applicationContext));
-            ResourceBundleMessageSource localMessages = new ResourceBundleMessageSource();
-            localMessages.setBasename(SELF_SERVICE_I18N_BASENAME);
-            localMessages.setDefaultEncoding(StandardCharsets.UTF_8.name());
-            // parent = 上下文 messageSource（starter 复合源：core basename + 宿主 spring.messages.*）——
-            // core 的 jauth.* 键与宿主覆盖在自助页与协议页保持同一解析语义
-            localMessages.setParentMessageSource(messageSource.getIfAvailable());
-            engine.setMessageSource(localMessages);
-
-            ThymeleafViewResolver viewResolver = new ThymeleafViewResolver();
-            viewResolver.setTemplateEngine(engine);
-            viewResolver.setOrder(Ordered.HIGHEST_PRECEDENCE + 100);
-            viewResolver.setViewNames(new String[] {
-                PatController.VIEW_PAT,
-                AuthorizedAppsController.VIEW_APPS,
-                PasskeyController.VIEW_PASSKEY,
-                SudoController.VIEW_SUDO,
-                MyAppsController.VIEW_MY_APPS,
-                MyAppsController.VIEW_MY_APP_NEW,
-                MyOrgsController.VIEW_MY_ORGS,
-                OrgInstallationsController.VIEW_ORG_INSTALLATIONS,
-                OrgAppsController.VIEW_ORG_APPS,
-                OrgMembersController.VIEW_ORG_MEMBERS
-            });
-            viewResolver.setContentType("text/html;charset=UTF-8");
-            viewResolver.setForceContentType(true);
-            return viewResolver;
-        }
-
-        /**
-         * 解析器在 @Bean 方法体内构造（非容器 bean，无 Aware 注入），而 Thymeleaf 3.1 起引擎不再向解析器
-         * 传导 ApplicationContext——必须显式传入，否则真渲染期 "Application Context cannot be null"
-         * （v1.2.1 修复：v1.0 起潜伏，standalone 页面测试不真渲染模板故从未暴露）。
-         */
-        private static SpringResourceTemplateResolver templateResolver(
-                String prefix, int order, ApplicationContext applicationContext) {
-            SpringResourceTemplateResolver resolver = new SpringResourceTemplateResolver();
-            resolver.setApplicationContext(applicationContext);
-            resolver.setPrefix(prefix);
-            resolver.setSuffix(".html");
-            resolver.setTemplateMode(TemplateMode.HTML);
-            resolver.setCheckExistence(true);
-            resolver.setOrder(order);
-            return resolver;
         }
     }
 

@@ -12,26 +12,27 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.resource.PathResourceResolver;
 
 /**
- * front 皮肤静态装配（v1.4 B4）：{@code jauth-hub-front} 构建产物经 Maven profile {@code front-skin}
- * 落 {@code classpath:/static/front/}，本配置把 {@code /front/**} 出网并为 history 路由深链提供
- * index.html 回退——{@code /front/login} 无物理文件，不回退即 404，SPA 深链与刷新直接断；带扩展名的
- * miss（如 {@code /front/logo.png}）照常 404，防静态 404 被吞成 index 页。访问控制在 default 链
- * （{@link AppSecurityConfiguration} 的 {@code /front/**} permitAll——登录页本尊在皮内，必须匿名可达）。
+ * front 静态装配（v1.4 B4；v1.5 B5a 起产物来源 = jauth-hub-front-dist 依赖，B5b 起 front 唯一皮）：
+ * {@code jauth-hub-front} 构建产物落 {@code classpath:/static/front/}，本配置把 {@code /front/**}
+ * 出网并为 history 路由深链提供 index.html 回退——{@code /front/login} 无物理文件，不回退即 404，
+ * SPA 深链与刷新直接断；带扩展名的 miss（如 {@code /front/logo.png}）照常 404，防静态 404 被吞成
+ * index 页。访问控制在 default 链（{@link AppSecurityConfiguration} 的 {@code /front/**} permitAll
+ * ——登录页本尊在皮内，必须匿名可达）。
  *
  * <p>资源位置两路并列：打包位（{@code classpath:/static/front/}）+ {@code spring.web.resources.static-locations}
  * 原值——后者使本地免打包联调一行配置可达：{@code static-locations=file:../jauth-hub-front/dist} 直指
- * dist 根（见 README v1.4 节），与打包形态的 front 子目录语义互不干扰。
+ * dist 根（见 README），与打包形态的 front 子目录语义互不干扰。
  *
  * @author oatelauser
  */
 @Configuration(proxyBeanMethods = false)
 public class AppWebConfiguration {
 
-    /** 打包形态的资源位：front-skin profile 把 dist 拷入的 classpath 目录（与 app pom 对齐）。 */
+    /** 打包形态的资源位：jauth-hub-front-dist jar 携带的 classpath 目录（与 app pom 依赖对齐）。 */
     static final String FRONT_PACKAGED_LOCATION = "classpath:/static/front/";
 
     @Bean
-    WebMvcConfigurer frontSkinResourceConfigurer(WebProperties webProperties) {
+    WebMvcConfigurer frontResourceConfigurer(WebProperties webProperties) {
         return new WebMvcConfigurer() {
             @Override
             public void addResourceHandlers(ResourceHandlerRegistry registry) {

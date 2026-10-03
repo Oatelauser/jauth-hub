@@ -44,9 +44,6 @@ public class JauthHubProperties {
     /** sudo 强验证层（SPEC §5 v1.2 C3：默认关；依赖 passkey，passkey 关而 sudo 开 → 启动 fail-fast）。 */
     private Sudo sudo = new Sudo();
 
-    /** 信任面皮肤（SPEC §1 v1.4：SSR 永远默认，front 只是备选皮部署形态）。 */
-    private TrustSkin trustSkin = TrustSkin.SSR;
-
     /** 播种清单（透传 core 的种子结构，两模式通用，幂等）。 */
     private List<ClientSeedProperties.ClientSeed> clients = new ArrayList<>();
 
@@ -111,14 +108,6 @@ public class JauthHubProperties {
         Sudo source = sudo == null ? new Sudo() : sudo;
         this.sudo.setEnabled(source.isEnabled());
         this.sudo.setTtlMinutes(source.getTtlMinutes());
-    }
-
-    public TrustSkin getTrustSkin() {
-        return this.trustSkin;
-    }
-
-    public void setTrustSkin(TrustSkin trustSkin) {
-        this.trustSkin = trustSkin == null ? TrustSkin.SSR : trustSkin;
     }
 
     public List<ClientSeedProperties.ClientSeed> getClients() {
@@ -289,19 +278,5 @@ public class JauthHubProperties {
         public void setTtlMinutes(int ttlMinutes) {
             this.ttlMinutes = ttlMinutes;
         }
-    }
-
-    /**
-     * 信任面皮肤词表（v1.4 B4，属性 {@code jauth-hub.trust-skin}）：SSR 永远默认（issues/10 宪法），
-     * front = 四页 GET 302 到 /front/&lt;路由&gt; 的 SPA 皮（jauth-hub-front 产物）。枚举绑定天然
-     * fail-fast——非法取值启动即绑定失败，不静默回退。
-     */
-    public enum TrustSkin {
-
-        /** SSR 皮（Thymeleaf，默认）。 */
-        SSR,
-
-        /** front 分离皮（/front/** 静态 + 302 路由）。 */
-        FRONT
     }
 }

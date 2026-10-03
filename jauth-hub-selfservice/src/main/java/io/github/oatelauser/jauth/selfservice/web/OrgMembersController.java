@@ -8,8 +8,8 @@ import io.github.oatelauser.jauth.core.response.JauthException;
 import io.github.oatelauser.jauth.core.response.ResponseRenderer;
 import io.github.oatelauser.jauth.core.user.JauthUser;
 import io.github.oatelauser.jauth.core.user.UserRepository;
-import io.github.oatelauser.jauth.core.web.EducationalFlag;
 import io.github.oatelauser.jauth.core.web.RequiresSudo;
+import jakarta.servlet.http.HttpServletRequest;
 import java.security.Principal;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -17,7 +17,6 @@ import java.util.Map;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,23 +25,20 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * org 成员管理页（v1.3 D3，仅 OWNER）：成员列表（用户名/角色/加入时间）+ 添加（输用户名，池内须存在，
- * 邀请/申请流 v2+ 记档）+ 移除/角色翻转。OWNER 门在 OrgService 服务层单点（A0508）；自操作护栏 A0518。
- * 销毁性动作（移除/改角色）挂 {@code @RequiresSudo}——与 D2 应用管理面的分界一致（非销毁不加）。
+ * org 成员管理面（v1.3 D3，仅 OWNER）：成员添加（输用户名，池内须存在，邀请/申请流 v2+ 记档）+ 移除/
+ * 角色翻转 JSON 端点与行装配共径；页面路由 v1.5 B5b 起 302 到
+ * {@code /front/selfservice/orgs/{orgId}/members} 的 SPA 皮（成员列表 SPA 消费状态面），查询串原样转发。
+ * OWNER 门在 OrgService 服务层单点（A0508）；自操作护栏 A0518。销毁性动作（移除/改角色）挂
+ * {@code @RequiresSudo}——与 D2 应用管理面的分界一致（非销毁不加）。
  *
  * @author oatelauser
  */
 @Controller
 public class OrgMembersController {
 
-    /** 成员管理页视图名（selfservice 命名空间模板）。 */
-    public static final String VIEW_ORG_MEMBERS = "org-members";
-
     private final @Nullable OrgService orgService;
 
     private final UserRepository userRepository;
-
-    private final EducationalFlag educational;
 
     private final ResponseRenderer responseRenderer;
 
@@ -51,36 +47,22 @@ public class OrgMembersController {
      */
     @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(value = "EI_EXPOSE_REP2")
     public OrgMembersController(
-            @Nullable OrgService orgService,
-            UserRepository userRepository,
-            EducationalFlag educational,
-            ResponseRenderer responseRenderer) {
+            @Nullable OrgService orgService, UserRepository userRepository, ResponseRenderer responseRenderer) {
         this.orgService = orgService;
         this.userRepository = userRepository;
-        this.educational = educational;
         this.responseRenderer = responseRenderer;
     }
 
     /**
-     * 成员管理页（仅 OWNER）。
+     * 成员管理页入口（仅 OWNER，SPA 消费状态面）：302 到 SPA 皮。
      *
      * @param orgId 路径 org id
-     * @param principal 当前登录主体
-     * @param model 视图模型
-     * @return 视图名
+     * @param request 当前请求（查询串原样转发给 SPA）
+     * @return 重定向指令
      */
     @GetMapping("/selfservice/orgs/{orgId}/members")
-    public String page(@PathVariable("orgId") String orgId, @Nullable Principal principal, Model model) {
-        model.addAttribute("educational", this.educational.enabled());
-        boolean supported = this.orgService != null;
-        model.addAttribute("membersSupported", supported);
-        if (!supported) {
-            return VIEW_ORG_MEMBERS;
-        }
-        JauthUser user = requireUser(principal);
-        model.addAttribute("orgId", orgId);
-        model.addAttribute("members", memberRows(orgId, user, this.orgService, this.userRepository));
-        return VIEW_ORG_MEMBERS;
+    public String page(@PathVariable("orgId") String orgId, HttpServletRequest request) {
+        return "redirect:" + SudoController.frontTarget("/front/selfservice/orgs/" + orgId + "/members", request);
     }
 
     /**

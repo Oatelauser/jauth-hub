@@ -8,10 +8,10 @@ import io.github.oatelauser.jauth.core.scope.ScopeCatalog;
 import io.github.oatelauser.jauth.core.scope.ScopeDefinition;
 import io.github.oatelauser.jauth.core.user.JauthUser;
 import io.github.oatelauser.jauth.core.user.UserRepository;
-import io.github.oatelauser.jauth.core.web.EducationalFlag;
 import io.github.oatelauser.jauth.selfservice.pat.PatRecord;
 import io.github.oatelauser.jauth.selfservice.pat.PatService;
 import io.github.oatelauser.jauth.selfservice.pat.PatService.PatIssuance;
+import jakarta.servlet.http.HttpServletRequest;
 import java.security.Principal;
 import java.time.Clock;
 import java.time.Duration;
@@ -25,10 +25,8 @@ import java.util.Set;
 import java.util.TreeSet;
 import org.jspecify.annotations.Nullable;
 import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,24 +34,20 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * PAT 管理页 + JSON 面（SPEC §2 selfservice 职责、§6 TTL 阶梯）。
- *
- * <p><b>页面</b>：SSR 渲染列表与创建表单（scope 勾选来自 {@link ScopeCatalog}，有效期 30/90/365 天默认 90）；
- * 创建/吊销由页内少量原生 JS 走 JSON 端点——明文令牌只在创建响应出现一次，直接渲染进页面的"仅此一次"横幅。
+ * PAT 管理面（SPEC §2 selfservice 职责、§6 TTL 阶梯）：JSON 端点 + 包内共径静态装配；页面路由 v1.5 B5b
+ * 起 302 到 {@code /front/selfservice/pat} 的 SPA 皮（SSR 皮退场），查询串原样转发。明文令牌只在创建响应
+ * 出现一次（SPA 的"仅此一次"横幅消费）。
  *
  * <p><b>安全边界</b>：路径不在 jauth 协议链认领清单内（SPEC §2 宿主链共存规则），认证与授权由部署方的 default
  * 链负责；本控制器只守"主体可用"（principal 非空且在 jauth 用户池）。
  *
- * <p><b>memory 门控</b>（04 票）：{@link PatService} 仅 jdbc 装配，缺失时页面渲染"当前存储模式不支持"提示（不
- * 500），JSON 端点回 A0504。
+ * <p><b>memory 门控</b>（04 票）：{@link PatService} 仅 jdbc 装配，缺失时 JSON 端点回 A0504
+ * （SPA 按状态面 patSupported=false 渲染"当前存储模式不支持"提示态）。
  *
  * @author oatelauser
  */
 @Controller
 public class PatController {
-
-    /** 视图名（selfservice 命名空间模板，本模块视图解析器按此白名单认领；自动配置读取）。 */
-    public static final String VIEW_PAT = "pat";
 
     /** 有效期阶梯（SPEC §6：90d 默认，可选 30/90/365）。 */
     static final Set<Integer> VALIDITY_DAYS = Set.of(30, 90, 365);
@@ -69,10 +63,6 @@ public class PatController {
 
     private final UserRepository userRepository;
 
-    private final MessageSource messageSource;
-
-    private final EducationalFlag educational;
-
     private final ResponseRenderer responseRenderer;
 
     private final Clock clock;
@@ -84,43 +74,26 @@ public class PatController {
             @Nullable PatService patService,
             ScopeCatalog scopeCatalog,
             UserRepository userRepository,
-            MessageSource messageSource,
-            EducationalFlag educational,
             ResponseRenderer responseRenderer,
             Clock clock,
             RateLimiter rateLimiter) {
         this.patService = patService;
         this.scopeCatalog = scopeCatalog;
         this.userRepository = userRepository;
-        this.messageSource = messageSource;
-        this.educational = educational;
         this.responseRenderer = responseRenderer;
         this.clock = clock;
         this.rateLimiter = rateLimiter;
     }
 
     /**
-     * PAT 管理页。
+     * PAT 管理页入口：302 到 SPA 皮。
      *
-     * @param principal 当前登录主体
-     * @param model 视图模型
-     * @return 视图名
+     * @param request 当前请求（查询串原样转发给 SPA）
+     * @return 重定向指令
      */
     @GetMapping("/selfservice/pat")
-    public String page(@Nullable Principal principal, Model model) {
-        model.addAttribute("educational", this.educational.enabled());
-        model.addAttribute("patSupported", this.patService != null);
-        if (this.patService == null) {
-            return VIEW_PAT;
-        }
-        JauthUser user = requireUser(principal);
-        model.addAttribute(
-                "scopes", scopeItems(this.scopeCatalog, this.messageSource, LocaleContextHolder.getLocale()));
-        model.addAttribute("validityDays", VALIDITY_DAYS.stream().sorted().toList());
-        model.addAttribute("defaultValidityDays", DEFAULT_VALIDITY_DAYS);
-        model.addAttribute("pats", this.patService.listActive(user.id()));
-        model.addAttribute("now", this.clock.instant());
-        return VIEW_PAT;
+    public String page(HttpServletRequest request) {
+        return "redirect:" + SudoController.frontTarget("/front/selfservice/pat", request);
     }
 
     /**

@@ -1,11 +1,9 @@
 package io.github.oatelauser.jauth.selfservice.e2e;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.containsString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
@@ -123,10 +121,13 @@ class OrgAppInstallationFlowIntegrationTest {
         String consentRedirect = authorizeFirst.getResponse().getHeader("Location");
         assertThat(consentRedirect).contains("/oauth2/consent");
         String consentState = queryParam(consentRedirect, "state");
+        // v1.5 B5b：consent 页 302 到 /front/consent（查询串逐字转发）；org 上下文由 SPA 消费
+        // /api/consent 状态面（org 三态在 ConsentStateControllerTest 钉死），本链只证 ceiling 剪裁
         this.mockMvc
                 .perform(get(consentRedirect).session(session))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("b11-acme")));
+                .andExpect(status().is3xxRedirection())
+                .andExpect(result ->
+                        assertThat(result.getResponse().getHeader("Location")).startsWith("/front/consent?"));
 
         // -- 2. consent 提交超集（openid profile）→ code → token：scope 被剪到 ceiling（= openid）
         String code =

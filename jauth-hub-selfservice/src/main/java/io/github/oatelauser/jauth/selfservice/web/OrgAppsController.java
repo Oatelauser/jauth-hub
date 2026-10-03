@@ -4,8 +4,6 @@ import io.github.oatelauser.jauth.core.audit.AuditEvent;
 import io.github.oatelauser.jauth.core.audit.AuditEventPublisher;
 import io.github.oatelauser.jauth.core.audit.AuditEventType;
 import io.github.oatelauser.jauth.core.client.ClientOwner;
-import io.github.oatelauser.jauth.core.org.Org;
-import io.github.oatelauser.jauth.core.org.OrgRepository;
 import io.github.oatelauser.jauth.core.org.OrgService;
 import io.github.oatelauser.jauth.core.ratelimit.RateLimiter;
 import io.github.oatelauser.jauth.core.response.JauthErrorCode;
@@ -13,8 +11,8 @@ import io.github.oatelauser.jauth.core.response.JauthException;
 import io.github.oatelauser.jauth.core.response.ResponseRenderer;
 import io.github.oatelauser.jauth.core.user.JauthUser;
 import io.github.oatelauser.jauth.core.user.UserRepository;
-import io.github.oatelauser.jauth.core.web.EducationalFlag;
 import io.github.oatelauser.jauth.core.web.RequiresSudo;
+import jakarta.servlet.http.HttpServletRequest;
 import java.security.Principal;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,7 +21,6 @@ import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,12 +29,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * org 应用页（B11，2026-09-30 拍板移入本批）：org 应用的注册/列表，注册操作者须为该 org OWNER。
- *
- * <p><b>页面</b>（GET /selfservice/orgs/{orgId}/apps，仅 OWNER）：org 应用列表（OwnedAppService.listOrg）+
- * 注册表单（照 my-app-new 结构：名称/redirect URIs/类型）——机密应用的 client_secret 明文只在注册响应出现
- * 一次，直接渲染进"仅此一次"横幅。构造惯例与个人应用同源（OwnedAppService 单核），owner=ofOrg；org 应用
- * 的 scope 封顶走安装审批 ceiling，注册面不做 ceiling。
+ * org 应用面（B11，2026-09-30 拍板移入本批）：org 应用的注册/编辑 JSON 端点，注册操作者须为该 org
+ * OWNER；页面路由 v1.5 B5b 起 302 到 {@code /front/selfservice/orgs/{orgId}/apps} 的 SPA 皮，查询串
+ * 原样转发。机密应用的 client_secret 明文只在注册响应出现一次；org 应用的 scope 封顶走安装审批
+ * ceiling，注册面不做 ceiling。
  *
  * <p><b>门控与安全边界</b>：OWNER 门在控制器入口（OrgService.isOwner → A0508）——OwnedAppService 是
  * selfservice 门面非 core 域服务，注册面无服务层门可依托；认证授权归部署方 default 链，控制器守"主体在池"。
@@ -47,18 +42,11 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @Controller
 public class OrgAppsController {
 
-    /** org 应用页视图名（selfservice 命名空间模板，本模块视图解析器按白名单认领；自动配置读取）。 */
-    public static final String VIEW_ORG_APPS = "org-apps";
-
     private final @Nullable OwnedAppService ownedAppService;
 
     private final @Nullable OrgService orgService;
 
-    private final @Nullable OrgRepository orgRepository;
-
     private final UserRepository userRepository;
-
-    private final EducationalFlag educational;
 
     private final ResponseRenderer responseRenderer;
 
@@ -74,44 +62,28 @@ public class OrgAppsController {
     public OrgAppsController(
             @Nullable OwnedAppService ownedAppService,
             @Nullable OrgService orgService,
-            @Nullable OrgRepository orgRepository,
             UserRepository userRepository,
-            EducationalFlag educational,
             ResponseRenderer responseRenderer,
             AuditEventPublisher auditPublisher,
             RateLimiter rateLimiter) {
         this.ownedAppService = ownedAppService;
         this.orgService = orgService;
-        this.orgRepository = orgRepository;
         this.userRepository = userRepository;
-        this.educational = educational;
         this.responseRenderer = responseRenderer;
         this.auditPublisher = auditPublisher;
         this.rateLimiter = rateLimiter;
     }
 
     /**
-     * org 应用列表 + 注册表单页（仅 OWNER）。
+     * org 应用页入口（仅 OWNER，SPA 消费状态面）：302 到 SPA 皮。
      *
      * @param orgId 路径 org id
-     * @param principal 当前登录主体
-     * @param model 视图模型
-     * @return 视图名
+     * @param request 当前请求（查询串原样转发给 SPA）
+     * @return 重定向指令
      */
     @GetMapping("/selfservice/orgs/{orgId}/apps")
-    public String page(@PathVariable("orgId") String orgId, @Nullable Principal principal, Model model) {
-        model.addAttribute("educational", this.educational.enabled());
-        boolean supported = this.ownedAppService != null && this.orgService != null && this.orgRepository != null;
-        model.addAttribute("orgAppsSupported", supported);
-        if (!supported) {
-            return VIEW_ORG_APPS;
-        }
-        JauthUser user = requireUser(principal);
-        requireOwner(orgId, user);
-        Org org = requireOrg(orgId);
-        model.addAttribute("org", org);
-        model.addAttribute("apps", this.ownedAppService.listOrg(orgId));
-        return VIEW_ORG_APPS;
+    public String page(@PathVariable("orgId") String orgId, HttpServletRequest request) {
+        return "redirect:" + SudoController.frontTarget("/front/selfservice/orgs/" + orgId + "/apps", request);
     }
 
     /**
@@ -266,14 +238,6 @@ public class OrgAppsController {
         if (!this.orgService.isOwner(orgId, user.id())) {
             throw new JauthException(JauthErrorCode.A0508);
         }
-    }
-
-    private Org requireOrg(String orgId) {
-        Org org = this.orgRepository.findById(orgId);
-        if (org == null) {
-            throw new JauthException(JauthErrorCode.B0502);
-        }
-        return org;
     }
 
     private JauthUser requireUser(@Nullable Principal principal) {

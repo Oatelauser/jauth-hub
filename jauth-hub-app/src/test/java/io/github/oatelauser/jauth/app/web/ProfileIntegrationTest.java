@@ -9,12 +9,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.github.oatelauser.jauth.app.JauthHubAppApplication;
 import io.github.oatelauser.jauth.core.ratelimit.RateLimiter;
 import io.github.oatelauser.jauth.core.user.UserRepository;
-import java.util.Locale;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,21 +70,12 @@ class ProfileIntegrationTest {
     private RateLimiter rateLimiter;
 
     @Test
-    @DisplayName("档案页 DOM：账号行回显用户名与显示名、改显示名/改密双表单齐备")
-    void profilePageRendersAccountAndBothForms() throws Exception {
-        createUser("page-olivia", "奥利维亚");
-
+    @DisplayName("档案页路由（v1.5 B5b）：302 到 /front/profile 的 SPA 皮")
+    void profilePageRedirectsToFront() throws Exception {
         this.mockMvc
-                .perform(get("/profile").with(user("page-olivia").roles("USER")).locale(Locale.SIMPLIFIED_CHINESE))
-                .andExpect(status().isOk())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML))
-                .andExpect(content().string(containsString("个人档案")))
-                .andExpect(content().string(containsString("page-olivia")))
-                .andExpect(content().string(containsString("奥利维亚")))
-                .andExpect(content().string(containsString("name=\"displayName\"")))
-                .andExpect(content().string(containsString("name=\"oldPassword\"")))
-                .andExpect(content().string(containsString("name=\"newPassword\"")))
-                .andExpect(content().string(containsString("修改密码")));
+                .perform(get("/profile").with(user("route-olivia").roles("USER")))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/front/profile"));
     }
 
     @Test

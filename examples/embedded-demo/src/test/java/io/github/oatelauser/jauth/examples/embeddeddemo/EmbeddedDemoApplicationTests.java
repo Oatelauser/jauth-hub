@@ -3,6 +3,7 @@ package io.github.oatelauser.jauth.examples.embeddeddemo;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.github.oatelauser.jauth.core.scope.ScopeCatalog;
@@ -54,6 +55,15 @@ class EmbeddedDemoApplicationTests {
                 .getResponse()
                 .getStatus();
         assertThat(status).isIn(200, 404);
+    }
+
+    @Test
+    @DisplayName("页面路由重定向：/login 302 到 /front/login（两态同测，不依赖 dist 内容）")
+    void loginPageRedirectsToFront() throws Exception {
+        this.mockMvc
+                .perform(get("/login"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/front/login"));
     }
 
     @Test

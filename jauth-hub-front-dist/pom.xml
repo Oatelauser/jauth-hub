@@ -46,7 +46,7 @@
   </build>
 
   <profiles>
-    <!-- dist 装配（默认关）：形态照抄 app 的 front-skin profile（v1.4 B4 先例）——enforcer 先行
+    <!-- dist 装配（默认关）：形态照抄 v1.4 B4 的 app 内置拷包 profile 先例——enforcer 先行
          fail-fast，兜住 resources-plugin 对缺失源目录静默跳过的缺口（实测教训：不拦即静默出空皮制品，
          发布场景等同事故）；copy-resources 再把 dist 拷成 classpath:/static/front。
          须从仓库根目录执行（${maven.multiModuleProjectDirectory} 随调用目录变化）。

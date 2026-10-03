@@ -4,7 +4,6 @@ import io.github.oatelauser.jauth.core.org.Installation;
 import io.github.oatelauser.jauth.core.org.InstallationRepository;
 import io.github.oatelauser.jauth.core.org.InstallationService;
 import io.github.oatelauser.jauth.core.org.InstallationStatus;
-import io.github.oatelauser.jauth.core.org.Org;
 import io.github.oatelauser.jauth.core.org.OrgRepository;
 import io.github.oatelauser.jauth.core.org.OrgService;
 import io.github.oatelauser.jauth.core.response.JauthErrorCode;
@@ -14,7 +13,7 @@ import io.github.oatelauser.jauth.core.scope.ScopeCatalog;
 import io.github.oatelauser.jauth.core.scope.ScopeDefinition;
 import io.github.oatelauser.jauth.core.user.JauthUser;
 import io.github.oatelauser.jauth.core.user.UserRepository;
-import io.github.oatelauser.jauth.core.web.EducationalFlag;
+import jakarta.servlet.http.HttpServletRequest;
 import java.security.Principal;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -26,12 +25,10 @@ import java.util.Set;
 import java.util.TreeSet;
 import org.jspecify.annotations.Nullable;
 import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -39,28 +36,22 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * 安装审批页（B11：流向 A 两步制的 OWNER 面，2026-09-30 拍板）。
+ * 安装审批面（B11：流向 A 两步制的 OWNER 面，2026-09-30 拍板）：request/approve/reject/revoke JSON 端点
+ * 与行装配共径；页面路由 v1.5 B5b 起 302 到 {@code /front/selfservice/orgs/{orgId}/installations} 的
+ * SPA 皮（PENDING 待批区 + 全量安装行 + 发起表单，SPA 消费状态面），查询串原样转发。
  *
- * <p><b>页面</b>（GET /selfservice/orgs/{orgId}/installations，仅该 org OWNER）：PENDING 待批区（发起人名、
- * requested_scopes 勾选框默认全选——OWNER 可收窄勾选为 ceiling）+ 本 org 全量安装行（状态徽标、ceiling、
- * 审批人/时间）+ 面向 org 的安装发起表单（手填 client_id + 勾选 scope 目录全集；最小面不做浏览目录）。
+ * <p><b>动作面</b>：request（任何登录用户可发起，发起人不要求 org 成员——控制点在 OWNER 审批不在发起，
+ * 拍板原文）/approve（勾选集即 ceilingScopes，空勾选拒 A0511；⊆ requested、OWNER 门、状态门全由
+ * InstallationService 强制）/reject/revoke。审计事件（installation.*）经服务调用自然落。
  *
- * <p><b>动作面</b>（页内原生 JS 调 JSON 端点，照 my-apps 惯例）：request（任何登录用户可发起，发起人不要求
- * org 成员——控制点在 OWNER 审批不在发起，拍板原文）/approve（勾选集即 ceilingScopes，空勾选拒 A0511；⊆
- * requested、OWNER 门、状态门全由 InstallationService 强制，页面不重复判）/reject/revoke。审计事件
- * （installation.*）经服务调用自然落，本批不加新事件。
- *
- * <p><b>门控与安全边界</b>：与 MyAppsController 同——认证授权归部署方 default 链，控制器守"主体在池"；页面
- * 入口的 OWNER 门走 OrgService.isOwner（非 OWNER → A0508，与服务层同语义）。领域 bean 由 starter 供给，
- * 缺席（宿主未引 starter）渲染不支持提示，JSON 回 A0504。
+ * <p><b>门控与安全边界</b>：与 MyAppsController 同——认证授权归部署方 default 链，控制器守"主体在池"。
+ * 领域 bean 由 starter 供给，缺席（宿主未引 starter）JSON 回 A0504（SPA 按状态面 installationsSupported=false
+ * 渲染提示态）。
  *
  * @author oatelauser
  */
 @Controller
 public class OrgInstallationsController {
-
-    /** 审批页视图名（selfservice 命名空间模板，本模块视图解析器按白名单认领；自动配置读取）。 */
-    public static final String VIEW_ORG_INSTALLATIONS = "org-installations";
 
     private final @Nullable OrgService orgService;
 
@@ -76,10 +67,6 @@ public class OrgInstallationsController {
 
     private final ScopeCatalog scopeCatalog;
 
-    private final MessageSource messageSource;
-
-    private final EducationalFlag educational;
-
     private final ResponseRenderer responseRenderer;
 
     /**
@@ -94,8 +81,6 @@ public class OrgInstallationsController {
             UserRepository userRepository,
             RegisteredClientRepository clientRepository,
             ScopeCatalog scopeCatalog,
-            MessageSource messageSource,
-            EducationalFlag educational,
             ResponseRenderer responseRenderer) {
         this.orgService = orgService;
         this.installationService = installationService;
@@ -104,42 +89,19 @@ public class OrgInstallationsController {
         this.userRepository = userRepository;
         this.clientRepository = clientRepository;
         this.scopeCatalog = scopeCatalog;
-        this.messageSource = messageSource;
-        this.educational = educational;
         this.responseRenderer = responseRenderer;
     }
 
     /**
-     * 安装审批页：PENDING 待批区 + 全量安装行 + 发起表单（仅 OWNER，入口门见类注释）。
+     * 安装审批页入口（仅 OWNER，SPA 消费状态面）：302 到 SPA 皮。
      *
      * @param orgId 路径 org id
-     * @param principal 当前登录主体
-     * @param model 视图模型
-     * @return 视图名
+     * @param request 当前请求（查询串原样转发给 SPA）
+     * @return 重定向指令
      */
     @GetMapping("/selfservice/orgs/{orgId}/installations")
-    public String page(@PathVariable("orgId") String orgId, @Nullable Principal principal, Model model) {
-        model.addAttribute("educational", this.educational.enabled());
-        boolean supported = domainBeansPresent();
-        model.addAttribute("installationsSupported", supported);
-        if (!supported) {
-            return VIEW_ORG_INSTALLATIONS;
-        }
-        JauthUser user = requireUser(principal);
-        requireOwner(orgId, user);
-        Org org = requireOrg(orgId);
-        List<InstallationRow> rows =
-                installationRows(orgId, this.installationRepository, this.clientRepository, this.userRepository);
-        model.addAttribute("org", org);
-        model.addAttribute(
-                "pending",
-                rows.stream()
-                        .filter(row -> row.status() == InstallationStatus.PENDING)
-                        .toList());
-        model.addAttribute("installations", rows);
-        model.addAttribute(
-                "scopes", scopeItems(LocaleContextHolder.getLocale(), this.scopeCatalog, this.messageSource));
-        return VIEW_ORG_INSTALLATIONS;
+    public String page(@PathVariable("orgId") String orgId, HttpServletRequest request) {
+        return "redirect:" + SudoController.frontTarget("/front/selfservice/orgs/" + orgId + "/installations", request);
     }
 
     /**
@@ -306,20 +268,6 @@ public class OrgInstallationsController {
             throw new JauthException(SelfServiceErrorCode.A0505);
         }
         return Set.copyOf(requested);
-    }
-
-    private void requireOwner(String orgId, JauthUser user) {
-        if (!this.orgService.isOwner(orgId, user.id())) {
-            throw new JauthException(JauthErrorCode.A0508);
-        }
-    }
-
-    private Org requireOrg(String orgId) {
-        Org org = this.orgRepository.findById(orgId);
-        if (org == null) {
-            throw new JauthException(JauthErrorCode.B0502);
-        }
-        return org;
     }
 
     private InstallationService requireService() {

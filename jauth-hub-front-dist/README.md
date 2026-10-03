@@ -27,8 +27,8 @@ cd .. && mvn -Pdist -pl jauth-hub-front-dist install   # enforcer 校验 dist �
 </dependency>
 ```
 
-`/front/index.html` 即你的登录皮；配 `jauth-hub.trust-skin=front` 后信任面四页 GET 302 到
-`/front/<路由>`（查询串原样转发）。两个宿主侧已知边界（jauth-hub-app 侧由 AppWebConfiguration
+`/front/index.html` 即你的登录皮；页面 GET（登录/consent/设备验证/sudo 等）一律 302 到
+`/front/<路由>`（查询串原样转发，v1.5 起无条件）。两个宿主侧已知边界（jauth-hub-app 侧由 AppWebConfiguration
 代管，嵌入宿主没有）：
 
 1. **history 深链回退缺失**：`/front/login` 这类无物理文件的路径不走回退，须宿主自配

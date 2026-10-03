@@ -10,10 +10,10 @@ import io.github.oatelauser.jauth.core.response.ResponseRenderer;
 import io.github.oatelauser.jauth.core.user.JauthUser;
 import io.github.oatelauser.jauth.core.user.UserRepository;
 import io.github.oatelauser.jauth.core.util.UuidV7;
-import io.github.oatelauser.jauth.core.web.EducationalFlag;
 import io.github.oatelauser.jauth.core.web.RequiresSudo;
 import io.github.oatelauser.springplus.security.annotation.Principal;
 import io.github.oatelauser.springplus.security.annotation.RequiresRole;
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -23,19 +23,18 @@ import org.springframework.http.MediaType;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * 用户管理面（B12，SPEC §2/§7：app 专属页面，SUPERADMIN 专属）：列表页 + 建号/改角色/停用启用/重置密码
- * JSON 端点。列表不设分页（单部署用户量形态，记档）；重置密码由管理员在请求中给定新值，响应不回显明文
- * （与 my-apps 的 secret 不同源：那里是服务端生成须一次性展示，这里明文只存在于管理员输入处）。
+ * 用户管理面（B12，SPEC §2/§7：app 专属页面，SUPERADMIN 专属）：页面路由 /admin/users（v1.5 B5b 起
+ * 302 到 /front/admin/users 的 SPA 皮）+ 建号/改角色/停用启用/重置密码 JSON 端点。重置密码由管理员在
+ * 请求中给定新值，响应不回显明文（与 my-apps 的 secret 不同源：那里是服务端生成须一次性展示，这里明文
+ * 只存在于管理员输入处）。
  *
  * <p><b>门控</b>：全端点 {@code @RequiresRole(ROLE_SUPER_ADMIN)}（08 票 GrantedAuthority 路线，403 由
  * spring-plus 渲染）。<b>自操作护栏</b>：改角色/停用启用不可作用于自己（A0513）——操作者自身的 SUPERADMIN +
@@ -45,9 +44,6 @@ import org.springframework.web.bind.annotation.ResponseBody;
  */
 @Controller
 public class AdminUsersController {
-
-    /** 列表视图名（壳层默认 Thymeleaf 解析器，classpath:/templates/）。 */
-    public static final String VIEW_ADMIN_USERS = "admin/users";
 
     /** jauth_user.username 列宽 varchar(50)，先于列宽拒绝超填。 */
     static final int USERNAME_MAX_LENGTH = 50;
@@ -74,8 +70,6 @@ public class AdminUsersController {
 
     private final PasswordEncoder passwordEncoder;
 
-    private final EducationalFlag educational;
-
     private final ResponseRenderer responseRenderer;
 
     private final AccountSecurityService accountSecurityService;
@@ -85,40 +79,26 @@ public class AdminUsersController {
     public AdminUsersController(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
-            EducationalFlag educational,
             ResponseRenderer responseRenderer,
             AccountSecurityService accountSecurityService,
             AuditEventPublisher auditPublisher) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
-        this.educational = educational;
         this.responseRenderer = responseRenderer;
         this.accountSecurityService = accountSecurityService;
         this.auditPublisher = auditPublisher;
     }
 
     /**
-     * 用户管理页：全量列表（username ASC，仓储定序）。
+     * 用户管理页入口：302 到 SPA 皮（page/size 查询串原样转发，分页状态由 SPA 经状态面取）。
      *
-     * @param model 视图模型
-     * @return 视图名
+     * @param request 当前请求（查询串原样转发给 SPA）
+     * @return 重定向指令
      */
     @RequiresRole(role = RequiresRole.ROLE_SUPER_ADMIN)
     @GetMapping("/admin/users")
-    public String page(
-            @RequestParam(value = "page", defaultValue = "1") int page,
-            @RequestParam(value = "size", defaultValue = USERS_PAGE_DEFAULT_SIZE) int size,
-            Model model) {
-        model.addAttribute("educational", this.educational.enabled());
-        long total = this.userRepository.countAll();
-        PageWindow window = pageWindow(page, size, total);
-        model.addAttribute(
-                "users", this.userRepository.findPage((window.pageNum() - 1) * window.pageSize(), window.pageSize()));
-        model.addAttribute("pageNum", window.pageNum());
-        model.addAttribute("pageSize", window.pageSize());
-        model.addAttribute("total", total);
-        model.addAttribute("totalPage", window.totalPage());
-        return VIEW_ADMIN_USERS;
+    public String page(HttpServletRequest request) {
+        return "redirect:" + RootController.frontTarget("/front/admin/users", request);
     }
 
     /**
@@ -349,6 +329,8 @@ public class AdminUsersController {
         data.put("displayName", user.displayName());
         data.put("role", user.role());
         data.put("status", user.status());
+        // v1.5 B3 滑账回收（B5b）：SPA 用户表的 createdAt 列——状态行与建号响应同形带出
+        data.put("createdAt", user.createdAt().toString());
         return data;
     }
 

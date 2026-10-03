@@ -29,11 +29,6 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-jdbc</artifactId>
     </dependency>
-    <!-- 协议三页（登录/consent/设备验证）SSR 渲染（SPEC §1 前端决议） -->
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-thymeleaf</artifactId>
-    </dependency>
     <!-- 库迁移：H2 支持在 flyway-core 内，PG 需专配模块；版本走 Boot BOM -->
     <dependency>
       <groupId>org.flywaydb</groupId>

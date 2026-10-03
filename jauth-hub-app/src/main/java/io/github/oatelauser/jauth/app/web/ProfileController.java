@@ -6,9 +6,9 @@ import io.github.oatelauser.jauth.core.response.JauthException;
 import io.github.oatelauser.jauth.core.response.ResponseRenderer;
 import io.github.oatelauser.jauth.core.user.JauthUser;
 import io.github.oatelauser.jauth.core.user.UserRepository;
-import io.github.oatelauser.jauth.core.web.EducationalFlag;
 import io.github.oatelauser.jauth.core.web.RequiresSudo;
 import io.github.oatelauser.jauth.selfservice.web.SelfServiceErrorCode;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.security.Principal;
 import java.util.LinkedHashMap;
@@ -17,7 +17,6 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,8 +24,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * 自助档案 + 改密面（B12，任何登录用户）：页面 /profile，JSON 面 /api/profile（改显示名）与
- * /api/profile/password（改密）。
+ * 自助档案 + 改密面（B12，任何登录用户）：页面路由 /profile（v1.5 B5b 起 302 到 /front/profile 的
+ * SPA 皮），JSON 面 /api/profile（改显示名）与 /api/profile/password（改密）。
  *
  * <p><b>旧密码核验联动防爆破</b>：失败记 {@link RateLimiter#onLoginFailure(String)}（与登录失败同一计数，
  * 同一阈值锁定）——防已认证会话内爆破旧密码；改密前先查 {@link RateLimiter#isLoginLocked(String)}，锁定期
@@ -42,16 +41,11 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @Controller
 public class ProfileController {
 
-    /** 档案视图名（壳层默认 Thymeleaf 解析器）。 */
-    public static final String VIEW_PROFILE = "profile";
-
     private final UserRepository userRepository;
 
     private final PasswordEncoder passwordEncoder;
 
     private final RateLimiter rateLimiter;
-
-    private final EducationalFlag educational;
 
     private final ResponseRenderer responseRenderer;
 
@@ -61,31 +55,24 @@ public class ProfileController {
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
             RateLimiter rateLimiter,
-            EducationalFlag educational,
             ResponseRenderer responseRenderer,
             AccountSecurityService accountSecurityService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.rateLimiter = rateLimiter;
-        this.educational = educational;
         this.responseRenderer = responseRenderer;
         this.accountSecurityService = accountSecurityService;
     }
 
     /**
-     * 档案页：当前用户显示名 + 改密表单。
+     * 档案页入口（v1.5 B5b 起 302 到 /front/profile 的 SPA 皮，查询串原样转发）。
      *
-     * @param principal 当前登录主体
-     * @param model 视图模型
-     * @return 视图名
+     * @param request 当前请求（查询串原样转发给 SPA）
+     * @return 重定向指令
      */
     @GetMapping("/profile")
-    public String page(@Nullable Principal principal, Model model) {
-        model.addAttribute("educational", this.educational.enabled());
-        JauthUser user = principal == null ? null : this.userRepository.findByUsername(principal.getName());
-        model.addAttribute("username", user == null ? "" : user.username());
-        model.addAttribute("displayName", user == null ? null : user.displayName());
-        return VIEW_PROFILE;
+    public String page(HttpServletRequest request) {
+        return "redirect:" + RootController.frontTarget("/front/profile", request);
     }
 
     /**

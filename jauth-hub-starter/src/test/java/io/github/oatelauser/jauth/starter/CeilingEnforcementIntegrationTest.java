@@ -1,12 +1,10 @@
 package io.github.oatelauser.jauth.starter;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.containsString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -133,10 +131,13 @@ class CeilingEnforcementIntegrationTest {
         String consentRedirect = authorizeFirst.getResponse().getHeader("Location");
         assertThat(consentRedirect).contains("/oauth2/consent");
         String consentState = queryParam(consentRedirect, "state");
+        // v1.5 B5b：consent 页 302 到 /front/consent（查询串逐字转发）；org 徽标/ceiling 勾选面
+        // 由 SPA 消费 /api/consent 状态（org 三态在 ConsentStateControllerTest 钉死），本链只证剪裁
         this.mockMvc
                 .perform(get(consentRedirect).session(session))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("acme-ceiling")));
+                .andExpect(status().is3xxRedirection())
+                .andExpect(result ->
+                        assertThat(result.getResponse().getHeader("Location")).startsWith("/front/consent?"));
 
         // -- 2. consent 提交超集(openid profile,即使手造 POST 全勾)→ code → token:scope 被剪到 ceiling
         //    scope 逐项多值提交(真实浏览器每复选框一值;框架 consent 转换器不按空格拆分)

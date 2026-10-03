@@ -75,7 +75,7 @@
 
 - **交付前 AI 全量评审**:上一版本 tag..本版本 diff 全量过一遍 delegate 评审(`/delegate-review` 传范围参数),发现清零或逐条注明豁免理由
 - 发布若携带 front 皮肤(v1.4 起):双臂验证前先在 `jauth-hub-front/` 下
-  `npm ci && npm run build`,再以 `mvn -Pfront-skin -pl jauth-hub-app -am verify`
+  `npm ci && npm run build`,再以 `mvn -Pdist -pl jauth-hub-app -am verify`
   跑一遍——确认 dist 完整进入制品且 `/front/**` 装配可用(front CI job 绿是前置)
 - 全量测试 + 静态检查(lint / 格式 / 依赖审计)0 失败
 - API 兼容性判定符合预期:纯新增 = 次版本级变更;**有意移除公共 API** 须
@@ -95,7 +95,7 @@ git push origin vX.Y.Z
 要点:
 
 - 发布若携带 front 皮肤(v1.4 起):提交前先在 `jauth-hub-front/` 下 `npm run build`,
-  再从仓库根目录 `mvn -Pfront-skin -pl jauth-hub-app -am package`(dist 随制品;
+  再从仓库根目录 `mvn -Pdist -pl jauth-hub-app -am package`(dist 随制品;
   dist 缺失时 profile 显式失败)
 - **提交体附验证证据**:两臂结果、兼容性判定、验证环境——发布提交是未来
   排查"这版怎么发的"的第一入口

@@ -72,7 +72,6 @@ import io.github.oatelauser.jauth.core.web.PasskeyFlag;
 import io.github.oatelauser.jauth.core.web.PlatformTokenResolver;
 import io.github.oatelauser.jauth.core.web.RequiresScope;
 import io.github.oatelauser.jauth.core.web.RequiresScopeInterceptor;
-import io.github.oatelauser.jauth.core.web.TrustSkinFlag;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.net.URI;
 import java.security.KeyPair;
@@ -162,11 +161,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
-import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
-import org.thymeleaf.spring6.templateresolver.SpringResourceTemplateResolver;
-import org.thymeleaf.templatemode.TemplateMode;
 
 /**
  * jauth-hub 接管式自动配置（SPEC §2 决议 2：引入 starter 即 jauth 装配链生效，Boot 4 自带配置让位）。
@@ -186,7 +182,7 @@ import org.thymeleaf.templatemode.TemplateMode;
  *
  * <p><b>宿主链共存四规则之三（禁止违反）</b>：本配置只产出一条精确匹配的协议链（securityMatcher =
  * 框架协议端点 ∪ /login、/api/login、/oauth2/consent、/device/verify、三页 JSON 状态面 /api/login、
- * /api/consent 与 /api/device/verify、core 静态 css），<b>绝不写 anyRequest
+ * /api/consent 与 /api/device/verify），<b>绝不写 anyRequest
  * 兜底</b>——嵌入模式的 default 链是宿主自己的事；jauth 链若吞下未认领请求，宿主接口会被静默纳入 jauth
  * 的认证语义，属结构性越权。
  *
@@ -224,9 +220,6 @@ public class JauthHubAutoConfiguration {
     /** 平台 API /me（SPEC §4 端点三分；链 matcher 认领 + 控制器自担 Bearer 认证）。 */
     static final String ME_PATH = "/me";
 
-    /** core 单文件 CSS 的出网路径（模板内 @{/css/jauth.css}）。 */
-    static final String CSS_PATTERN = "/css/**";
-
     /** WebAuthn 端点根（passkey 开启时认领：注册/选项端点、框架默认注册页与其静态资源都在其下）。 */
     static final String WEBAUTHN_PATTERN = "/webauthn/**";
 
@@ -239,11 +232,7 @@ public class JauthHubAutoConfiguration {
     /** core 资源命名空间根（模板/i18n/静态资源与 Flyway 脚本同居其下，防撞宿主同名资源）。 */
     static final String CORE_NAMESPACE = "io/github/oatelauser/jauth/core";
 
-    static final String CORE_TEMPLATES_PREFIX = "classpath:" + CORE_NAMESPACE + "/web/templates/";
-
     static final String CORE_I18N_BASENAME = CORE_NAMESPACE + "/i18n/messages";
-
-    static final String CORE_CSS_LOCATION = "classpath:" + CORE_NAMESPACE + "/web/static/css/";
 
     /** Flyway 私有历史表：与宿主自己的 flyway_schema_history 并存不撞（SPEC §2 库表归属的装配侧实现）。 */
     static final String FLYWAY_HISTORY_TABLE = "jauth_flyway_schema_history";
@@ -491,16 +480,6 @@ public class JauthHubAutoConfiguration {
         return properties.getPasskey()::isEnabled;
     }
 
-    /**
-     * 信任面皮肤开关（v1.4 B4）：属性绑定（默认 ssr = SSR 皮永远默认，SPEC §1/issues 10 宪法），四页 SSR
-     * 控制器消费（core 三页直注，selfservice sudo 页经 ObjectProvider 降级 SSR）。front 皮肤的静态装配
-     * （/front/** 资源 + 深链回退）是 app/宿主部署层职责，不在本协议链认领范围。
-     */
-    @Bean
-    TrustSkinFlag jauthTrustSkinFlag(JauthHubProperties properties) {
-        return () -> properties.getTrustSkin() == JauthHubProperties.TrustSkin.FRONT;
-    }
-
     /** scope 目录：内存实现内置三枚 OIDC 标准 scope，宿主可注册自有 scope（目录 = 代码 + i18n，不建表）。 */
     @Bean
     @ConditionalOnMissingBean(ScopeCatalog.class)
@@ -552,8 +531,8 @@ public class JauthHubAutoConfiguration {
     }
 
     @Bean
-    LoginController jauthLoginController(EducationalFlag educational, PasskeyFlag passkey, TrustSkinFlag trustSkin) {
-        return new LoginController(educational, passkey, trustSkin);
+    LoginController jauthLoginController() {
+        return new LoginController();
     }
 
     /**
@@ -627,8 +606,8 @@ public class JauthHubAutoConfiguration {
     }
 
     @Bean
-    ConsentController jauthConsentController(ConsentPageAssembler assembler, TrustSkinFlag trustSkin) {
-        return new ConsentController(assembler, trustSkin);
+    ConsentController jauthConsentController() {
+        return new ConsentController();
     }
 
     /** consent 页 JSON 状态面（v1.4 B1）：GET /api/consent，链认领与授权规则镜像 SSR 同名页。 */
@@ -639,8 +618,8 @@ public class JauthHubAutoConfiguration {
     }
 
     @Bean
-    DeviceVerifyController jauthDeviceVerifyController(EducationalFlag educational, TrustSkinFlag trustSkin) {
-        return new DeviceVerifyController(educational, trustSkin);
+    DeviceVerifyController jauthDeviceVerifyController() {
+        return new DeviceVerifyController();
     }
 
     /** 设备验证页 JSON 状态面（v1.4 B1）：GET /api/device/verify，链认领与授权规则镜像 SSR 同名页。 */
@@ -653,8 +632,8 @@ public class JauthHubAutoConfiguration {
     /**
      * i18n 复合源：core 命名空间 basename + 宿主 spring.messages.* 中真实可解析的 basename 合并为一个
      * ResourceBundleMessageSource。必须在 Boot 的 MessageSourceAutoConfiguration <b>之前</b>求值（类注解
-     * before）以 messageSource 之名注册：否则 Boot 先建宿主单源、core 文案（jauth.* 键）在 Thymeleaf
-     * （#{...} 走 context messageSource）与 ConsentController 均无解析处；Boot 侧因同名 bean 已存在整体
+     * before）以 messageSource 之名注册：否则 Boot 先建宿主单源、core 文案（jauth.* 键）在 scope 目录解析
+     * （服务端 i18n，走 context messageSource）与 ConsentPageAssembler 均无解析处；Boot 侧因同名 bean 已存在整体
      * 让位，宿主 spring.messages.* 配置由本复合源如实承接。宿主自定义 messageSource bean 时本让位
      * （jauth 模板文案归宿主自理）。
      */
@@ -687,33 +666,6 @@ public class JauthHubAutoConfiguration {
         } catch (MissingResourceException ex) {
             return false;
         }
-    }
-
-    /**
-     * core 模板解析器：前缀指 core 命名空间目录（防撞宿主 templates/）。checkExistence + 最高序位——
-     * 仅 core 视图名（login/consent/device-verify）命中，未命中即穿透到宿主默认解析器，宿主自有视图不受扰；
-     * 宿主要覆盖 jauth 页面：以<b>相同资源路径</b>放置同名文件（classpath 资源遮蔽，确定性生效）。
-     */
-    @Bean
-    SpringResourceTemplateResolver jauthTemplateResolver() {
-        SpringResourceTemplateResolver resolver = new SpringResourceTemplateResolver();
-        resolver.setPrefix(CORE_TEMPLATES_PREFIX);
-        resolver.setSuffix(".html");
-        resolver.setTemplateMode(TemplateMode.HTML);
-        resolver.setCheckExistence(true);
-        resolver.setOrder(Ordered.HIGHEST_PRECEDENCE);
-        return resolver;
-    }
-
-    /** core 单文件 CSS 出网（/css/jauth.css → core 命名空间）；宿主自有 /css/** 静态资源不受影响（未命中即穿透）。 */
-    @Bean
-    WebMvcConfigurer jauthStaticResourcesConfigurer() {
-        return new WebMvcConfigurer() {
-            @Override
-            public void addResourceHandlers(ResourceHandlerRegistry registry) {
-                registry.addResourceHandler(CSS_PATTERN).addResourceLocations(CORE_CSS_LOCATION);
-            }
-        };
     }
 
     /**
@@ -788,7 +740,7 @@ public class JauthHubAutoConfiguration {
     /**
      * jauth 协议链：唯一产出的安全链，精认知领框架协议端点 ∪ 自有路径（登录/consent/设备验证三 SSR 页、
      * 登录/consent/设备验证三 JSON 面、/me、core css），序位可配（默认 100，委托
-     * OrderedSecurityFilterChain 实现）。链内授权规则逐路径显式声明（login/css 放行、协议端点与上述页面需
+     * OrderedSecurityFilterChain 实现）。链内授权规则逐路径显式声明（login 放行、协议端点与上述页面需
      * 认证），<b>无 anyRequest 兜底</b>（类注释第三规则）。非浏览器客户端（Accept 非 text/html）401 而非
      * 重定向登录页（协议端点的正确姿势）。CORS 仅在来源非空时并入。
      */
@@ -833,8 +785,7 @@ public class JauthHubAutoConfiguration {
                 PathPatternRequestMatcher.withDefaults().matcher(DEVICE_VERIFY_PATH),
                 PathPatternRequestMatcher.withDefaults().matcher(API_CONSENT_PATH),
                 PathPatternRequestMatcher.withDefaults().matcher(API_DEVICE_VERIFY_PATH),
-                PathPatternRequestMatcher.withDefaults().matcher(ME_PATH),
-                PathPatternRequestMatcher.withDefaults().matcher(CSS_PATTERN)));
+                PathPatternRequestMatcher.withDefaults().matcher(ME_PATH)));
         if (properties.getPasskey().isEnabled()) {
             // /login 的精确 matcher 不匹配子路径，passkey 登录端点须单独认领（C1）
             claimedMatchers.add(PathPatternRequestMatcher.withDefaults().matcher(WEBAUTHN_PATTERN));
@@ -857,7 +808,7 @@ public class JauthHubAutoConfiguration {
                 .requestMatchers(endpointsMatcher)
                 .authenticated()
                 // /api/login = 登录前页面状态 + 认证提交（POST 在 CsrfFilter 保护下），镜像 /login 放行
-                .requestMatchers(LOGIN_PATH, API_LOGIN_PATH, CSS_PATTERN, ME_PATH)
+                .requestMatchers(LOGIN_PATH, API_LOGIN_PATH, ME_PATH)
                 .permitAll()
                 .requestMatchers(CONSENT_PAGE_PATH, DEVICE_VERIFY_PATH)
                 .authenticated()

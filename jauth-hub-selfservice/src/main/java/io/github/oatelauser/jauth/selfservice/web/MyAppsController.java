@@ -9,15 +9,14 @@ import io.github.oatelauser.jauth.core.response.JauthException;
 import io.github.oatelauser.jauth.core.response.ResponseRenderer;
 import io.github.oatelauser.jauth.core.user.JauthUser;
 import io.github.oatelauser.jauth.core.user.UserRepository;
-import io.github.oatelauser.jauth.core.web.EducationalFlag;
 import io.github.oatelauser.jauth.core.web.RequiresSudo;
+import jakarta.servlet.http.HttpServletRequest;
 import java.security.Principal;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,33 +25,23 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * 我的应用页（B10：个人应用免安装审批的自助注册面，SPEC §3/§7 v1.1 应用管理页）。
- *
- * <p><b>页面</b>：列表（GET /selfservice/my-apps）与注册表单（GET /selfservice/my-apps/new，最小三件：名称/redirect URIs/类型）；
- * 注册走页内原生 JS 调 JSON 端点（照 PAT 页惯例）——机密应用的 client_secret 明文只在注册响应出现一次，
- * 直接渲染进"仅此一次"横幅。scopes 不进表单：allowed scopes = scope 目录全集，封顶由 consent 页把关
- * （个人应用无 ceiling）。
+ * 我的应用面（B10：个人应用免安装审批的自助注册面，SPEC §3/§7 v1.1 应用管理）：JSON 端点；页面路由
+ * v1.5 B5b 起 302 到 {@code /front/selfservice/my-apps} 的 SPA 皮（注册并入 my-apps 页内对话框，B0 普查
+ * 决议——/new 旧路同指该页），查询串原样转发。机密应用的 client_secret 明文只在注册响应出现一次。
+ * scopes 不进表单：allowed scopes = scope 目录全集，封顶由 consent 页把关（个人应用无 ceiling）。
  *
  * <p><b>门控与安全边界</b>：与 PatController 同——路径不在 jauth 协议链认领清单内，认证授权归部署方 default 链；
  * 控制器守"主体在池"。与 PAT 不同，memory 模式<b>可用</b>（InMemoryOwnedAppService），服务缺席仅发生在
- * jdbc 模式宿主自换了非 Jauth 仓储等装配边角——页面渲染不支持提示，JSON 回 A0504。
+ * jdbc 模式宿主自换了非 Jauth 仓储等装配边角——JSON 回 A0504（SPA 按状态面 appsSupported=false 渲染提示态）。
  *
  * @author oatelauser
  */
 @Controller
 public class MyAppsController {
 
-    /** 列表视图名（selfservice 命名空间模板，本模块视图解析器按白名单认领；自动配置读取）。 */
-    public static final String VIEW_MY_APPS = "my-apps";
-
-    /** 注册表单视图名。 */
-    public static final String VIEW_MY_APP_NEW = "my-app-new";
-
     private final @Nullable OwnedAppService ownedAppService;
 
     private final UserRepository userRepository;
-
-    private final EducationalFlag educational;
 
     private final ResponseRenderer responseRenderer;
 
@@ -68,48 +57,36 @@ public class MyAppsController {
     public MyAppsController(
             @Nullable OwnedAppService ownedAppService,
             UserRepository userRepository,
-            EducationalFlag educational,
             ResponseRenderer responseRenderer,
             AuditEventPublisher auditPublisher,
             RateLimiter rateLimiter) {
         this.ownedAppService = ownedAppService;
         this.userRepository = userRepository;
-        this.educational = educational;
         this.responseRenderer = responseRenderer;
         this.auditPublisher = auditPublisher;
         this.rateLimiter = rateLimiter;
     }
 
     /**
-     * 我的应用列表页。
+     * 我的应用列表页入口：302 到 SPA 皮（注册对话框在页内）。
      *
-     * @param principal 当前登录主体
-     * @param model 视图模型
-     * @return 视图名
+     * @param request 当前请求（查询串原样转发给 SPA）
+     * @return 重定向指令
      */
     @GetMapping("/selfservice/my-apps")
-    public String page(@Nullable Principal principal, Model model) {
-        model.addAttribute("educational", this.educational.enabled());
-        model.addAttribute("appsSupported", this.ownedAppService != null);
-        JauthUser user = principal == null ? null : this.userRepository.findByUsername(principal.getName());
-        // 非池内主体（嵌入宿主自有用户）与服务缺席同态：渲染空列表态，页面不炸
-        if (this.ownedAppService != null && user != null) {
-            model.addAttribute("apps", this.ownedAppService.list(user.id()));
-        }
-        return VIEW_MY_APPS;
+    public String page(HttpServletRequest request) {
+        return "redirect:" + SudoController.frontTarget("/front/selfservice/my-apps", request);
     }
 
     /**
-     * 注册表单页。
+     * 旧注册表单页入口：302 到 SPA 皮（/new 无独立 SPA 路由，注册是 my-apps 页内对话框）。
      *
-     * @param model 视图模型
-     * @return 视图名
+     * @param request 当前请求
+     * @return 重定向指令
      */
     @GetMapping("/selfservice/my-apps/new")
-    public String newAppPage(Model model) {
-        model.addAttribute("educational", this.educational.enabled());
-        model.addAttribute("appsSupported", this.ownedAppService != null);
-        return VIEW_MY_APP_NEW;
+    public String newAppPage(HttpServletRequest request) {
+        return "redirect:" + SudoController.frontTarget("/front/selfservice/my-apps", request);
     }
 
     /**

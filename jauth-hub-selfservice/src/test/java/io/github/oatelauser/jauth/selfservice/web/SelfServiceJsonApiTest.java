@@ -15,8 +15,6 @@ import io.github.oatelauser.jauth.core.response.JauthResponseAdvice;
 import io.github.oatelauser.jauth.core.scope.InMemoryScopeCatalog;
 import io.github.oatelauser.jauth.core.user.JauthUser;
 import io.github.oatelauser.jauth.core.user.UserRepository;
-import io.github.oatelauser.jauth.core.web.EducationalFlag;
-import io.github.oatelauser.jauth.core.web.PasskeyFlag;
 import io.github.oatelauser.jauth.selfservice.pat.InMemoryPatService;
 import io.github.oatelauser.jauth.selfservice.pat.PatTokens;
 import io.github.oatelauser.jauth.selfservice.support.Providers;
@@ -30,8 +28,6 @@ import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.context.MessageSource;
-import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
@@ -67,8 +63,6 @@ class SelfServiceJsonApiTest {
                         this.patService,
                         new InMemoryScopeCatalog(),
                         this.users,
-                        messageSource(),
-                        EducationalFlag.ON,
                         new DefaultResponseRenderer(),
                         Clock.fixed(T0, ZoneOffset.UTC),
                         new io.github.oatelauser.jauth.core.ratelimit.RateLimiter(
@@ -87,8 +81,6 @@ class SelfServiceJsonApiTest {
                         this.patService,
                         new InMemoryScopeCatalog(),
                         this.users,
-                        messageSource(),
-                        EducationalFlag.ON,
                         new DefaultResponseRenderer(),
                         Clock.fixed(T0, ZoneOffset.UTC),
                         tight))
@@ -200,8 +192,6 @@ class SelfServiceJsonApiTest {
                         null,
                         new InMemoryScopeCatalog(),
                         this.users,
-                        messageSource(),
-                        EducationalFlag.ON,
                         new DefaultResponseRenderer(),
                         Clock.fixed(T0, ZoneOffset.UTC),
                         new io.github.oatelauser.jauth.core.ratelimit.RateLimiter(
@@ -235,8 +225,6 @@ class SelfServiceJsonApiTest {
                         mock(
                                 org.springframework.security.oauth2.server.authorization.client
                                         .RegisteredClientRepository.class),
-                        EducationalFlag.ON,
-                        PasskeyFlag.OFF,
                         new DefaultResponseRenderer()))
                 .setControllerAdvice(jauthAdvice())
                 .build();
@@ -284,13 +272,6 @@ class SelfServiceJsonApiTest {
     private static String plaintextOf(String responseBody) {
         int tokenIndex = responseBody.indexOf("\"token\":\"") + "\"token\":\"".length();
         return responseBody.substring(tokenIndex, responseBody.indexOf('"', tokenIndex));
-    }
-
-    private MessageSource messageSource() {
-        ResourceBundleMessageSource source = new ResourceBundleMessageSource();
-        source.setBasename("io/github/oatelauser/jauth/selfservice/i18n/messages");
-        source.setDefaultEncoding(StandardCharsets.UTF_8.name());
-        return source;
     }
 
     private JauthUser user(String username) {

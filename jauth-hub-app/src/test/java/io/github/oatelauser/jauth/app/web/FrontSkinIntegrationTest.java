@@ -21,10 +21,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 /**
- * front 皮肤同域名装配回归（v1.4 B4）：trust-skin=front 下四页 SSR GET 各 302 到 /front/&lt;路由&gt; 且
- * 查询串<b>逐字</b>保留（经 URI 重载构造请求，getQueryString 原样透传，编码与顺序不变）；/front/** 静态
- * 装配（本测试与皮肤旗标无关，同一上下文顺带钉死）——物理文件 200、history 深链回退 index.html、
- * 带扩展名的 miss 照常 404 不回 index。默认 ssr 的零行为变化由既有页面测试全绿自证。
+ * front 同域名装配回归（v1.4 B4；v1.5 B5b 起无条件——皮肤旗标随 SSR 退场删除）：信任面四页
+ * GET 各 302 到 /front/&lt;路由&gt; 且查询串<b>逐字</b>保留（经 URI 重载构造请求，getQueryString 原样透传，
+ * 编码与顺序不变）；/front/** 静态装配——物理文件 200、history 深链回退 index.html、带扩展名的 miss
+ * 照常 404 不回 index。全量页面路由的 302 网见 {@link PageRoutesRedirectIntegrationTest}。
  *
  * <p>v1.5 B5a 起 app 经 jauth-hub-front-dist 依赖携带 /front 静态（compile；默认态空 jar、-Pdist 带真
  * dist）。上述静态断言即 dist jar 形态的既覆盖：夹具位于 test-classes，classpath 解析先于依赖 jar，把
@@ -36,19 +36,18 @@ import org.springframework.test.web.servlet.MvcResult;
 @AutoConfigureMockMvc
 @TestPropertySource(
         properties = {
-            "spring.datasource.url=jdbc:h2:mem:jauth-front-skin-it;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1",
+            "spring.datasource.url=jdbc:h2:mem:jauth-front-it;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1",
             "spring.datasource.username=sa",
             "spring.datasource.password=",
             "jauth-hub.bootstrap.superadmin.username=superadmin",
             "jauth-hub.bootstrap.superadmin.password=super-secret-placeholder",
-            "jauth-hub.trust-skin=front"
         })
 class FrontSkinIntegrationTest {
 
     private static final String SUPERADMIN_USERNAME = "superadmin";
 
     /** 深链回退断言标记（src/test/resources/static/front/index.html 夹具）。 */
-    private static final String FIXTURE_MARKER = "front-skin-fixture-index";
+    private static final String FIXTURE_MARKER = "front-fixture-index";
 
     @Autowired
     private MockMvc mockMvc;

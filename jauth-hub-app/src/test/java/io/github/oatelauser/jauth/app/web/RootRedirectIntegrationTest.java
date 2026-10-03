@@ -37,12 +37,12 @@ class RootRedirectIntegrationTest {
     private MockMvc mockMvc;
 
     @Test
-    @DisplayName("已认证访问 / → 302 看板；未认证访问 / → 认证引导而非 403")
+    @DisplayName("已认证访问 / → 302 SPA 看板（v1.5 B5b 默认值）；未认证访问 / → 认证引导而非 403")
     void rootRedirectsToDashboard() throws Exception {
         this.mockMvc
                 .perform(get("/").with(user("superadmin").roles("SUPER_ADMIN")))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/selfservice/apps"));
+                .andExpect(redirectedUrl("/front/selfservice/apps"));
         // 未认证：链入口把浏览器引导去登录页（302），登录后经保存请求回到 / 再跳看板——闭环
         this.mockMvc.perform(get("/")).andExpect(status().is3xxRedirection());
     }

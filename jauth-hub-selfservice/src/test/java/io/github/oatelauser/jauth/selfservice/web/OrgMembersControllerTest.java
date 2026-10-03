@@ -2,8 +2,10 @@ package io.github.oatelauser.jauth.selfservice.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.github.oatelauser.jauth.core.org.Org;
@@ -13,7 +15,6 @@ import io.github.oatelauser.jauth.core.response.JauthResponseAdvice;
 import io.github.oatelauser.jauth.core.user.InMemoryUserRepository;
 import io.github.oatelauser.jauth.core.user.JauthUser;
 import io.github.oatelauser.jauth.core.util.UuidV7;
-import io.github.oatelauser.jauth.core.web.EducationalFlag;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -62,10 +63,20 @@ class OrgMembersControllerTest {
         this.org = orgService.create(
                 "members-r-us", this.users.findByUsername(OWNER_NAME).id());
         OrgMembersController controller =
-                new OrgMembersController(orgService, this.users, EducationalFlag.ON, new DefaultResponseRenderer());
+                new OrgMembersController(orgService, this.users, new DefaultResponseRenderer());
         this.api = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new JauthResponseAdvice(new DefaultResponseRenderer()))
+                .setViewResolvers(new org.springframework.web.servlet.view.InternalResourceViewResolver())
                 .build();
+    }
+
+    @Test
+    @DisplayName("页面路由：/selfservice/orgs/{orgId}/members 无条件 302 到 SPA 皮（orgId 入目标路径）")
+    void pageRouteRedirectsToFront() throws Exception {
+        this.api
+                .perform(get("/selfservice/orgs/{orgId}/members", this.org.id()).principal(() -> OWNER_NAME))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/front/selfservice/orgs/" + this.org.id() + "/members"));
     }
 
     @Test

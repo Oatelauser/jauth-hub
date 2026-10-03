@@ -313,7 +313,8 @@ class EndToEndFlowIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("authorization_pending"));
 
-        this.mockMvc.perform(get("/device/verify").session(session)).andExpect(status().isOk());
+        // v1.5 B5b：设备验证页路由 302 到 /front/device-verify（SPA 皮）；MockMvc 直走 POST 提交语义
+        this.mockMvc.perform(get("/device/verify").session(session)).andExpect(status().is3xxRedirection());
         // 框架语义：device flow 首次验证必经确认页（与 requireAuthorizationConsent 无关——
         // OAuth2DeviceVerificationAuthenticationProvider 的既定谓词：无覆盖 scope 的存量 consent 即确认）
         MvcResult consentPage = this.mockMvc

@@ -9,12 +9,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.github.oatelauser.jauth.app.JauthHubAppApplication;
 import io.github.oatelauser.jauth.core.user.JauthUser;
 import io.github.oatelauser.jauth.core.user.UserRepository;
-import java.util.Locale;
+import java.net.URI;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,27 +68,12 @@ class AdminUsersIntegrationTest {
     private PasswordEncoder passwordEncoder;
 
     @Test
-    @DisplayName("管理页 DOM：列表行/徽标/建号表单齐备（含 USER 行与显示名回显）")
-    void adminUsersPageRendersListBadgesAndCreateForm() throws Exception {
-        createUser("page-bob", "鲍勃");
-
+    @DisplayName("管理页路由（v1.5 B5b）：302 到 /front/admin/users 的 SPA 皮，分页查询串透传")
+    void adminUsersPageRedirectsToFrontWithQuery() throws Exception {
         this.mockMvc
-                .perform(get("/admin/users").with(superAdmin()).locale(Locale.SIMPLIFIED_CHINESE))
-                .andExpect(status().isOk())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML))
-                .andExpect(content().string(containsString("用户管理")))
-                .andExpect(content().string(containsString("name=\"username\"")))
-                .andExpect(content().string(containsString("name=\"password\"")))
-                .andExpect(content().string(containsString("name=\"displayName\"")))
-                .andExpect(content().string(containsString("page-bob")))
-                .andExpect(content().string(containsString("鲍勃")))
-                .andExpect(content().string(containsString("超管")))
-                .andExpect(content().string(containsString("用户")))
-                .andExpect(content().string(containsString("启用")))
-                .andExpect(content().string(containsString("改角色")))
-                .andExpect(content().string(containsString("停用/启用")))
-                .andExpect(content().string(containsString("重置密码")))
-                .andExpect(content().string(containsString("发生了什么")));
+                .perform(get(URI.create("/admin/users?page=2&size=50")).with(superAdmin()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/front/admin/users?page=2&size=50"));
     }
 
     @Test
@@ -250,6 +236,8 @@ class AdminUsersIntegrationTest {
                 .andExpect(jsonPath("$.data.item[0].username").isNotEmpty())
                 .andExpect(jsonPath("$.data.item[0].role").isNotEmpty())
                 .andExpect(jsonPath("$.data.item[0].status").isNotEmpty())
+                // v1.5 B5b 滑账回收：createdAt 进状态行（SPA AdminUsers 表格列）
+                .andExpect(jsonPath("$.data.item[0].createdAt").isNotEmpty())
                 .andExpect(jsonPath("$.data.item[0].password").doesNotExist())
                 .andExpect(jsonPath("$.data.csrfToken").isNotEmpty())
                 .andExpect(jsonPath("$.data.csrfHeaderName").value("X-CSRF-TOKEN"));
@@ -321,35 +309,5 @@ class AdminUsersIntegrationTest {
             assertThat(result.getResponse().getStatus()).as("登录失败应 3xx 回登录页").isIn(301, 302, 303, 307);
             assertThat(result.getResponse().getHeader("Location")).contains("error");
         };
-    }
-
-    @Test
-    @DisplayName("用户列表分页（老账⑦）：size=2 三用户 → 两页，导航与合计渲染")
-    void usersListPaginated() throws Exception {
-        for (int i = 1; i <= 3; i++) {
-            this.mockMvc
-                    .perform(post("/api/admin/users")
-                            .with(user(ADMIN_USERNAME).roles("SUPER_ADMIN"))
-                            .with(csrf())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"username\":\"page-user-" + i + "\",\"password\":\"paged-pass-placeholder\"}"))
-                    .andExpect(status().isOk());
-        }
-        this.mockMvc
-                .perform(get("/admin/users")
-                        .queryParam("size", "2")
-                        .locale(java.util.Locale.SIMPLIFIED_CHINESE)
-                        .with(user(ADMIN_USERNAME).roles("SUPER_ADMIN")))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("page-user")))
-                .andExpect(content().string(containsString("下一页")));
-        this.mockMvc
-                .perform(get("/admin/users")
-                        .queryParam("size", "2")
-                        .queryParam("page", "2")
-                        .locale(java.util.Locale.SIMPLIFIED_CHINESE)
-                        .with(user(ADMIN_USERNAME).roles("SUPER_ADMIN")))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("上一页")));
     }
 }

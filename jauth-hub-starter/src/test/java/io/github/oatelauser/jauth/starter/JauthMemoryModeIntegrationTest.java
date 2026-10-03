@@ -10,7 +10,6 @@ import io.github.oatelauser.jauth.core.token.key.JwkRotationService;
 import io.github.oatelauser.jauth.core.web.EducationalFlag;
 import java.util.List;
 import java.util.Locale;
-import org.hamcrest.Matchers;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -109,9 +108,6 @@ class JauthMemoryModeIntegrationTest {
         assertThat(chain.matches(request("GET", "/api/device/verify")))
                 .as("设备验证状态面")
                 .isTrue();
-        assertThat(chain.matches(request("GET", "/css/jauth.css")))
-                .as("core CSS")
-                .isTrue();
         assertThat(chain.matches(request("POST", "/webauthn/register/options")))
                 .as("passkey 默认关：webauthn 端点不认领")
                 .isFalse();
@@ -181,11 +177,11 @@ class JauthMemoryModeIntegrationTest {
     }
 
     @Test
-    @DisplayName("登录页可用：匿名 GET /login 渲染 200，品牌名来自 core 模板命名空间")
-    void loginPageRenders() throws Exception {
+    @DisplayName("登录页路由（v1.5 B5b）：匿名 GET /login 302 到 /front/login 的 SPA 皮")
+    void loginPageRedirectsToFront() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders.get("/login"))
-                .andExpect(MockMvcResultMatchers.status().isOk())
-                .andExpect(MockMvcResultMatchers.content().string(Matchers.containsString("jauth-hub")));
+                .andExpect(MockMvcResultMatchers.status().is3xxRedirection())
+                .andExpect(MockMvcResultMatchers.redirectedUrl("/front/login"));
     }
 
     @Test

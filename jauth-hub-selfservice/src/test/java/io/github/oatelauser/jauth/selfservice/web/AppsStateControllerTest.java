@@ -132,8 +132,6 @@ class AppsStateControllerTest {
                         Providers.fixed(null),
                         Providers.fixed(null),
                         clients(),
-                        EducationalFlag.ON,
-                        (PasskeyFlag) () -> true,
                         new DefaultResponseRenderer()))
                 .setControllerAdvice(
                         new io.github.oatelauser.jauth.core.response.JauthResponseAdvice(new DefaultResponseRenderer()))

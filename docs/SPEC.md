@@ -29,7 +29,7 @@
 jauth-hub-core                        协议+领域实现，无自动配置、零 spring-plus 依赖
 ├── client/authorization/consent      RegisteredClientRepository 等的内存+JDBC 双实现
 ├── token/                            opaque/JWT 定制、刷新轮转、JWK 生成与轮转调度（DB 化）
-├── web/                              默认 Thymeleaf 登录/consent/设备页 + 控制器
+├── web/                              登录/consent/设备页路由（302 到 /front）+ 控制器与协议过滤件
 ├── org/                              组织实体与上下文（单 issuer，无租户路由）
 ├── flyway/                           迁移脚本（H2/PG 双兼容单目录）
 jauth-hub-starter                     opt-in 接管式自动配置；唯一可选接入点：classpath 有
@@ -39,9 +39,9 @@ jauth-hub-app                         独立部署壳：自持用户库、用户
                                       spring-plus 三件套全必选
 jauth-hub-resource-server-starter     资源服务器薄封装：预接线 introspection（缓存 30s）+ scope→权限映射
 examples/                             内嵌接入示例工程（宿主嵌 starter + OAuth 保护自家接口演示）
-jauth-hub-front/                      v1.4 分离前端工程（Vue 3 + Vite，不在 Maven reactor）：信任面四页的
-                                      自家备选皮，构建产物部署于同域名 /front/**（app 的 front-skin
-                                      profile 拷包 + /front/** 资源装配与深链回退）
+jauth-hub-front/                      v1.4 分离前端工程（Vue 3 + Vite，不在 Maven reactor）：v1.5 起
+                                      唯一官方前端（SSR 皮退场），构建产物部署于同域名 /front/**
+                                      （dist 经 jauth-hub-front-dist 模块打包 + /front/** 资源装配与深链回退）
 ```
 
 关键机制（[03](../.scratch/jauth-hub/issues/03-grilling-dual-mode-architecture.md)）：
@@ -138,7 +138,7 @@ v2+：webhook、secret scanning、多 Secret 轮转、token exchange（配置可
 
 **`/demo` 真实联调教学区**（app 内置）：对真实端点完整走授权码 + PKCE（code_verifier/state 存 sessionStorage、callback 手工 code→token 交换），实时展示 HTTP 请求/响应日志，最后持 token 调受保护接口——蓝本即参考 demo 的 `front/callback.html`，"解码 payload"环节替换为**内省结果展示**。
 
-三层教学：折叠"发生了什么"说明块 / demo HTTP 日志 / 流程图高亮当前步骤。**v1.5 修宪（2026-10-02 用户拍板）**：教学形态整体收缩进 `/demo` 专区——主页面（信任面/自助面/管理面）企业级认证中心设计语言，不再携带 demo 味教学元素；demo 区内三层教学全量保留（Vue 承载）。`jauth-hub.educational` 开关随 SSR 拆除一并退场。
+三层教学：折叠"发生了什么"说明块 / demo HTTP 日志 / 流程图高亮当前步骤。**v1.5 修宪（2026-10-02 用户拍板）**：教学形态整体收缩进 `/demo` 专区——主页面（信任面/自助面/管理面）企业级认证中心设计语言，不再携带 demo 味教学元素；demo 区内三层教学全量保留（Vue 承载）。`jauth-hub.educational` 开关与 educational 字段随状态 API 契约保留，退场挂 v1.6 滑账。
 
 ## 8. 工程约定
 

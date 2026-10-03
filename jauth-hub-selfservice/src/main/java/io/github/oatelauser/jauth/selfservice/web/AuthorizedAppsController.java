@@ -3,8 +3,7 @@ package io.github.oatelauser.jauth.selfservice.web;
 import io.github.oatelauser.jauth.core.response.JauthErrorCode;
 import io.github.oatelauser.jauth.core.response.JauthException;
 import io.github.oatelauser.jauth.core.response.ResponseRenderer;
-import io.github.oatelauser.jauth.core.web.EducationalFlag;
-import io.github.oatelauser.jauth.core.web.PasskeyFlag;
+import jakarta.servlet.http.HttpServletRequest;
 import java.security.Principal;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -20,17 +19,14 @@ import org.springframework.security.oauth2.server.authorization.OAuth2Authorizat
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * 已授权应用看板页 + JSON 面（05 票 v1.0 页面：授权的持久化与撤销语义）。
- *
- * <p>页面 SSR 渲染聚合行（client 展示名经 {@link RegisteredClientRepository} 解析，查无回退 id）；"解除授权"由页内
- * 少量原生 JS 调 JSON 端点。"最近使用"列暂缺，B7 审计上线后补。
+ * 已授权应用看板：JSON 面（05 票 v1.0 页面：授权的持久化与撤销语义）；页面路由 v1.5 B5b 起 302 到
+ * {@code /front/selfservice/apps} 的 SPA 皮（SSR 皮退场），查询串原样转发。
  *
  * <p><b>Revoke 编排在此而非查询服务</b>：双 remove = 该 (principal, client) 的全部授权
  * {@link OAuth2AuthorizationService#remove} + 授权许可 {@link OAuth2AuthorizationConsentService#remove}（不清
@@ -44,9 +40,6 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @Controller
 public class AuthorizedAppsController {
 
-    /** 视图名（selfservice 命名空间模板，本模块视图解析器按此白名单认领；自动配置读取）。 */
-    public static final String VIEW_APPS = "apps";
-
     private final @Nullable AuthorizedAppService appService;
 
     private final ObjectProvider<OAuth2AuthorizationService> authorizationService;
@@ -55,10 +48,6 @@ public class AuthorizedAppsController {
 
     private final RegisteredClientRepository clientRepository;
 
-    private final EducationalFlag educational;
-
-    private final PasskeyFlag passkey;
-
     private final ResponseRenderer responseRenderer;
 
     public AuthorizedAppsController(
@@ -66,35 +55,23 @@ public class AuthorizedAppsController {
             ObjectProvider<OAuth2AuthorizationService> authorizationService,
             ObjectProvider<OAuth2AuthorizationConsentService> consentService,
             RegisteredClientRepository clientRepository,
-            EducationalFlag educational,
-            PasskeyFlag passkey,
             ResponseRenderer responseRenderer) {
         this.appService = appService;
         this.authorizationService = authorizationService;
         this.consentService = consentService;
         this.clientRepository = clientRepository;
-        this.educational = educational;
-        this.passkey = passkey;
         this.responseRenderer = responseRenderer;
     }
 
     /**
-     * 看板页。
+     * 看板页入口：302 到 SPA 皮。
      *
-     * @param principal 当前登录主体
-     * @param model 视图模型
-     * @return 视图名
+     * @param request 当前请求（查询串原样转发给 SPA）
+     * @return 重定向指令
      */
     @GetMapping("/selfservice/apps")
-    public String page(@Nullable Principal principal, Model model) {
-        model.addAttribute("educational", this.educational.enabled());
-        model.addAttribute("appsSupported", this.appService != null);
-        model.addAttribute("passkeyEnabled", this.passkey.enabled());
-        if (this.appService == null || principal == null) {
-            return VIEW_APPS;
-        }
-        model.addAttribute("apps", appViews(this.appService.list(principal.getName()), this.clientRepository));
-        return VIEW_APPS;
+    public String page(HttpServletRequest request) {
+        return "redirect:" + SudoController.frontTarget("/front/selfservice/apps", request);
     }
 
     /**
@@ -168,7 +145,7 @@ public class AuthorizedAppsController {
         }
     }
 
-    /** 行装配包内共径（v1.5 B1a：页面 / list / JSON 状态面三处同源，提为 static——不复制行装配逻辑）。 */
+    /** 行装配包内共径（v1.5 B1a：list / JSON 状态面同源，提为 static——不复制行装配逻辑）。 */
     static List<AppView> appViews(List<AuthorizedApp> apps, RegisteredClientRepository clientRepository) {
         List<AppView> views = new ArrayList<>(apps.size());
         for (AuthorizedApp app : apps) {
@@ -186,7 +163,7 @@ public class AuthorizedAppsController {
         return client != null && client.getClientName() != null ? client.getClientName() : registeredClientId;
     }
 
-    /** 看板行（页面与 JSON 共用投影）：scopes 有序化保证页面/JSON 输出稳定。 */
+    /** 看板行（list 与 JSON 共用投影）：scopes 有序化保证输出稳定。 */
     public record AppView(String clientId, String clientName, List<String> scopes, Instant lastAuthorizedAt) {
 
         /** scopes 排序拷贝（目录序不稳定，展示面要确定性）。 */

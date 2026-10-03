@@ -53,7 +53,7 @@ import org.springframework.security.oauth2.server.authorization.OAuth2Authorizat
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 
 /**
- * 自助装配矩阵：jdbc 门控（PAT/看板服务只在 jdbc 注册）、memory 形态（控制器在、PAT/看板服务缺、页面渲染提示态；
+ * 自助装配矩阵：jdbc 门控（PAT/看板服务只在 jdbc 注册）、memory 形态（控制器在、PAT/看板服务缺、状态面 supported=false 提示态；
  * 我的应用服务 memory 可用——B10 与 PAT 的门控差异）、无 starter 探针（RegisteredClientRepository 缺席时整组
  * 让位）、selfservice i18n basename 可解析。
  *
@@ -118,7 +118,8 @@ class JauthSelfServiceAutoConfigurationTest {
                     assertThat(context).hasSingleBean(OrgMembersStateController.class);
                     // v1.5 B1c 通行密钥状态面：同场注册（凭据仓储缺席即 passkeyEnabled=false 状态体）
                     assertThat(context).hasSingleBean(PasskeyStateController.class);
-                    assertThat(context).hasBean("jauthSelfServiceViewResolver");
+                    // v1.5 B5b：SSR 拆除后不再有视图解析器 bean
+                    assertThat(context).doesNotHaveBean(org.springframework.web.servlet.ViewResolver.class);
                 });
     }
 

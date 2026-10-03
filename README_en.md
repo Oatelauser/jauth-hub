@@ -16,7 +16,7 @@ English | [中文](README.md)
 | 🏢 **v1.1 platform layer** | Self-service organizations, two-step app-installation approval with OWNER-set scope ceilings, issued scopes = requested ∩ consented ∩ ceiling (intersected at runtime), an enriched `orgs` claim (id/name/role), app registration for personal and org apps, user management and self-service password change |
 | 🔑 **v1.2 Passkey** | WebAuthn passkeys: a passwordless button on the login page plus a self-service management page (register/delete); the private key never leaves the device — off by default, one switch to enable |
 | 🧹 **v1.3 hardening sweep** | Account-security closed loop: password change / disable revokes every token and session (fail-secure); full app lifecycle (secret rotation / edit / delete-with-cascade); org member management (OWNER surface); sensitive scopes auto-imply sudo; creation throttling; audit vocabulary completion |
-| 🧑‍💻 **v1.4 headless skin** | Trust-surface JSON APIs (`/api/login` GET+POST, `/api/consent`, `/api/device/verify`, `/api/sudo`) + `jauth-hub-front` (Vue 3 + Vite separated frontend); one switch — `jauth-hub.trust-skin=front` — flips the four pages to a same-domain `/front/**` SPA; SSR remains the default |
+| 🧑‍💻 **v1.5 frontend unification** | `jauth-hub-front` (Vue 3 + Vite) is the **one and only official frontend**: the SSR skin is retired, every page route 302s to `/front/<route>` (query string forwarded verbatim); embedding hosts get the **whole UI for free** by depending on `jauth-hub-front-dist` (same-domain `/front/**` static assets + history deep-link fallback); all page data flows through the JSON state/action endpoints |
 | 🔀 **Dual mode, one codebase** | **Standalone**: run one service and point every project at it. **Embedded**: drop in a starter and auth grows inside your own service (the host only supplies a `UserDetailsService`) |
 | 🔐 **Security-first core** | Only SHA-256 hashes of tokens ever hit the database (a DB leak ≠ a token leak), refresh token rotation with **whole-family revocation on replay**, mandatory PKCE, signing keys auto-rotated every 90 days |
 | 🎓 **Built to teach** | The bundled `/demo` walkthrough drives a real authorization-code + PKCE flow against real endpoints, showing every HTTP request/response live — frontend engineers get OAuth in one sitting |
@@ -130,9 +130,9 @@ cd .. && mvn -Pdist -pl jauth-hub-app -am package # dist enters the jar via the 
 java -jar jauth-hub-app/target/jauth-hub-app-1.4.0.jar --jauth-hub.trust-skin=front
 ```
 
-The app takes the dist jar artifact as a compile dependency: a `-Pdist` full-chain build embeds `classpath:/static/front` in the executable jar; a plain build without the profile resolves an empty jar (no UI embedded — the reactor is never hijacked by npm). The v1.4 `-Pfront-skin` profile remains for compatibility.
+The app takes the dist jar artifact as a compile dependency: a `-Pdist` full-chain build embeds `classpath:/static/front` in the executable jar; a plain build without the profile resolves an empty jar (no UI embedded — the reactor is never hijacked by npm).
 
-With `jauth-hub.trust-skin=front`, the four page GETs 302 to `/front/<route>` (query string forwarded verbatim); static assets are served under `/front/**` with history deep-link fallback. Local no-repackage iteration (start from `jauth-hub-app/`): `--spring.web.resources.static-locations=file:../jauth-hub-front/dist` (note the property replaces the default static locations entirely — append `,classpath:/static/` to keep the `/demo` assets).
+Every page GET (login/consent/device-verify/sudo plus all selfservice/admin/demo pages) 302s to `/front/<route>` (query string forwarded verbatim); static assets are served under `/front/**` with history deep-link fallback. Local no-repackage iteration (start from `jauth-hub-app/`): `--spring.web.resources.static-locations=file:../jauth-hub-front/dist` (note the property replaces the default static locations entirely).
 
 ## 📖 User guide
 
@@ -197,7 +197,6 @@ OIDC discovery endpoint: <http://localhost:8080/.well-known/openid-configuration
 | Property | Default | Notes |
 |---|---|---|
 | `jauth-hub.storage` | `memory` (app pins `jdbc`) | In-memory = light demo; jdbc = production |
-| `jauth-hub.trust-skin` | `ssr` | `front` = the four trust-surface page GETs 302 to `/front/<route>` (SPA skin, query string forwarded verbatim); SSR remains the default, front is an optional deployment skin |
 | `jauth-hub.issuer` | `http://localhost:8080` | Issuer address |
 | `jauth-hub.educational` | `true` | Teaching blocks toggle (turn off in production) |
 | `jauth-hub.rate-limit.limit-per-hour` | `5000` | Per-user merged rate limiting |

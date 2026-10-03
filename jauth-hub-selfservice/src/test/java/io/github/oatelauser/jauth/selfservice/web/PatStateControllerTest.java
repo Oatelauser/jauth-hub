@@ -146,8 +146,6 @@ class PatStateControllerTest {
                         this.patService,
                         new InMemoryScopeCatalog(),
                         this.users,
-                        messageSource(),
-                        EducationalFlag.ON,
                         new DefaultResponseRenderer(),
                         Clock.fixed(T0, ZoneOffset.UTC),
                         new RateLimiter(1_000, 5, Duration.ofMinutes(15), Clock.systemUTC())))

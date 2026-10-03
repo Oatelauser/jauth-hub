@@ -1,14 +1,13 @@
 package io.github.oatelauser.jauth.selfservice.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.github.oatelauser.jauth.core.audit.AuditEvent;
@@ -23,20 +22,15 @@ import io.github.oatelauser.jauth.core.response.JauthResponseAdvice;
 import io.github.oatelauser.jauth.core.scope.InMemoryScopeCatalog;
 import io.github.oatelauser.jauth.core.user.JauthUser;
 import io.github.oatelauser.jauth.core.user.UserRepository;
-import io.github.oatelauser.jauth.core.web.EducationalFlag;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
-import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.context.MessageSource;
-import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -44,23 +38,15 @@ import org.springframework.security.oauth2.server.authorization.client.InMemoryR
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.servlet.i18n.FixedLocaleResolver;
-import org.thymeleaf.spring6.SpringTemplateEngine;
-import org.thymeleaf.spring6.view.ThymeleafViewResolver;
-import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 
 /**
- * org 应用页（B11）：DOM 断言（OWNER 列表 + 注册表单 + secret 仅此一次横幅骨架，照 MyAppsControllerTest 模式）
- * + 注册 JSON 面（OWNER 门 A0508 在控制器入口、机密 secret 仅此一次、公开无 secret、A0503/A0504）。受测服务用
+ * org 应用面（B11；v1.5 B5b 页路由 302 化后重写）：注册 JSON 面（OWNER 门 A0508 在控制器入口、机密
+ * secret 仅此一次、公开无 secret、A0503/A0504）+ 页面路由无条件 302 到 SPA 皮。受测服务用
  * InMemoryOwnedAppService 真路径——页面两存储模式同契约。
  *
  * @author oatelauser
  */
 class OrgAppsControllerTest {
-
-    private static final String SELF_SERVICE_TEMPLATES = "io/github/oatelauser/jauth/selfservice/web/templates/";
-
-    private static final String CORE_TEMPLATES = "io/github/oatelauser/jauth/core/web/templates/";
 
     private static final Instant T0 = Instant.parse("2026-09-30T10:00:00Z");
 
@@ -102,32 +88,14 @@ class OrgAppsControllerTest {
     }
 
     @Test
-    @DisplayName("列表 + 注册表单页（OWNER 视角）：org 名徽标、注册三件表单、secret 横幅骨架、JS 端点指向 org 路由")
-    void ownerPageRendersListAndRegisterForm() throws Exception {
-        this.ownedAppService.registerOrg(this.org.id(), "组织门户", Set.of("https://portal.example.com/cb"), true);
-
-        pages().perform(get(appsPath()).principal(() -> ALICE))
-                .andExpect(status().isOk())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML))
-                .andExpect(content().string(containsString("组织应用")))
-                .andExpect(content().string(containsString("acme")))
-                .andExpect(content().string(containsString("组织门户")))
-                .andExpect(content().string(containsString("app_")))
-                .andExpect(content().string(containsString("机密")))
-                .andExpect(content().string(containsString("name=\"name\"")))
-                .andExpect(content().string(containsString("textarea name=\"redirectUris\"")))
-                .andExpect(content().string(containsString("只显示这一次")))
-                .andExpect(content().string(containsString("\"" + appsPath() + "\"")))
-                .andExpect(content().string(containsString("发生了什么")));
-    }
-
-    @Test
     @DisplayName("越权门：MEMBER 页面与注册 JSON 均 A0508（控制器入口，OWNER 外拒），注册无落库")
     void memberGetsA0508OnPageAndRegister() throws Exception {
         this.orgRepository.saveMember(new OrgMember(this.org.id(), "user-bob", OrgRole.MEMBER, T0));
 
+        // 页面路由 v1.5 B5b 起无条件 302（不再有控制器入口 OWNER 门）；门语义在 JSON 注册/状态面
         api().perform(get(appsPath()).principal(() -> BOB))
-                .andExpect(jsonPath("$.code").value("A0508"));
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/front/selfservice/orgs/" + this.org.id() + "/apps"));
         api().perform(post(appsPath())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"越权应用\",\"redirectUris\":\"https://evil.example.com/cb\"}")
@@ -174,9 +142,7 @@ class OrgAppsControllerTest {
         MockMvc missing = MockMvcBuilders.standaloneSetup(new OrgAppsController(
                         null,
                         null,
-                        null,
                         this.users,
-                        EducationalFlag.ON,
                         new DefaultResponseRenderer(),
                         event -> {},
                         new io.github.oatelauser.jauth.core.ratelimit.RateLimiter(
@@ -194,22 +160,11 @@ class OrgAppsControllerTest {
         return "/selfservice/orgs/" + this.org.id() + "/apps";
     }
 
-    /** DOM 面（手装 Thymeleaf 双解析器 + 双 basename，同 MyAppsControllerTest）。 */
-    private MockMvc pages() {
-        return MockMvcBuilders.standaloneSetup(newController())
-                .setViewResolvers(viewResolver())
-                .setLocaleResolver(new FixedLocaleResolver(Locale.SIMPLIFIED_CHINESE))
-                .addFilters((request, response, chain) -> {
-                    response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-                    chain.doFilter(request, response);
-                })
-                .build();
-    }
-
     /** JSON 面（advice 手挂：JauthException → SPI 失败体，生产由 starter 装配）。 */
     private MockMvc api() {
         return MockMvcBuilders.standaloneSetup(newController())
                 .setControllerAdvice(jauthAdvice())
+                .setViewResolvers(new org.springframework.web.servlet.view.InternalResourceViewResolver())
                 .build();
     }
 
@@ -217,9 +172,7 @@ class OrgAppsControllerTest {
         return new OrgAppsController(
                 this.ownedAppService,
                 this.orgService,
-                this.orgRepository,
                 this.users,
-                EducationalFlag.ON,
                 new DefaultResponseRenderer(),
                 event -> {},
                 new io.github.oatelauser.jauth.core.ratelimit.RateLimiter(
@@ -234,36 +187,6 @@ class OrgAppsControllerTest {
     private static String extractSecret(String responseBody) {
         int index = responseBody.indexOf("\"clientSecret\":\"") + "\"clientSecret\":\"".length();
         return responseBody.substring(index, responseBody.indexOf('"', index));
-    }
-
-    private ThymeleafViewResolver viewResolver() {
-        SpringTemplateEngine engine = new SpringTemplateEngine();
-        engine.setTemplateResolver(templateResolver(SELF_SERVICE_TEMPLATES));
-        engine.addTemplateResolver(templateResolver(CORE_TEMPLATES));
-        engine.setMessageSource(messageSource());
-        ThymeleafViewResolver viewResolver = new ThymeleafViewResolver();
-        viewResolver.setTemplateEngine(engine);
-        viewResolver.setContentType("text/html;charset=UTF-8");
-        viewResolver.setForceContentType(true);
-        return viewResolver;
-    }
-
-    private ClassLoaderTemplateResolver templateResolver(String prefix) {
-        ClassLoaderTemplateResolver resolver = new ClassLoaderTemplateResolver();
-        resolver.setPrefix(prefix);
-        resolver.setSuffix(".html");
-        resolver.setCacheable(false);
-        resolver.setCheckExistence(true);
-        return resolver;
-    }
-
-    private MessageSource messageSource() {
-        ResourceBundleMessageSource source = new ResourceBundleMessageSource();
-        source.setBasenames(
-                "io/github/oatelauser/jauth/selfservice/i18n/messages",
-                "io/github/oatelauser/jauth/core/i18n/messages");
-        source.setDefaultEncoding(StandardCharsets.UTF_8.name());
-        return source;
     }
 
     private static JauthUser user(String id, String username) {
